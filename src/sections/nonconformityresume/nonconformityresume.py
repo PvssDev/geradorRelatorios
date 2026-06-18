@@ -1,6 +1,7 @@
 from utils import adicionar_titulo_secao
 from docx.shared import Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
+import pandas as pd
 
 
 def gerar_secao_resumo_nao_conformidades(doc, row, nao_conformidades_df):
@@ -16,9 +17,13 @@ def gerar_secao_resumo_nao_conformidades(doc, row, nao_conformidades_df):
 
     id_fisc = row["ID da Fiscalização"]
 
-    nc_fisc = nao_conformidades_df[
-        nao_conformidades_df["ID da Fiscalização"] == id_fisc
-    ]
+    # Verifica de forma segura se a coluna existe em nao_conformidades_df
+    if "ID da Fiscalização" in nao_conformidades_df.columns:
+        nc_fisc = nao_conformidades_df[
+            nao_conformidades_df["ID da Fiscalização"] == id_fisc
+        ]
+    else:
+        nc_fisc = pd.DataFrame()
 
     if nc_fisc.empty:
         doc.add_paragraph("Nenhuma não conformidade registrada.")

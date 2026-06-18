@@ -7,6 +7,29 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from PIL import Image
 import io
+import pandas as pd
+
+
+def normalizar_status_gerado(serie):
+    """Converte a coluna 'Relatório Gerado' para bool de forma consistente."""
+    valores_gerado = {"true", "verdadeiro", "sim", "s", "1", "yes", "y"}
+    valores_pendente = {"false", "falso", "nao", "não", "n", "0", "no", ""}
+
+    def parse(valor):
+        if pd.isna(valor):
+            return False
+        if isinstance(valor, bool):
+            return valor
+        if isinstance(valor, (int, float)):
+            return bool(valor) and valor != 0
+        texto = str(valor).strip().lower()
+        if texto in valores_gerado:
+            return True
+        if texto in valores_pendente:
+            return False
+        return False
+
+    return serie.map(parse)
 
 
 # Funções auxiliares de formatação:

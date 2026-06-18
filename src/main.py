@@ -2,7 +2,9 @@ from report import gerar_relatorio
 
 
 def main():
-    gerar_relatorio()
+    arquivos, planilha = gerar_relatorio()
+    if arquivos:
+        print(f"✅ {len(arquivos)} relatórios gerados.")
 
 
 if __name__ == "__main__":

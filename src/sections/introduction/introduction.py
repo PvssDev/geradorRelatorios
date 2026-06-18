@@ -42,7 +42,8 @@ def gerar_secao_introducao(doc: Document, row):
         par.add_run(" e nas cidades de Caruaru, Garanhuns, Arcoverde, Serra Talhada e Petrolina. ")
 
     par.add_run("As visitas técnicas foram realizadas pela equipe formada por ")
-    par.add_run(str(row["Pessoal Responsável"])).bold = True
+    pessoal = str(row.get("Pessoal Responsável", "")).strip()
+    par.add_run(pessoal if pessoal else "Equipe Técnica ARPE").bold = True
     par.add_run(
         ".\n\nNeste Relatório de Fiscalização foram observadas as condições de conservação, limpeza e higiene das áreas de embarque e desembarque, dos sanitários, as condições do pavimento das vias de circulação interna, a infraestrutura oferecida, os locais de estocagem de veículos, a segurança e o atendimento ao usuário, bem como toda estrutura para funcionamento dos terminais. A equipe da Arpe conversou com os responsáveis pelos seis terminais que forneceram informações complementares à fiscalização, principalmente sobre a implantação dos sistemas contra incêndio."
     )
