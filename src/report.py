@@ -26,6 +26,65 @@ from utils import (
     normalizar_status_gerado,
 )
 
+def _obter_caminhos_base(fotos_dir, relatorios_dir):
+    """Define diretórios base para fotos e relatórios."""
+    if getattr(sys, "frozen", False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    fotos = fotos_dir if fotos_dir else os.path.join(base_dir, "assets")
+    relatorios = relatorios_dir if relatorios_dir else os.path.join(base_dir, "reports")
+    return base_dir, fotos, relatorios
+
+def _identificar_abas(sheet_names):
+    """Identifica as abas necessárias com lógica de fallback."""
+    def find_sheet(target, sheets):
+        if target in sheets:
+            return target
+        target_clean = target.strip().lower()
+        for s in sheets:
+            if s.strip().lower() == target_clean:
+                return s
+        return None
+
+    abas = {
+        "fiscalizacoes": find_sheet("Fiscalizações", sheet_names),
+        "nao_conformidades": find_sheet("Não-conformidades ", sheet_names),
+        "observacoes": find_sheet("Observações Importantes", sheet_names),
+        "recomendacoes": find_sheet("Recomendações", sheet_names),
+    }
+
+    # Fallback por índice se os nomes não baterem
+    fallbacks = ["fiscalizacoes", "nao_conformidades", "observacoes", "recomendacoes"]
+    for i, key in enumerate(fallbacks):
+        if not abas[key] and len(sheet_names) > i:
+            abas[key] = sheet_names[i]
+    
+    return abas
+
+def _carregar_e_normalizar_df(excel_file, sheet_name):
+    """Carrega uma aba e normaliza o nome das colunas."""
+    if not sheet_name:
+        return pd.DataFrame()
+    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
+
+def _garantir_colunas_obrigatorias(df, colunas, sheet_name):
+    """Verifica se colunas essenciais existem (busca insensível a caso)."""
+    for nome_esperado in colunas:
+        encontrada = False
+        if nome_esperado in df.columns:
+            encontrada = True
+        else:
+            for col in df.columns:
+                if col.lower() == nome_esperado.lower():
+                    df.rename(columns={col: nome_esperado}, inplace=True)
+                    encontrada = True
+                    break
+        if not encontrada:
+             raise KeyError(f"Coluna '{nome_esperado}' não encontrada na aba '{sheet_name}'.")
 
 def gerar_relatorio(
     caminho_planilha=None,
@@ -33,132 +92,54 @@ def gerar_relatorio(
     relatorios_dir=None,
     gerar_todos=False,
 ):
-    """
-    Gera o relatório completo (docx + pdf) com base nos dados da fiscalização.
-    """
+    """Gera o relatório completo (docx + pdf) com base nos dados da fiscalização."""
 
-    if getattr(sys, "frozen", False):
-        BASE_DIR = os.path.dirname(sys.executable)
-    else:
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-    FOTOS_DIR = fotos_dir if fotos_dir else os.path.join(BASE_DIR, "assets")
-    RELATORIOS_DIR = relatorios_dir if relatorios_dir else os.path.join(BASE_DIR, "reports")
+    BASE_DIR, FOTOS_DIR, RELATORIOS_DIR = _obter_caminhos_base(fotos_dir, relatorios_dir)
     
-    # Se não passar caminho, tenta o modelo base primeiro, depois o original
+    # Gerenciar caminho da planilha
     if not caminho_planilha:
         modelo_base = os.path.join(BASE_DIR, "modelo_base.xlsx")
-        if os.path.exists(modelo_base):
-            CAMINHO_PLANILHA = modelo_base
-        else:
-            CAMINHO_PLANILHA = os.path.join(BASE_DIR, "planilha_fiscalizacao.xlsx")
+        CAMINHO_PLANILHA = modelo_base if os.path.exists(modelo_base) else os.path.join(BASE_DIR, "planilha_fiscalizacao.xlsx")
     else:
         CAMINHO_PLANILHA = caminho_planilha
 
     if hasattr(CAMINHO_PLANILHA, "read") and not isinstance(CAMINHO_PLANILHA, (str, bytes)):
         CAMINHO_PLANILHA = io.BytesIO(CAMINHO_PLANILHA.read())
 
-    COLUNA_STATUS = "Relatório Gerado"
-
     os.makedirs(RELATORIOS_DIR, exist_ok=True)
     os.makedirs(FOTOS_DIR, exist_ok=True)
 
-    # Só verifica se está em uso se for um caminho de arquivo real (string)
-    if isinstance(CAMINHO_PLANILHA, str) and os.path.exists(CAMINHO_PLANILHA):
-        if arquivo_em_uso(CAMINHO_PLANILHA):
-            print("⚠️ A planilha está em uso. Feche-a antes de executar o script.")
-            return [], None
+    if isinstance(CAMINHO_PLANILHA, str) and os.path.exists(CAMINHO_PLANILHA) and arquivo_em_uso(CAMINHO_PLANILHA):
+        print("⚠️ A planilha está em uso. Feche-a antes de executar o script.")
+        return [], None
 
-    # Carregar todas as abas para verificar nomes
+    # Processamento de Dados
     excel_file = pd.ExcelFile(CAMINHO_PLANILHA)
-    sheet_names = excel_file.sheet_names
+    abas = _identificar_abas(excel_file.sheet_names)
 
-    def find_sheet(target, sheets):
-        # Busca exata
-        if target in sheets:
-            return target
-        # Busca ignorando espaços extras e case
-        target_clean = target.strip().lower()
-        for s in sheets:
-            if s.strip().lower() == target_clean:
-                return s
-        # Busca parcial ou sem acentos (opcional, mas vamos focar no comum)
-        return None
+    if not abas["fiscalizacoes"]:
+        raise ValueError(f"Aba de fiscalizações não identificada. Abas: {excel_file.sheet_names}")
 
-    sheet_fiscalizacoes = find_sheet("Fiscalizações", sheet_names)
-    sheet_nao_conformidades = find_sheet("Não-conformidades ", sheet_names)
-    sheet_observacoes = find_sheet("Observações Importantes", sheet_names)
-    sheet_recomendacoes = find_sheet("Recomendações", sheet_names)
+    fiscal_df = _carregar_e_normalizar_df(excel_file, abas["fiscalizacoes"])
+    nc_df = _carregar_e_normalizar_df(excel_file, abas["nao_conformidades"])
+    obs_df = _carregar_e_normalizar_df(excel_file, abas["observacoes"])
+    rec_df = _carregar_e_normalizar_df(excel_file, abas["recomendacoes"])
 
-    # Fallback: Se não encontrou pelo nome, pega por ordem se existirem
-    if not sheet_fiscalizacoes and len(sheet_names) > 0:
-        sheet_fiscalizacoes = sheet_names[0]
+    _garantir_colunas_obrigatorias(fiscal_df, ["ID da Fiscalização", "Contrato", "Data", "Local"], abas["fiscalizacoes"])
+
+    COLUNA_STATUS = "Relatório Gerado"
+    if COLUNA_STATUS not in fiscal_df.columns:
+        # Tenta achar insensível a caso antes de criar nova
+        for col in fiscal_df.columns:
+            if col.lower() == COLUNA_STATUS.lower():
+                fiscal_df.rename(columns={col: COLUNA_STATUS}, inplace=True)
+                break
+        else:
+            fiscal_df[COLUNA_STATUS] = False
     
-    if not sheet_nao_conformidades and len(sheet_names) > 1:
-        sheet_nao_conformidades = sheet_names[1]
-    
-    if not sheet_observacoes and len(sheet_names) > 2:
-        sheet_observacoes = sheet_names[2]
-        
-    if not sheet_recomendacoes and len(sheet_names) > 3:
-        sheet_recomendacoes = sheet_names[3]
+    fiscal_df[COLUNA_STATUS] = normalizar_status_gerado(fiscal_df[COLUNA_STATUS])
 
-    if not sheet_fiscalizacoes:
-        raise ValueError(f"Nenhuma aba encontrada na planilha. Abas disponíveis: {sheet_names}")
-
-    fiscalizacoes_df = pd.read_excel(CAMINHO_PLANILHA, sheet_name=sheet_fiscalizacoes)
-    
-    # Normalizar nomes das colunas (remover espaços extras)
-    fiscalizacoes_df.columns = [str(c).strip() for c in fiscalizacoes_df.columns]
-    
-    # Carregar as outras abas ou criar DataFrames vazios se não existirem
-    if sheet_nao_conformidades:
-        nao_conformidades_df = pd.read_excel(CAMINHO_PLANILHA, sheet_name=sheet_nao_conformidades)
-        nao_conformidades_df.columns = [str(c).strip() for c in nao_conformidades_df.columns]
-    else:
-        nao_conformidades_df = pd.DataFrame()
-
-    if sheet_observacoes:
-        observacoes_df = pd.read_excel(CAMINHO_PLANILHA, sheet_name=sheet_observacoes)
-        observacoes_df.columns = [str(c).strip() for c in observacoes_df.columns]
-    else:
-        observacoes_df = pd.DataFrame()
-
-    if sheet_recomendacoes:
-        recomendacoes_df = pd.read_excel(CAMINHO_PLANILHA, sheet_name=sheet_recomendacoes)
-        recomendacoes_df.columns = [str(c).strip() for c in recomendacoes_df.columns]
-    else:
-        recomendacoes_df = pd.DataFrame()
-
-    # Função auxiliar para garantir que colunas essenciais existem (busca insensível a caso)
-    def garantir_coluna(df, nome_esperado):
-        if nome_esperado in df.columns:
-            return True
-        for col in df.columns:
-            if col.lower() == nome_esperado.lower():
-                df.rename(columns={col: nome_esperado}, inplace=True)
-                return True
-        return False
-
-    # Verificar colunas essenciais
-    colunas_obrigatorias = ["ID da Fiscalização", "Contrato", "Data", "Local"]
-    for col in colunas_obrigatorias:
-        if not garantir_coluna(fiscalizacoes_df, col):
-            raise KeyError(f"Coluna obrigatória '{col}' não encontrada na aba '{sheet_fiscalizacoes}'. Colunas disponíveis: {list(fiscalizacoes_df.columns)}")
-
-    if COLUNA_STATUS not in fiscalizacoes_df.columns:
-        if not garantir_coluna(fiscalizacoes_df, COLUNA_STATUS):
-            fiscalizacoes_df[COLUNA_STATUS] = False
-    
-    fiscalizacoes_df[COLUNA_STATUS] = normalizar_status_gerado(
-        fiscalizacoes_df[COLUNA_STATUS]
-    )
-
-    if gerar_todos:
-        pendentes = fiscalizacoes_df
-    else:
-        pendentes = fiscalizacoes_df[~fiscalizacoes_df[COLUNA_STATUS]]
-
+    pendentes = fiscal_df if gerar_todos else fiscal_df[~fiscal_df[COLUNA_STATUS]]
     if pendentes.empty:
         print("✅ Nenhum relatório pendente.")
         return [], None
@@ -166,100 +147,71 @@ def gerar_relatorio(
     arquivos_gerados = []
 
     for idx in tqdm(pendentes.index, desc="Gerando relatórios"):
-        row = fiscalizacoes_df.loc[idx]
+        row = fiscal_df.loc[idx]
         id_fisc = row["ID da Fiscalização"]
         doc = Document()
 
+        # Cabeçalho do Documento
         logo_path = os.path.join(BASE_DIR, "assets/logo_arpe.jpeg")
         if os.path.exists(logo_path):
             doc.add_picture(logo_path, width=Inches(2))
-            logo_arpe = doc.paragraphs[-1]
-            logo_arpe.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            doc.paragraphs[-1].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         
-        adicionar_texto_centralizado(doc, "DIRETORIA DE REGULAÇÃO TÉCNICO-OPERACIONAL")
-        adicionar_texto_centralizado(doc, "COORDENADORIA DE TRANSPORTES E RODOVIAS")
-        adicionar_texto_centralizado(
-            doc, "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR 01/2025"
-        )
-        adicionar_texto_centralizado(
-            doc, "TERMINAIS RODOVIÁRIOS INTERMUNICIPAIS CONCEDIDOS À EMPRESA SOCICAM"
-        )
-        adicionar_texto_centralizado(
-            doc, "CONTRATO DE CONCESSÃO DE SERVIÇO PÚBLICO Nº 1.041.080/08"
-        )
+        for titulo in [
+            "DIRETORIA DE REGULAÇÃO TÉCNICO-OPERACIONAL",
+            "COORDENADORIA DE TRANSPORTES E RODOVIAS",
+            "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR 01/2025",
+            "TERMINAIS RODOVIÁRIOS INTERMUNICIPAIS CONCEDIDOS À EMPRESA SOCICAM",
+            "CONTRATO DE CONCESSÃO DE SERVIÇO PÚBLICO Nº 1.041.080/08"
+        ]:
+            adicionar_texto_centralizado(doc, titulo)
 
         doc.add_section(WD_SECTION.NEW_PAGE)
 
+        # Geração das Seções
         gerar_secao_introducao(doc, row)
         gerar_secao_fundamentacao_legal(doc)
-        gerar_secao_nao_conformidades_constatadas(
-            doc, row, nao_conformidades_df, FOTOS_DIR, observacoes_df, recomendacoes_df
-        )
-        gerar_secao_resumo_nao_conformidades(doc, row, nao_conformidades_df)
+        gerar_secao_nao_conformidades_constatadas(doc, row, nc_df, FOTOS_DIR, obs_df, rec_df)
+        gerar_secao_resumo_nao_conformidades(doc, row, nc_df)
         gerar_secao_consideracoes_finais(doc, row)
 
-        # Sanitizar o ID para evitar erro de caracteres inválidos no nome do arquivo (Windows)
-        id_fisc_str = str(id_fisc)
-        # Substitui caracteres proibidos: \ / : * ? " < > |
-        for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
-            id_fisc_str = id_fisc_str.replace(char, "_")
+        # Sanitização e Salvamento
+        id_safe = "".join([c if c not in r'\/:*?"<>|' else "_" for c in str(id_fisc)]).strip()
+        nome_base = f"relatorio_{id_safe}"
+        caminho_docx = os.path.join(RELATORIOS_DIR, f"{nome_base}.docx")
         
-        nome_arquivo = f"relatorio_{id_fisc_str.strip()}"
-        caminho_docx = os.path.join(RELATORIOS_DIR, f"{nome_arquivo}.docx")
-        caminho_pdf = os.path.join(RELATORIOS_DIR, f"{nome_arquivo}.pdf")
-
         doc.save(caminho_docx)
+        arquivos_gerados.append(caminho_docx)
+        
         try:
+            caminho_pdf = os.path.join(RELATORIOS_DIR, f"{nome_base}.pdf")
             convert(caminho_docx, caminho_pdf)
             arquivos_gerados.append(caminho_pdf)
         except Exception as e:
-            print(f"⚠️ Não foi possível converter para PDF: {e}")
+            print(f"⚠️ Erro ao converter PDF ({id_fisc}): {e}")
         
-        arquivos_gerados.append(caminho_docx)
-        fiscalizacoes_df.at[idx, COLUNA_STATUS] = True
+        fiscal_df.at[idx, COLUNA_STATUS] = True
 
-    # 🔹 Garantir que a coluna Data seja salva no formato dd/mm/aaaa
-    if "Data" in fiscalizacoes_df.columns:
-        fiscalizacoes_df["Data"] = pd.to_datetime(
-            fiscalizacoes_df["Data"], errors="coerce"
-        ).dt.strftime("%d/%m/%Y")
+    # Finalização da Planilha
+    if "Data" in fiscal_df.columns:
+        fiscal_df["Data"] = pd.to_datetime(fiscal_df["Data"], errors="coerce").dt.strftime("%d/%m/%Y")
 
-    planilha_atualizada_buffer = None
+    def salvar_excel(writer):
+        fiscal_df.to_excel(writer, sheet_name=abas["fiscalizacoes"], index=False)
+        for key, df in [("nao_conformidades", nc_df), ("observacoes", obs_df), ("recomendacoes", rec_df)]:
+            if not df.empty or abas[key]:
+                df.to_excel(writer, sheet_name=abas[key] or key.capitalize(), index=False)
 
-    # Salva a planilha se for um caminho de arquivo real
+    planilha_buffer = None
     if isinstance(CAMINHO_PLANILHA, str) and not arquivo_em_uso(CAMINHO_PLANILHA):
-        with pd.ExcelWriter(
-            CAMINHO_PLANILHA, engine="openpyxl", mode="a", if_sheet_exists="replace"
-        ) as writer:
-            fiscalizacoes_df.to_excel(writer, sheet_name=sheet_fiscalizacoes, index=False)
-            nao_conformidades_df.to_excel(
-                writer, sheet_name=sheet_nao_conformidades if sheet_nao_conformidades else "Não-conformidades ", index=False
-            )
-            observacoes_df.to_excel(
-                writer, sheet_name=sheet_observacoes if sheet_observacoes else "Observações Importantes", index=False
-            )
-            recomendacoes_df.to_excel(
-                writer, sheet_name=sheet_recomendacoes if sheet_recomendacoes else "Recomendações", index=False
-            )
-
+        with pd.ExcelWriter(CAMINHO_PLANILHA, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+            salvar_excel(writer)
         ajustar_largura_colunas(CAMINHO_PLANILHA)
     else:
-        # Se for um buffer (Streamlit), gera um novo buffer com a planilha atualizada
-        planilha_atualizada_buffer = io.BytesIO()
-        with pd.ExcelWriter(planilha_atualizada_buffer, engine="openpyxl") as writer:
-            fiscalizacoes_df.to_excel(writer, sheet_name=sheet_fiscalizacoes, index=False)
-            nao_conformidades_df.to_excel(
-                writer, sheet_name=sheet_nao_conformidades if sheet_nao_conformidades else "Não-conformidades ", index=False
-            )
-            observacoes_df.to_excel(
-                writer, sheet_name=sheet_observacoes if sheet_observacoes else "Observações Importantes", index=False
-            )
-            recomendacoes_df.to_excel(
-                writer, sheet_name=sheet_recomendacoes if sheet_recomendacoes else "Recomendações", index=False
-            )
-        planilha_atualizada_buffer.seek(0)
+        planilha_buffer = io.BytesIO()
+        with pd.ExcelWriter(planilha_buffer, engine="openpyxl") as writer:
+            salvar_excel(writer)
+        planilha_buffer.seek(0)
 
-    print("🎉 Relatórios gerados e planilha atualizada com sucesso.")
-
-    return arquivos_gerados, planilha_atualizada_buffer
-
+    print("🎉 Processo concluído com sucesso.")
+    return arquivos_gerados, planilha_buffer
