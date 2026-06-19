@@ -122,6 +122,10 @@ def gerar_relatorio(
 
     fiscal_df = _carregar_e_normalizar_df(excel_file, abas["fiscalizacoes"])
     nc_df = _carregar_e_normalizar_df(excel_file, abas["nao_conformidades"])
+    nc_df.rename(columns={
+        "Não conformidade": "Não Conformidade",
+        "Observações": "Legenda da Foto"
+    }, inplace=True)
     obs_df = _carregar_e_normalizar_df(excel_file, abas["observacoes"])
     rec_df = _carregar_e_normalizar_df(excel_file, abas["recomendacoes"])
 

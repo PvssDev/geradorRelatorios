@@ -8,6 +8,10 @@ from report import gerar_relatorio
 
 st.set_page_config(page_title="Gerador de Relatórios ARPE", layout="wide")
 
+@st.dialog("Visualização Completa da Imagem", width="large")
+def mostrar_foto_modal(uploaded_file):
+    st.image(uploaded_file, caption=uploaded_file.name, use_container_width=True)
+
 st.title("📄 Gerador de Relatórios de Fiscalização")
 
 # Abas principais da aplicação
@@ -132,34 +136,39 @@ with tab_preenchimento:
         st.session_state.temp_fiscalizacoes = []
     if "temp_nc" not in st.session_state:
         st.session_state.temp_nc = []
-    if "temp_abreviaturas" not in st.session_state:
-        st.session_state.temp_abreviaturas = []
 
     with st.form("form_fiscalizacao"):
         col1, col2 = st.columns(2)
         with col1:
             id_fisc = st.text_input("ID da Fiscalização (ex: 2026-001)", help="Identificador único para vincular as abas")
-            processo_sei = st.text_input("Processo SEI", placeholder="00000.000000/2026-00")
-            data_periodo = st.text_input("Data ou Período", placeholder="15/06/2026 ou 15 a 18/06/2026")
+            data_fisc = st.text_input("Data (ex: 15/06/2026)", placeholder="dd/mm/aaaa")
+            hora = st.text_input("Hora (ex: 10:00)", placeholder="Opcional")
+            cidade = st.text_input("Cidade (ex: Recife)", placeholder="Cidade do Terminal")
+            local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
         with col2:
-            terminal = st.selectbox("Terminal Vistoriado", [
-                "TIP (RECIFE)", "CARUARU", "GARANHUNS", "ARCOVERDE", "SERRA TALHADA", "PETROLINA"
-            ])
-            responsaveis = st.text_input("Responsáveis Técnicos", placeholder="Nome 1, Nome 2")
+            responsaveis = st.text_input("Pessoal Responsável (ex: Nome 1, Nome 2)", placeholder="Investigadores")
+            coordenador = st.text_input("Coordenador", placeholder="Nome do Coordenador")
             contrato = st.text_input("Número do Contrato", value="1.041.080/08")
+            periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
 
         submit_fisc = st.form_submit_button("➕ Adicionar Fiscalização")
         if submit_fisc:
             if not id_fisc:
                 st.error("O ID da Fiscalização é obrigatório.")
             else:
+                # Preenche as assinaturas automaticamente a partir do Pessoal Responsável
+                assinaturas_auto = responsaveis.replace(",", ";") if responsaveis else ""
                 st.session_state.temp_fiscalizacoes.append({
                     "ID da Fiscalização": id_fisc,
-                    "Processo SEI": processo_sei,
-                    "Data": data_periodo,
-                    "Local": terminal,
+                    "Data": data_fisc,
+                    "Hora": hora,
+                    "Cidade": cidade,
+                    "Local": local,
                     "Pessoal Responsável": responsaveis,
+                    "Coordenador": coordenador,
                     "Contrato": contrato,
+                    "Período": periodo,
+                    "Assinatura": assinaturas_auto,
                     "Relatório Gerado": False
                 })
                 st.success(f"Fiscalização {id_fisc} adicionada!")
@@ -172,7 +181,7 @@ with tab_preenchimento:
     with col_preview:
         st.markdown("### 🖼️ Pré-visualização da Foto")
         uploaded_nc_photo = st.file_uploader(
-            "Selecione a foto correspondente para visualizar e preencher o nome do arquivo", 
+            "Selecione a foto correspondente para visualizar e preencher automaticamente o nome do arquivo", 
             type=["jpg", "jpeg", "png"],
             key="nc_photo_uploader"
         )
@@ -183,6 +192,7 @@ with tab_preenchimento:
                 # Ajusta a foto para caber exatamente em um box padrão de 400x300 mantendo a proporção e cortando o excesso
                 preview_image = ImageOps.fit(image, (400, 300))
                 st.image(preview_image, caption=f"Visualização (Tamanho Padrão): {uploaded_nc_photo.name}")
+                st.button("🔍 Clique para ampliar a foto", on_click=mostrar_foto_modal, args=(uploaded_nc_photo,), key="btn_zoom_photo")
             except Exception as e:
                 st.image(uploaded_nc_photo, caption=f"Visualização: {uploaded_nc_photo.name}", use_container_width=True)
             foto_default = uploaded_nc_photo.name
@@ -192,54 +202,39 @@ with tab_preenchimento:
 
     with col_inputs:
         id_vinculo = st.selectbox("Vincular ao ID da Fiscalização", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
-        terminal_nc = st.text_input("Terminal (Repetir se necessário)", value=terminal if st.session_state.temp_fiscalizacoes else "")
         
-        nc_num = st.number_input("Nº da NC", min_value=1, step=1)
-        nc_descricao = st.text_area("Descrição da Não Conformidade", placeholder="Descreva os problemas encontrados...")
+        # Obtém o terminal associado automaticamente a partir do ID da Fiscalização
+        terminal_nc = ""
+        if id_vinculo != "Nenhum ID cadastrado" and st.session_state.temp_fiscalizacoes:
+            for f in st.session_state.temp_fiscalizacoes:
+                if f["ID da Fiscalização"] == id_vinculo:
+                    terminal_nc = f["Local"]
+                    break
         
-        nc_foto = st.text_input("Identificador da Foto", value=foto_default, placeholder="Foto01.jpg", help="Opcional: o nome do arquivo da foto carregada será preenchido aqui automaticamente.")
-        
-        nc_legenda = st.text_area("Legenda Descritiva", placeholder="Exemplo: Foto01.jpg – teto da área de embarque com infiltração e rachaduras")
+        # Calcula o próximo número sequencial de NC para este ID da Fiscalização automaticamente
+        nc_num = 1
+        if id_vinculo != "Nenhum ID cadastrado" and st.session_state.temp_nc:
+            ncs_existentes = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_vinculo]
+            nc_num = len(ncs_existentes) + 1
+            
+        nc_descricao = st.text_area("Não Conformidade", placeholder="Descreva os problemas encontrados...")
+        nc_legenda = st.text_area("Observações", placeholder="Escreva as observações/legenda correspondente...")
         
         if st.button("➕ Adicionar Não Conformidade", type="primary"):
             if id_vinculo == "Nenhum ID cadastrado":
                 st.error("Adicione uma fiscalização primeiro.")
             elif not nc_descricao:
-                st.error("A descrição da não conformidade é obrigatória.")
+                st.error("O campo 'Não Conformidade' é obrigatório.")
             else:
                 st.session_state.temp_nc.append({
                     "ID da Fiscalização": id_vinculo,
-                    "Terminal": terminal_nc,
                     "Nº": nc_num,
+                    "Terminal": terminal_nc,
                     "Não Conformidade": nc_descricao,
-                    "Foto": nc_foto,
-                    "Legenda da Foto": nc_legenda
+                    "Foto": foto_default,
+                    "Observações": nc_legenda
                 })
                 st.success(f"NC {nc_num} adicionada ao ID {id_vinculo}!")
-
-    st.divider()
-    st.subheader("🔤 Abreviaturas e SOCICAM")
-    with st.form("form_extra"):
-        col_ex1, col_ex2 = st.columns(2)
-        with col_ex1:
-            st.write("**Abreviaturas**")
-            id_vinculo_abr = st.selectbox("ID da Fiscalização (Abreviaturas)", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
-            sigla = st.text_input("Sigla")
-            sigla_desc = st.text_input("Descrição da Sigla")
-        with col_ex2:
-            st.write("**Levantamento SOCICAM**")
-            num_ctr = st.text_input("Processo (Formato CTR NN/AAAA)", value="CTR 01/2026")
-            # Aqui poderíamos adicionar mais campos para a planilha SOCICAM conforme necessário
-
-        submit_extra = st.form_submit_button("➕ Adicionar Dados Extras")
-        if submit_extra:
-            if sigla:
-                st.session_state.temp_abreviaturas.append({
-                    "ID da Fiscalização": id_vinculo_abr,
-                    "Sigla": sigla,
-                    "Descrição": sigla_desc
-                })
-                st.success("Sigla adicionada!")
 
     st.divider()
     if st.session_state.temp_fiscalizacoes:
@@ -248,26 +243,53 @@ with tab_preenchimento:
         st.write("**Não Conformidades:**", pd.DataFrame(st.session_state.temp_nc))
         
         if st.button("💾 Gerar Planilha Completa"):
+            # Vincular Não Conformidades e Observações à planilha Fiscalizações logo após a coluna Período
+            flat_fiscalizacoes = []
+            for fisc in st.session_state.temp_fiscalizacoes:
+                id_fisc = fisc["ID da Fiscalização"]
+                ncs = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_fisc]
+                if not ncs:
+                    flat_fiscalizacoes.append({
+                        "ID da Fiscalização": fisc["ID da Fiscalização"],
+                        "Data": fisc["Data"],
+                        "Hora": fisc["Hora"],
+                        "Cidade": fisc["Cidade"],
+                        "Local": fisc["Local"],
+                        "Pessoal Responsável": fisc["Pessoal Responsável"],
+                        "Coordenador": fisc["Coordenador"],
+                        "Contrato": fisc["Contrato"],
+                        "Período": fisc["Período"],
+                        "Observações": "",
+                        "Fotos": "",
+                        "Não conformidade": "",
+                        "Assinatura": fisc["Assinatura"],
+                        "Relatório Gerado": fisc["Relatório Gerado"]
+                    })
+                else:
+                    for nc in ncs:
+                        flat_fiscalizacoes.append({
+                            "ID da Fiscalização": fisc["ID da Fiscalização"],
+                            "Data": fisc["Data"],
+                            "Hora": fisc["Hora"],
+                            "Cidade": fisc["Cidade"],
+                            "Local": fisc["Local"],
+                            "Pessoal Responsável": fisc["Pessoal Responsável"],
+                            "Coordenador": fisc["Coordenador"],
+                            "Contrato": fisc["Contrato"],
+                            "Período": fisc["Período"],
+                            "Observações": nc.get("Observações", nc.get("Legenda da Foto", "")),
+                            "Fotos": nc.get("Foto", nc.get("Fotos", "")),
+                            "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
+                            "Assinatura": fisc["Assinatura"],
+                            "Relatório Gerado": fisc["Relatório Gerado"]
+                        })
+
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                pd.DataFrame(st.session_state.temp_fiscalizacoes).to_excel(writer, sheet_name="Fiscalizações", index=False)
+                pd.DataFrame(flat_fiscalizacoes).to_excel(writer, sheet_name="Fiscalizações", index=False)
                 pd.DataFrame(st.session_state.temp_nc).to_excel(writer, sheet_name="Não-conformidades ", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="Observações Importantes", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="Recomendações", index=False)
-                if st.session_state.temp_abreviaturas:
-                    pd.DataFrame(st.session_state.temp_abreviaturas).to_excel(writer, sheet_name="Abreviaturas", index=False)
-                
-                # Planilha SOCICAM (Exemplo de exportação)
-                socicam_data = []
-                for nc in st.session_state.temp_nc:
-                    socicam_data.append({
-                        "Processo": num_ctr,
-                        "Terminal Rodoviário": nc["Terminal"],
-                        "ID": nc["ID da Fiscalização"],
-                        "NC": nc["Não Conformidade"]
-                    })
-                if socicam_data:
-                    pd.DataFrame(socicam_data).to_excel(writer, sheet_name="Levantamento_NC_SOCICAM", index=False)
 
             st.download_button(
                 label="📥 Baixar Planilha Preenchida",
@@ -279,7 +301,6 @@ with tab_preenchimento:
         if st.button("🗑️ Limpar Tudo", type="secondary"):
             st.session_state.temp_fiscalizacoes = []
             st.session_state.temp_nc = []
-            st.session_state.temp_abreviaturas = []
             st.rerun()
 
 st.divider()
