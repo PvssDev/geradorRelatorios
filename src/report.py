@@ -4,7 +4,7 @@ from docx.shared import Inches
 import pandas as pd
 from tqdm import tqdm
 from docx.enum.section import WD_SECTION
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 import sys
 import os
 import io
@@ -150,7 +150,10 @@ def gerar_relatorio(
 
     arquivos_gerados = []
 
-    for idx in tqdm(pendentes.index, desc="Gerando relatórios"):
+    # Evita duplicados processando apenas IDs de fiscalização únicos
+    pendentes_unicos = pendentes.drop_duplicates(subset=["ID da Fiscalização"])
+
+    for idx in tqdm(pendentes_unicos.index, desc="Gerando relatórios"):
         row = fiscal_df.loc[idx]
         id_fisc = row["ID da Fiscalização"]
         doc = Document()
@@ -159,7 +162,7 @@ def gerar_relatorio(
         logo_path = os.path.join(BASE_DIR, "assets/logo_arpe.jpeg")
         if os.path.exists(logo_path):
             doc.add_picture(logo_path, width=Inches(2))
-            doc.paragraphs[-1].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         for titulo in [
             "DIRETORIA DE REGULAÇÃO TÉCNICO-OPERACIONAL",
@@ -189,12 +192,20 @@ def gerar_relatorio(
         
         try:
             caminho_pdf = os.path.join(RELATORIOS_DIR, f"{nome_base}.pdf")
-            convert(caminho_docx, caminho_pdf)
-            arquivos_gerados.append(caminho_pdf)
+            
+            # CoInitialize é necessário para rodar COM em threads secundárias do Streamlit
+            import pythoncom
+            pythoncom.CoInitialize()
+            try:
+                convert(caminho_docx, caminho_pdf)
+                arquivos_gerados.append(caminho_pdf)
+            finally:
+                pythoncom.CoUninitialize()
         except Exception as e:
             print(f"⚠️ Erro ao converter PDF ({id_fisc}): {e}")
         
-        fiscal_df.at[idx, COLUNA_STATUS] = True
+        # Marca todas as linhas deste ID de fiscalização como geradas
+        fiscal_df.loc[fiscal_df["ID da Fiscalização"] == id_fisc, COLUNA_STATUS] = True
 
     # Finalização da Planilha
     if "Data" in fiscal_df.columns:

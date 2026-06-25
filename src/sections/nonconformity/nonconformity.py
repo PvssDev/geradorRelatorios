@@ -89,7 +89,7 @@ def gerar_secao_nao_conformidades_constatadas(
                         if os.path.exists(foto_path):
                             buffer = processar_imagem_para_relatorio(foto_path)
                             doc.add_picture(buffer, width=Inches(3))
-                            doc.paragraphs[-1].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
                             aplicar_borda_paragrafo(doc.paragraphs[-1])
                             adicionar_legenda_formatada(doc, legenda)
                         elif legenda:
@@ -98,10 +98,12 @@ def gerar_secao_nao_conformidades_constatadas(
                 num_nc += 1
 
             # OBSERVAÇÕES IMPORTANTES
-            obs_terminais = observacoes_df[
-                (observacoes_df["ID da Fiscalização"] == id_fisc)
-                & (observacoes_df["Terminal"] == terminal)
-            ]
+            obs_terminais = pd.DataFrame()
+            if not observacoes_df.empty and "ID da Fiscalização" in observacoes_df.columns and "Terminal" in observacoes_df.columns:
+                obs_terminais = observacoes_df[
+                    (observacoes_df["ID da Fiscalização"] == id_fisc)
+                    & (observacoes_df["Terminal"] == terminal)
+                ]
             if not obs_terminais.empty:
                 adicionar_titulo_secao(doc, "OBSERVAÇÕES IMPORTANTES:")
                 run_titulo_obs = doc.paragraphs[-1].runs[0]
@@ -136,7 +138,7 @@ def gerar_secao_nao_conformidades_constatadas(
                             if os.path.exists(foto_path):
                                 buffer = processar_imagem_para_relatorio(foto_path)
                                 doc.add_picture(buffer, width=Inches(3))
-                                doc.paragraphs[-1].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
                                 aplicar_borda_paragrafo(doc.paragraphs[-1])
                                 if legenda_obs:
                                     adicionar_legenda_formatada(doc, legenda_obs)
@@ -146,10 +148,12 @@ def gerar_secao_nao_conformidades_constatadas(
                         num_obs += 1
 
             # RECOMENDAÇÕES
-            rec_terminais = recomendacoes_df[
-                (recomendacoes_df["ID da Fiscalização"] == id_fisc)
-                & (recomendacoes_df["Terminal"] == terminal)
-            ]
+            rec_terminais = pd.DataFrame()
+            if not recomendacoes_df.empty and "ID da Fiscalização" in recomendacoes_df.columns and "Terminal" in recomendacoes_df.columns:
+                rec_terminais = recomendacoes_df[
+                    (recomendacoes_df["ID da Fiscalização"] == id_fisc)
+                    & (recomendacoes_df["Terminal"] == terminal)
+                ]
             if not rec_terminais.empty:
                 adicionar_titulo_secao(doc, "RECOMENDAÇÕES:")
                 run_titulo_rec = doc.paragraphs[-1].runs[0]
@@ -184,7 +188,7 @@ def gerar_secao_nao_conformidades_constatadas(
                             if os.path.exists(foto_path):
                                 buffer = processar_imagem_para_relatorio(foto_path)
                                 doc.add_picture(buffer, width=Inches(3))
-                                doc.paragraphs[-1].alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
                                 aplicar_borda_paragrafo(doc.paragraphs[-1])
                                 if legenda_rec:
                                     adicionar_legenda_formatada(doc, legenda_rec)
