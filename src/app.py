@@ -13,123 +13,8 @@ def mostrar_foto_modal(uploaded_file):
 
 st.title("📄 Gerador de Relatórios de Fiscalização")
 
-# Abas principais da aplicação
-tab_gerador, tab_preenchimento = st.tabs(["🚀 Gerador de Relatórios", "📝 Preencher Planilha"])
-
-with tab_gerador:
-    st.write("Faça o upload da planilha e das fotos para gerar os relatórios.")
-
-    # Download do Modelo
-    with st.expander("📌 Ajuda e Modelo de Planilha"):
-        st.write("""
-        A planilha deve conter as seguintes colunas na primeira aba:
-        - **ID da Fiscalização**: Identificador único.
-        - **Contrato**: Número do contrato.
-        - **Data**: Data da fiscalização.
-        - **Local**: Cidade ou Terminal.
-        - **Relatório Gerado**: (Opcional) Coluna de status.
-        """)
-        template_path = os.path.join(os.path.dirname(__file__), "planilha_fiscalizacao.xlsx")
-        if os.path.exists(template_path):
-            with open(template_path, "rb") as f:
-                st.download_button(
-                    label="📥 Baixar Modelo de Planilha (Base)",
-                    data=f,
-                    file_name="planilha_fiscalizacao.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-        else:
-            st.error("⚠️ Arquivo de modelo não encontrado.")
-
-    # Upload da Planilha
-    uploaded_excel = st.file_uploader("Selecione a planilha Excel (.xlsx)", type=["xlsx"])
-
-    # Upload das Fotos
-    uploaded_photos = st.file_uploader("Selecione as fotos (múltiplos arquivos)", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
-
-    regenerar_todos = st.checkbox(
-        "Regenerar relatórios já marcados como gerados",
-        help="Ative se a planilha já foi processada antes e todas as linhas estão com 'Relatório Gerado' = VERDADEIRO.",
-    )
-
-    # Inicializar estado da sessão para persistir dados entre cliques
-    if "arquivos_gerados_data" not in st.session_state:
-        st.session_state.arquivos_gerados_data = []
-    if "planilha_atualizada_data" not in st.session_state:
-        st.session_state.planilha_atualizada_data = None
-
-    if st.button("🚀 Gerar Relatório"):
-        if not uploaded_excel:
-            st.error("⚠️ Por favor, faça o upload da planilha Excel.")
-        elif not uploaded_photos:
-            st.warning("⚠️ Nenhuma foto foi carregada. O relatório será gerado sem imagens.")
-        
-        with st.spinner("Processando relatórios... Isso pode levar alguns minutos."):
-                st.session_state.arquivos_gerados_data = []
-                st.session_state.planilha_atualizada_data = None
-                
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    fotos_dir = os.path.join(temp_dir, "fotos")
-                    reports_dir = os.path.join(temp_dir, "reports")
-                    os.makedirs(fotos_dir, exist_ok=True)
-                    os.makedirs(reports_dir, exist_ok=True)
-
-                    for photo in uploaded_photos:
-                        with open(os.path.join(fotos_dir, photo.name), "wb") as f:
-                            f.write(photo.getbuffer())
-
-                    try:
-                        arquivos_gerados, planilha_atualizada = gerar_relatorio(
-                            caminho_planilha=uploaded_excel,
-                            fotos_dir=fotos_dir,
-                            relatorios_dir=reports_dir,
-                            gerar_todos=regenerar_todos
-                        )
-
-                        if not arquivos_gerados:
-                            st.warning("Nenhum relatório pendente encontrado.")
-                        else:
-                            for arquivo in arquivos_gerados:
-                                nome_base = os.path.basename(arquivo)
-                                with open(arquivo, "rb") as f:
-                                    st.session_state.arquivos_gerados_data.append({
-                                        "nome": nome_base,
-                                        "bytes": f.read()
-                                    })
-                            
-                            if planilha_atualizada:
-                                st.session_state.planilha_atualizada_data = planilha_atualizada.getvalue()
-                            
-                            st.success(f"✅ {len(arquivos_gerados)} arquivo(s) gerado(s) com sucesso!")
-                    
-                    except Exception as e:
-                        st.error(f"❌ Erro: {e}")
-                        st.exception(e)
-
-    if st.session_state.arquivos_gerados_data:
-        st.divider()
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("📥 Relatórios")
-            for i, item in enumerate(st.session_state.arquivos_gerados_data):
-                st.download_button(
-                    label=f"Baixar {item['nome']}",
-                    data=item["bytes"],
-                    file_name=item["nome"],
-                    key=f"dl_{i}_{item['nome']}"
-                )
-        with col2:
-            if st.session_state.planilha_atualizada_data:
-                st.subheader("📊 Planilha Atualizada")
-                st.download_button(
-                    label="Baixar Planilha Atualizada",
-                    data=st.session_state.planilha_atualizada_data,
-                    file_name="planilha_fiscalizacao_atualizada.xlsx"
-                )
-
-with tab_preenchimento:
-    st.header("📝 Cadastro de Fiscalização")
-    st.write("Preencha os dados abaixo para gerar a planilha formatada.")
+# Layout principal da aplicação
+with st.container():
 
     # 1. Upload de Fotos do Levantamento no início
     st.subheader("📸 Upload de Fotos do Levantamento")
@@ -365,10 +250,133 @@ with tab_preenchimento:
                 file_name=f"planilha_gerada_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-        
+        # Inicializar estado para persistir os relatórios gerados via aba preenchimento
+        if "relatorios_preenchimento_data" not in st.session_state:
+            st.session_state.relatorios_preenchimento_data = []
+
+        if st.button("🚀 Gerar Relatório Automático", type="primary"):
+            if not st.session_state.temp_fiscalizacoes:
+                st.error("Adicione pelo menos uma fiscalização primeiro.")
+            else:
+                with st.spinner("Gerando relatórios automaticamente..."):
+                    st.session_state.relatorios_preenchimento_data = []
+                    
+                    # 1. Gerar a planilha em memória
+                    flat_fiscalizacoes = []
+                    for fisc in st.session_state.temp_fiscalizacoes:
+                        id_fisc = fisc["ID da Fiscalização"]
+                        ncs = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_fisc]
+                        if not ncs:
+                            flat_fiscalizacoes.append({
+                                "ID da Fiscalização": fisc["ID da Fiscalização"],
+                                "Data": fisc["Data"],
+                                "Hora": fisc["Hora"],
+                                "Cidade": fisc["Cidade"],
+                                "Local": fisc["Local"],
+                                "Pessoal Responsável": fisc["Pessoal Responsável"],
+                                "Coordenador": fisc["Coordenador"],
+                                "Contrato": fisc["Contrato"],
+                                "Período": fisc["Período"],
+                                "Observações": "",
+                                "Fotos": "",
+                                "Não conformidade": "",
+                                "Assinatura": fisc["Assinatura"],
+                                "Relatório Gerado": fisc["Relatório Gerado"]
+                            })
+                        else:
+                            for nc in ncs:
+                                flat_fiscalizacoes.append({
+                                    "ID da Fiscalização": fisc["ID da Fiscalização"],
+                                    "Data": fisc["Data"],
+                                    "Hora": fisc["Hora"],
+                                    "Cidade": fisc["Cidade"],
+                                    "Local": fisc["Local"],
+                                    "Pessoal Responsável": fisc["Pessoal Responsável"],
+                                    "Coordenador": fisc["Coordenador"],
+                                    "Contrato": fisc["Contrato"],
+                                    "Período": fisc["Período"],
+                                    "Observações": nc.get("Observações", nc.get("Legenda da Foto", "")),
+                                    "Fotos": nc.get("Foto", nc.get("Fotos", "")),
+                                    "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
+                                    "Assinatura": fisc["Assinatura"],
+                                    "Relatório Gerado": fisc["Relatório Gerado"]
+                                })
+
+                    excel_buffer = io.BytesIO()
+                    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                        pd.DataFrame(flat_fiscalizacoes).to_excel(writer, sheet_name="Fiscalizações", index=False)
+                        pd.DataFrame(st.session_state.temp_nc).to_excel(writer, sheet_name="Não-conformidades ", index=False)
+                        pd.DataFrame().to_excel(writer, sheet_name="Observações Importantes", index=False)
+                        pd.DataFrame().to_excel(writer, sheet_name="Recomendações", index=False)
+                    excel_buffer.seek(0)
+
+                    # 2. Criar diretório temporário para as fotos já enviadas (st.session_state.fill_photos)
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        fotos_dir = os.path.join(temp_dir, "fotos")
+                        reports_dir = os.path.join(temp_dir, "reports")
+                        os.makedirs(fotos_dir, exist_ok=True)
+                        os.makedirs(reports_dir, exist_ok=True)
+
+                        # Copiar as fotos salvas em st.session_state.fill_photos
+                        if "fill_photos" in st.session_state and st.session_state.fill_photos:
+                            for photo in st.session_state.fill_photos:
+                                with open(os.path.join(fotos_dir, photo.name), "wb") as f:
+                                    f.write(photo.getbuffer())
+
+                        # 3. Chamar a função gerar_relatorio
+                        try:
+                            arquivos_gerados, _ = gerar_relatorio(
+                                caminho_planilha=excel_buffer,
+                                fotos_dir=fotos_dir,
+                                relatorios_dir=reports_dir,
+                                gerar_todos=True
+                            )
+
+                            if not arquivos_gerados:
+                                st.warning("Nenhum relatório gerado.")
+                            else:
+                                for arquivo in arquivos_gerados:
+                                    nome_base = os.path.basename(arquivo)
+                                    with open(arquivo, "rb") as f:
+                                        st.session_state.relatorios_preenchimento_data.append({
+                                            "nome": nome_base,
+                                            "bytes": f.read()
+                                        })
+                                st.success(f"✅ {len(arquivos_gerados) // 2} relatório(s) completo(s) (Word + PDF) gerado(s) com sucesso!")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao gerar relatórios: {e}")
+                            st.exception(e)
+
+        # Exibir botões de download dos relatórios se gerados
+        if st.session_state.relatorios_preenchimento_data:
+            st.write("### 📥 Baixar Relatórios Gerados")
+            col1, col2 = st.columns(2)
+            docx_files = [x for x in st.session_state.relatorios_preenchimento_data if x["nome"].endswith(".docx")]
+            pdf_files = [x for x in st.session_state.relatorios_preenchimento_data if x["nome"].endswith(".pdf")]
+            
+            with col1:
+                st.write("**Documentos Word (.docx):**")
+                for i, item in enumerate(docx_files):
+                    st.download_button(
+                        label=f"Baixar {item['nome']}",
+                        data=item["bytes"],
+                        file_name=item["nome"],
+                        key=f"dl_fill_docx_{i}_{item['nome']}"
+                    )
+            with col2:
+                st.write("**Documentos PDF (.pdf):**")
+                for i, item in enumerate(pdf_files):
+                    st.download_button(
+                        label=f"Baixar {item['nome']}",
+                        data=item["bytes"],
+                        file_name=item["nome"],
+                        key=f"dl_fill_pdf_{i}_{item['nome']}"
+                    )
+
         if st.button("🗑️ Limpar Tudo", type="secondary"):
             st.session_state.temp_fiscalizacoes = []
             st.session_state.temp_nc = []
+            st.session_state.relatorios_preenchimento_data = []
             st.rerun()
 
 st.divider()
