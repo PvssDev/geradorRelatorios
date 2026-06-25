@@ -165,7 +165,8 @@ with st.container():
             ncs_existentes = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_vinculo]
             nc_num = len(ncs_existentes) + 1
             
-        nc_descricao = st.text_area("Não Conformidade", key=f"nc_desc_{st.session_state.nc_form_counter}", placeholder="Descreva os problemas encontrados...")
+        nc_options = ["FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB", "JE", "TBE", "ALP", "ATP", "O", "P", "EX", "D", "R", "ALC", "ATC", "E"]
+        nc_descricao = st.pills("Não Conformidade", nc_options, key=f"nc_desc_{st.session_state.nc_form_counter}")
         nc_legenda = st.text_area("Observações", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva as observações/legenda correspondente...")
         
         if st.button("➕ Adicionar Não Conformidade", type="primary"):
@@ -186,6 +187,7 @@ with st.container():
                 if st.session_state.get("auto_advance_active", True) and st.session_state.fill_photos and st.session_state.carousel_index < len(st.session_state.fill_photos) - 1:
                     st.session_state.carousel_index += 1
                 
+                st.session_state.nc_form_counter += 1
                 st.success(f"NC {nc_num} adicionada ao ID {id_vinculo}!")
                 st.rerun()
 
