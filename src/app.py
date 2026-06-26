@@ -20,7 +20,7 @@ with st.container():
     st.subheader("📸 Upload de Fotos do Levantamento")
     
     if "fill_photos_sort_option" not in st.session_state:
-        st.session_state.fill_photos_sort_option = "Ordem de Upload"
+        st.session_state.fill_photos_sort_option = "Nome (A-Z / 0-9)"
 
     col_uploader, col_sort = st.columns([3, 1])
     with col_uploader:
@@ -34,14 +34,14 @@ with st.container():
         st.write("") # Alinhamento vertical discreto
         st.write("**Ordenar Fotos por:**")
         with st.popover(f"↕️ {st.session_state.fill_photos_sort_option}", use_container_width=True):
-            if st.button("Ordem de Upload", use_container_width=True, key="btn_sort_upload"):
-                st.session_state.fill_photos_sort_option = "Ordem de Upload"
-                st.rerun()
             if st.button("Nome (A-Z / 0-9)", use_container_width=True, key="btn_sort_asc"):
                 st.session_state.fill_photos_sort_option = "Nome (A-Z / 0-9)"
                 st.rerun()
             if st.button("Nome (Z-A / 9-0)", use_container_width=True, key="btn_sort_desc"):
                 st.session_state.fill_photos_sort_option = "Nome (Z-A / 9-0)"
+                st.rerun()
+            if st.button("Ordem de Upload", use_container_width=True, key="btn_sort_upload"):
+                st.session_state.fill_photos_sort_option = "Ordem de Upload"
                 st.rerun()
 
     sort_option = st.session_state.fill_photos_sort_option
@@ -84,8 +84,13 @@ with st.container():
 
         submit_fisc = st.form_submit_button("➕ Adicionar Fiscalização")
         if submit_fisc:
+            ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
             if not id_fisc:
                 st.error("O ID da Fiscalização é obrigatório.")
+            elif not local.strip():
+                st.error("O campo 'Local' é obrigatório.")
+            elif id_fisc.strip() in ids_existentes:
+                st.error(f"O ID da Fiscalização '{id_fisc}' já está cadastrado. Por favor, utilize um ID único.")
             else:
                 # Preenche as assinaturas automaticamente a partir do Pessoal Responsável
                 assinaturas_auto = responsaveis.replace(",", ";") if responsaveis else ""
@@ -102,6 +107,21 @@ with st.container():
                     "Assinatura": assinaturas_auto,
                     "Relatório Gerado": False
                 })
+                
+                # Exibe um aviso listando quais campos adicionais ficaram em branco
+                campos_verificar = {
+                    "Data": data_fisc,
+                    "Hora": hora,
+                    "Cidade": cidade,
+                    "Pessoal Responsável": responsaveis,
+                    "Coordenador": coordenador,
+                    "Número do Contrato": contrato,
+                    "Período": periodo
+                }
+                campos_em_branco = [nome for nome, valor in campos_verificar.items() if not str(valor).strip()]
+                if campos_em_branco:
+                    st.warning(f"⚠️ Atenção: Os seguintes campos opcionais de preenchimento ficaram em branco: {', '.join(campos_em_branco)}.")
+                
                 st.success(f"Fiscalização {id_fisc} adicionada!")
 
     st.divider()
@@ -174,6 +194,8 @@ with st.container():
                 st.error("Adicione uma fiscalização primeiro.")
             elif not nc_descricao:
                 st.error("O campo 'Não Conformidade' é obrigatório.")
+            elif not foto_default:
+                st.error("É obrigatório ter uma foto selecionada no carrossel para adicionar uma não conformidade.")
             else:
                 st.session_state.temp_nc.append({
                     "ID da Fiscalização": id_vinculo,
