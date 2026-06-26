@@ -11,6 +11,64 @@ st.set_page_config(page_title="Gerador de Relatórios ARPE", layout="wide")
 def mostrar_foto_modal(uploaded_file):
     st.image(uploaded_file, caption=uploaded_file.name, use_container_width=True)
 
+@st.dialog("Confirmar Exclusão em Lote")
+def confirmar_exclusao_lote_modal(ids):
+    st.write("Você tem certeza que deseja excluir as seguintes fiscalizações?")
+    for id_fisc in ids:
+        st.write(f"- **{id_fisc}**")
+    st.write("Isso também removerá todas as Não Conformidades vinculadas a estes IDs.")
+    st.warning("⚠️ Esta ação não pode ser desfeita.")
+    
+    col_sim, col_nao = st.columns(2)
+    with col_sim:
+        if st.button("Sim, Excluir", type="primary", use_container_width=True, key="btn_confirm_bulk_del"):
+            st.session_state.temp_fiscalizacoes = [f for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] not in ids]
+            st.session_state.temp_nc = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] not in ids]
+            st.session_state.relatorios_preenchimento_data = []
+            st.success("Fiscalizações selecionadas excluídas com sucesso!")
+            st.rerun()
+    with col_nao:
+        if st.button("Cancelar", use_container_width=True, key="btn_cancel_bulk_del"):
+            st.rerun()
+
+@st.dialog("Confirmar Exclusão de Não Conformidades")
+def confirmar_exclusao_nc_modal(nc_keys):
+    st.write("Você tem certeza que deseja excluir as seguintes Não Conformidades?")
+    for id_fisc, num in nc_keys:
+        st.write(f"- **ID {id_fisc} - NC nº {num}**")
+    st.warning("⚠️ Esta ação não pode ser desfeita.")
+    
+    col_sim, col_nao = st.columns(2)
+    with col_sim:
+        if st.button("Sim, Excluir", type="primary", use_container_width=True, key="btn_confirm_nc_del"):
+            # Mantém apenas as NCs que NÃO foram marcadas para exclusão
+            st.session_state.temp_nc = [
+                nc for nc in st.session_state.temp_nc 
+                if (nc["ID da Fiscalização"], nc["Nº"]) not in nc_keys
+            ]
+            
+            # Recalcula a numeração sequencial ("Nº") das NCs restantes por ID de fiscalização
+            ncs_por_id = {}
+            for nc in st.session_state.temp_nc:
+                id_f = nc["ID da Fiscalização"]
+                if id_f not in ncs_por_id:
+                    ncs_por_id[id_f] = []
+                ncs_por_id[id_f].append(nc)
+            
+            novas_ncs = []
+            for id_f, lista in ncs_por_id.items():
+                for seq, nc in enumerate(lista, 1):
+                    nc["Nº"] = seq
+                    novas_ncs.append(nc)
+            st.session_state.temp_nc = novas_ncs
+            
+            st.session_state.relatorios_preenchimento_data = []
+            st.success("Não Conformidades selecionadas excluídas com sucesso!")
+            st.rerun()
+    with col_nao:
+        if st.button("Cancelar", use_container_width=True, key="btn_cancel_nc_del"):
+            st.rerun()
+
 st.title("📄 Gerador de Relatórios de Fiscalização")
 
 # Layout principal da aplicação
@@ -216,8 +274,67 @@ with st.container():
     st.divider()
     if st.session_state.temp_fiscalizacoes:
         st.subheader("📋 Resumo do Preenchimento")
-        st.write("**Fiscalizações:**", pd.DataFrame(st.session_state.temp_fiscalizacoes))
-        st.write("**Não Conformidades:**", pd.DataFrame(st.session_state.temp_nc))
+        
+        df_fisc = pd.DataFrame(st.session_state.temp_fiscalizacoes)
+        if "Relatório Gerado" in df_fisc.columns:
+            df_fisc = df_fisc.drop(columns=["Relatório Gerado"])
+        df_fisc.insert(0, "Excluir", False)
+        
+        st.write("**Fiscalizações:**")
+        edited_df = st.data_editor(
+            df_fisc,
+            column_config={
+                "Excluir": st.column_config.CheckboxColumn(
+                    "Excluir",
+                    help="Selecione as fiscalizações que deseja excluir",
+                    default=False,
+                )
+            },
+            disabled=[col for col in df_fisc.columns if col != "Excluir"],
+            use_container_width=True,
+            hide_index=True,
+            key="fisc_data_editor"
+        )
+        
+        # Identifica as linhas marcadas para exclusão
+        selected_rows = edited_df[edited_df["Excluir"] == True] if "Excluir" in edited_df.columns else pd.DataFrame()
+        ids_para_excluir = selected_rows["ID da Fiscalização"].tolist() if not selected_rows.empty else []
+        
+        # Botão que fica habilitado se houver itens selecionados
+        disable_btn = len(ids_para_excluir) == 0
+        if st.button("🗑️ Excluir Selecionadas", type="secondary", disabled=disable_btn, key="btn_bulk_delete"):
+            confirmar_exclusao_lote_modal(ids_para_excluir)
+            
+        st.write("") # Espaçamento
+        df_nc = pd.DataFrame(st.session_state.temp_nc)
+        st.write("**Não Conformidades:**")
+        if not df_nc.empty:
+            df_nc.insert(0, "Excluir", False)
+            edited_nc_df = st.data_editor(
+                df_nc,
+                column_config={
+                    "Excluir": st.column_config.CheckboxColumn(
+                        "Excluir",
+                        help="Selecione as não conformidades que deseja excluir",
+                        default=False,
+                    )
+                },
+                disabled=[col for col in df_nc.columns if col != "Excluir"],
+                use_container_width=True,
+                hide_index=True,
+                key="nc_data_editor"
+            )
+            
+            # Identifica as linhas marcadas para exclusão
+            selected_ncs = edited_nc_df[edited_nc_df["Excluir"] == True] if "Excluir" in edited_nc_df.columns else pd.DataFrame()
+            ncs_para_excluir = list(zip(selected_ncs["ID da Fiscalização"], selected_ncs["Nº"])) if not selected_ncs.empty else []
+            
+            # Botão que fica habilitado se houver NCs selecionadas
+            disable_nc_btn = len(ncs_para_excluir) == 0
+            if st.button("🗑️ Excluir NCs Selecionadas", type="secondary", disabled=disable_nc_btn, key="btn_nc_bulk_delete"):
+                confirmar_exclusao_nc_modal(ncs_para_excluir)
+        else:
+            st.info("Nenhuma não conformidade registrada.")
         
         if st.button("💾 Gerar Planilha Completa"):
             # Vincular Não Conformidades e Observações à planilha Fiscalizações logo após a coluna Período
