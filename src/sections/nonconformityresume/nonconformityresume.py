@@ -66,7 +66,10 @@ def gerar_secao_resumo_nao_conformidades(doc, row, nao_conformidades_df):
 
         num_nc = 1  # contador sequencial para NCs
 
-        for idx, (_, linha) in enumerate(grupo.iterrows()):
+        # Agrupar por Não Conformidade dentro do terminal
+        nc_agrupado = grupo.groupby("Não Conformidade", sort=False)
+
+        for idx, (nc_desc, sub_grupo) in enumerate(nc_agrupado):
             row_cells = tabela.add_row().cells
 
             # Primeira linha do grupo: título do terminal
@@ -78,7 +81,7 @@ def gerar_secao_resumo_nao_conformidades(doc, row, nao_conformidades_df):
                 row_cells[0].text = ""
 
             # Coluna da NC
-            descricao = linha["Não Conformidade"].strip()
+            descricao = str(nc_desc).strip()
 
             paragrafo_nc = row_cells[1].paragraphs[0]
             run_titulo = paragrafo_nc.add_run(f"{sigla_terminal} {num_nc}")

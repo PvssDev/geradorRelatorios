@@ -120,6 +120,46 @@ def aplicar_borda_paragrafo(paragraph):
     pPr.append(borders)
 
 
+def aplicar_fundo_cinza_paragrafo(paragraph):
+    p = paragraph._element
+    pPr = p.get_or_add_pPr()
+    shd = OxmlElement('w:shd')
+    shd.set(qn('w:val'), 'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'), 'D9D9D9') # Cinza claro
+    pPr.append(shd)
+
+
+def adicionar_texto_caixa_cinza(doc, texto, altura_cm=1.0):
+    """Cria uma tabela 1x1 sem bordas com fundo cinza para simular uma caixa de texto."""
+    from docx.shared import Cm
+    from docx.enum.table import WD_ALIGN_VERTICAL
+    table = doc.add_table(rows=1, cols=1)
+    
+    # Define a altura da linha
+    table.rows[0].height = Cm(altura_cm)
+    
+    cell = table.cell(0, 0)
+    cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+    
+    # Aplica fundo cinza na célula
+    tcPr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement('w:shd')
+    shd.set(qn('w:val'), 'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'), 'D9D9D9')
+    tcPr.append(shd)
+    
+    # Adiciona o texto centralizado na célula
+    p = cell.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run(texto)
+    run.bold = True
+    
+    # Ajusta espaçamento interno do parágrafo para 0, já que a célula está centralizada verticalmente
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
+
 def adicionar_legenda_formatada(doc, texto):
     par = doc.add_paragraph()
     run = par.add_run(texto)

@@ -55,9 +55,9 @@ def gerar_secao_nao_conformidades_constatadas(
             par_terminal.add_run(f"3.{num_terminal} - {terminal.upper()}").bold = True
 
             num_nc = 1
-            for nc_id, grupo_nc in grupo_terminal.groupby("Nº"):
-                descricao = grupo_nc["Não Conformidade"].iloc[0]
-
+            for nc_desc, grupo_nc in grupo_terminal.groupby("Não Conformidade", sort=False):
+                descricao = str(nc_desc).strip()
+ 
                 par_nc = doc.add_paragraph()
                 run_nc_titulo = par_nc.add_run(
                     f"Não Conformidade {sigla_terminal} {str(num_nc).zfill(2)}"
@@ -66,11 +66,11 @@ def gerar_secao_nao_conformidades_constatadas(
                 run_nc_titulo.underline = True
                 run_nc_titulo.font.size = Pt(10)
                 run_nc_titulo.font.color.rgb = RGBColor(0, 0, 0)
-
+ 
                 run_nc_desc = par_nc.add_run(f" – {descricao}")
                 run_nc_desc.font.size = Pt(10)
                 run_nc_desc.font.color.rgb = RGBColor(0, 0, 0)
-
+ 
                 for _, linha in grupo_nc.iterrows():
                     nomes_fotos = (
                         [f.strip() for f in str(linha["Foto"]).split(";") if f.strip()]
@@ -82,7 +82,7 @@ def gerar_secao_nao_conformidades_constatadas(
                         if pd.notna(linha["Legenda da Foto"])
                         else []
                     )
-
+ 
                     for idx, nome_foto in enumerate(nomes_fotos):
                         foto_path = os.path.join(fotos_dir, nome_foto)
                         legenda = legendas[idx] if idx < len(legendas) else ""
@@ -94,7 +94,7 @@ def gerar_secao_nao_conformidades_constatadas(
                             adicionar_legenda_formatada(doc, legenda)
                         elif legenda:
                             adicionar_paragrafo_justificado(doc, legenda)
-
+ 
                 num_nc += 1
 
             # OBSERVAÇÕES IMPORTANTES

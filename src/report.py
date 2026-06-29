@@ -19,6 +19,7 @@ from sections.nonconformityresume.nonconformityresume import (
 from sections.finalconsiderations.finalconsiderations import (
     gerar_secao_consideracoes_finais,
 )
+from sections.cabecalho.cabecalho import gerar_capa_primeira_pagina
 from utils import (
     adicionar_texto_centralizado,
     ajustar_largura_colunas,
@@ -158,22 +159,9 @@ def gerar_relatorio(
         id_fisc = row["ID da Fiscalização"]
         doc = Document()
 
-        # Cabeçalho do Documento
-        logo_path = os.path.join(BASE_DIR, "assets/logo_arpe.jpeg")
-        if os.path.exists(logo_path):
-            doc.add_picture(logo_path, width=Inches(2))
-            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        for titulo in [
-            "DIRETORIA DE REGULAÇÃO TÉCNICO-OPERACIONAL",
-            "COORDENADORIA DE TRANSPORTES E RODOVIAS",
-            "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR 01/2025",
-            "TERMINAIS RODOVIÁRIOS INTERMUNICIPAIS CONCEDIDOS À EMPRESA SOCICAM",
-            "CONTRATO DE CONCESSÃO DE SERVIÇO PÚBLICO Nº 1.041.080/08"
-        ]:
-            adicionar_texto_centralizado(doc, titulo)
-
-        doc.add_section(WD_SECTION.NEW_PAGE)
+        # Primeira Página (Capa)
+        logo_capa_path = os.path.join(BASE_DIR, "assets/logo_capa.jpeg")
+        gerar_capa_primeira_pagina(doc, logo_capa_path)
 
         # Geração das Seções
         gerar_secao_introducao(doc, row)
@@ -228,5 +216,5 @@ def gerar_relatorio(
             salvar_excel(writer)
         planilha_buffer.seek(0)
 
-    print("🎉 Processo concluído com sucesso.")
+    print("Processo concluído com sucesso.")
     return arquivos_gerados, planilha_buffer
