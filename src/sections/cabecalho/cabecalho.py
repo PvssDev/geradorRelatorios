@@ -17,6 +17,8 @@ def gerar_capa_primeira_pagina(doc, logo_path):
     style.font.name = 'Aptos'
     
     section = doc.sections[0]
+    section.page_width = Inches(8.27)
+    section.page_height = Inches(11.69)
     section.top_margin = Inches(0.5)
     section.bottom_margin = Inches(0.5)
     section.left_margin = Inches(0.5)
@@ -202,13 +204,13 @@ def gerar_sumario(doc):
     p.paragraph_format.space_after = Pt(24)
     
     linhas = [
-        "1.\tINTRODUÇÃO\t4",
-        "2.\tOBJETIVO\t4",
-        "3.\tMETODOLOGIA\t6",
-        "4.\tFISCALIZAÇÃO\t7",
-        "5.\tDETERMINAÇÕES GERAIS\t11",
-        "6.\tRECOMENDAÇÕES\t11",
-        "7.\tCONCLUSÕES\t11",
+        "\tINTRODUÇÃO\t4",
+        "1.\tOBJETIVO\t4",
+        "2.\tMETODOLOGIA\t5",
+        "3.\tFISCALIZAÇÃO\t7",
+        "4.\tDETERMINAÇÕES GERAIS\t11",
+        "5.\tRECOMENDAÇÕES\t11",
+        "6.\tCONCLUSÕES\t11",
         "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
     ]
     
