@@ -5,7 +5,7 @@ from utils import adicionar_titulo_secao
 import os
 
 def gerar_secao_introducao(doc: Document, row):
-    """Gera as seções de Introdução, Objetivo, Informações Gerais e Metodologia no relatório."""
+    """Gera as seções de Introdução, Objetivo, Informações Gerais, Metodologia e Fiscalização."""
     
     # ----------------------------------------------------
     # 1. SEÇÃO: INTRODUÇÃO (Sem número)
@@ -44,7 +44,7 @@ def gerar_secao_introducao(doc: Document, row):
         "contratuais, regulamentares e normativas aplicáveis, preservando a segurança, a qualidade do serviço, e a "
         "adequada prestação do serviço público aos usuários. Dessa forma a ação de fiscalização da Arpe verifica o grau "
         "de conformidade dessas instalações com o Contrato de Concessão, bem como com a legislação e normas vigentes "
-        "de modo a determinar e/ou recomendar medidas corretivas, com foco na qualidade dos serviços prestados."
+        "de modo a determinar/ou recomendar medidas corretivas, com foco na qualidade dos serviços prestados."
     )
     
     p_obj = doc.add_paragraph()
@@ -166,12 +166,16 @@ def gerar_secao_introducao(doc: Document, row):
     adicionar_titulo_secao(doc, "2. METODOLOGIA")
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
-    paragraphs_metodo = [
+    # Parágrafos iniciais da Metodologia
+    paragraphs_metodo_1 = [
         "A Coordenadoria de Transporte e Rodovias da Arpe implementou o cronograma de fiscalização para 2026 do Complexo Viário e Logístico de SUAPE reservando dois dias consecutivos, para melhor estruturar suas ações de fiscalização técnico-operacionais no Complexo Rodoviário, após uma visita técnica prévia, realizada antes do período de fiscalização, com o objetivo de elaborar um roteiro que é encaminhado para a CRA e SUAPE contendo os trechos mapeados com possíveis Não Conformidades, tornando os levantamentos fotográficos mais ágeis e a fiscalização efetiva.",
-        "Posteriormente, as possíveis Não Conformidades levantadas em campo são analisadas de acordo com os critérios elencados no PDCL anexo ao Contrato de Concessão, em conjunto com o último Relatório Anual elaborado pelo Verificador Independente."
+        "Posteriormente, as possíveis Não Conformidades levantadas em campo são analisadas de acordo com os critérios elencados no PDCL (Anexo IV do Contrato de Concessão), em conjunto com o último Relatório Anual elaborado pelo Verificador Independente.",
+        "Assim, a fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da Arpe está submetida a uma metodologia organizada em três etapas: Preparação e Planejamento, Execução da Fiscalização e Monitoramento e Avaliação.",
+        "Preparação e Planejamento - compreende a organização e estruturação das atividades preliminares à execução da fiscalização, destacando-se a elaboração e o envio de avisos de fiscalização à Concessionária e demais atividades de suporte à fiscalização, bem como a análise de fiscalizações anteriores com a identificação de eventuais Não Conformidades pendentes.",
+        "Execução da Fiscalização - a execução da fiscalização é pautada por um arcabouço de normas e diretrizes, possibilitando que todas as etapas sejam desenvolvidas de maneira eficiente e em conformidade aos padrões estabelecidos, destacando-se:"
     ]
     
-    for text in paragraphs_metodo:
+    for text in paragraphs_metodo_1:
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         p.paragraph_format.space_after = Pt(6)
@@ -179,3 +183,175 @@ def gerar_secao_introducao(doc: Document, row):
         run = p.add_run(text)
         run.font.name = 'Aptos'
         run.font.size = Pt(11)
+        
+    # Referências com recuo de parágrafo estruturado nativamente no Word (Hanging Indent)
+    referencias = [
+        ("Lei Estadual nº. 12.524, de 30 de dezembro de 2003, regulamentada pelo Decreto Estadual nº. 30.200, de 09 de fevereiro de 2007, que altera e consolida as disposições da Lei nº. 12.126, de 12 de dezembro de 2001, que cria a Agência de Regulação dos Serviços Públicos Delegados do Estado de Pernambuco - ARPE, e dá outras providências;", False, True),
+        ("Art. 3º Compete à ARPE a regulação de todos os serviços públicos delegados pelo Estado de Pernambuco, ou por ele diretamente prestados, embora sujeitos à delegação, quer de sua competência ou a ele delegados por outros entes federados, em decorrência de norma legal ou regulamentar, disposição convenial ou contratual.", True, False),
+        ("§ 1º A atividade reguladora da ARPE deverá ser exercida, em especial, nas seguintes áreas:", True, False),
+        ("[...]", True, False),
+        ("III - rodovias;", True, False),
+        ("[...]", True, False),
+        ("Art. 4º Compete ainda à ARPE:", True, False),
+        ("[...]", True, False),
+        ("X - Fiscalizar diretamente ou mediante convênio com o Estado de Pernambuco, através de seus órgãos ou entidades vinculadas, com sua supervisão, os aspectos técnico, econômico, contábil, financeiro, operacional e jurídico dos serviços públicos delegados, valendo-se inclusive, de indicadores e procedimentos amostrais.", True, False),
+        ("", False, False),
+        ("Contrato de Concessão CT. nº 043/2011, de 18 de julho de 2011, para a delegação da exploração do Complexo Viário e Logístico de SUAPE – EXPRESSWAY, conforme detalhado no Anexo IV do Edital (PDCL) e regidos pela Constituição Federal; pela Lei Federal Nº 8.987/95; Lei Federal Nº 9.074/95; Lei Federal 8.666/93 e Lei Estadual Nº 14.233/2010.", False, True),
+        ("", False, False),
+        ("Convênio de Cooperação Técnica n° 003/2021 de 22 de setembro 2021, firmado entre o Complexo Industrial Portuário Governador Eraldo Gueiros – SUAPE e a Agência de Regulação de Pernambuco – ARPE, e Renovação do Termo Aditivo que prorroga o prazo de vigência e execução contratual até 22 de setembro de 2026.", False, True),
+        ("", False, False),
+        ("Norma DNIT 005/2003 – que define os termos técnicos empregados em defeitos que ocorrem nos pavimentos flexíveis e semirrígidos e serve para padronizar a linguagem adotada na elaboração das normas, manuais, projetos e textos relativos aos pavimentos flexíveis e semirrígidos.", False, True),
+        ("", False, False),
+        ("Relatórios elaborados pelo Verificador Independente.", False, True)
+    ]
+    
+    for text, recuado, is_bullet in referencias:
+        if text == "":
+            doc.add_paragraph()
+            continue
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p.paragraph_format.line_spacing = 1.15
+        p.paragraph_format.space_after = Pt(6)
+        if recuado:
+            p.paragraph_format.left_indent = Pt(70.8)
+            run = p.add_run(text)
+        elif is_bullet:
+            p.paragraph_format.left_indent = Pt(36.0)
+            p.paragraph_format.first_line_indent = Pt(-18.0)
+            run_bullet = p.add_run("•\t")
+            run_bullet.font.name = 'Aptos'
+            run_bullet.font.size = Pt(11)
+            run = p.add_run(text)
+        else:
+            run = p.add_run(text)
+            
+        run.font.name = 'Aptos'
+        run.font.size = Pt(11)
+
+    doc.add_paragraph()
+    
+    # Texto de codificação das NCs
+    p_cod = doc.add_paragraph()
+    p_cod.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p_cod.paragraph_format.space_after = Pt(6)
+    p_cod.paragraph_format.line_spacing = 1.15
+    run_cod = p_cod.add_run("Registra-se que as Não conformidades (NC) são codificadas de acordo com os seguintes níveis de informação, separados por “.” (ponto):")
+    run_cod.font.name = 'Aptos'
+    run_cod.font.size = Pt(11)
+    
+    niveis = [
+        "Nível 1 - três dígitos, caracterizando a concessionária: CRA ou CRC.",
+        "Nível 2 - composto por cinco dígitos: os dois primeiros representam as subdivisões utilizadas na rodovia concedida, por exemplo, Trecho (TR); Subtrecho (ST); Segmento Homogêneo (SH) e os três últimos dígitos identificam a subdivisão utilizada em cada contrato.",
+        "Nível 3 – composto por nove dígitos os quatro primeiros e os quatro últimos delimitam a localização das NC em escala de 0,01Km e o dígito intermediário informa se a NC é pontual \"+\" ou distribuída.",
+        "Nível 4 – informa o ano da constatação da NC com quatro dígitos, antecedido de “/”.",
+        "Nível 5 - contendo o sequencial numérico da NC no ano, expresso em três dígitos."
+    ]
+    
+    for niv in niveis:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p.paragraph_format.space_after = Pt(0)  # Uma linha abaixo da outra, sem espaço extra
+        p.paragraph_format.line_spacing = 1.15
+        p.paragraph_format.left_indent = Pt(54.0)       # Recuo da margem para o texto (0.75 in)
+        p.paragraph_format.first_line_indent = Pt(-18.0) # Hanging Indent para o marcador (bullet)
+        
+        run_bullet = p.add_run("•\t")
+        run_bullet.font.name = 'Aptos'
+        run_bullet.font.size = Pt(11)
+        
+        run = p.add_run(niv)
+        run.font.name = 'Aptos'
+        run.font.size = Pt(11)
+        
+    # Exemplo (Sem pular linha antes)
+    p_ex_label = doc.add_paragraph()
+    p_ex_label.paragraph_format.left_indent = Pt(72.0)
+    p_ex_label.paragraph_format.space_after = Pt(6)
+    run_ex_lbl = p_ex_label.add_run("Exemplo:")
+    run_ex_lbl.font.name = 'Aptos'
+    run_ex_lbl.font.size = Pt(11)
+    
+    p_ex_val = doc.add_paragraph()
+    p_ex_val.paragraph_format.left_indent = Pt(120.5)
+    p_ex_val.paragraph_format.space_after = Pt(6)
+    run_ex_val = p_ex_val.add_run("CRA.ST601.2794-2834/2025.013")
+    run_ex_val.bold = True
+    run_ex_val.font.name = 'Aptos'
+    run_ex_val.font.size = Pt(11)
+    
+    p_ex_desc = doc.add_paragraph()
+    p_ex_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p_ex_desc.paragraph_format.left_indent = Pt(120.5)
+    p_ex_desc.paragraph_format.space_after = Pt(6)
+    p_ex_desc.paragraph_format.line_spacing = 1.15
+    run_ex_desc = p_ex_desc.add_run("Indica que esta Não Conformidade foi apontada para a CRA, no subtrecho 6.01, distribuída do km 27,94 ao km 28,34, sendo a 13ª NC registrada pela Arpe em 2025")
+    run_ex_desc.font.name = 'Aptos'
+    run_ex_desc.font.size = Pt(11)
+    
+    # Monitoramento e Avaliação (Sem pular linha antes)
+    p_mon = doc.add_paragraph()
+    p_mon.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p_mon.paragraph_format.space_after = Pt(6)
+    p_mon.paragraph_format.line_spacing = 1.15
+    run_mon_bold = p_mon.add_run("Monitoramento e Avaliação")
+    run_mon_bold.bold = True
+    run_mon_bold.font.name = 'Aptos'
+    run_mon_bold.font.size = Pt(11)
+    
+    run_mon_text = p_mon.add_run(" - Esta etapa é fundamental para garantir a eficácia das ações corretivas a serem executadas pela Concessionária para a melhoria contínua dos serviços prestados. Os principais instrumentos do Monitoramento e Avaliação são: Termo de Notificação e respectivo Relatório de Fiscalização, Plano de Ação da Concessionária e Relatórios de Monitoramento e Avaliação Final.")
+    run_mon_text.font.name = 'Aptos'
+    run_mon_text.font.size = Pt(11)
+
+    # ----------------------------------------------------
+    # 5. SEÇÃO: FISCALIZAÇÃO (Seção 3)
+    # ----------------------------------------------------
+    adicionar_titulo_secao(doc, "3. FISCALIZAÇÃO")
+    doc.add_paragraph()  # Pula uma linha abaixo do título
+    
+    # Parágrafo 1 de Fiscalização
+    p_fisc1 = doc.add_paragraph()
+    p_fisc1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p_fisc1.paragraph_format.space_after = Pt(6)
+    p_fisc1.paragraph_format.line_spacing = 1.15
+    
+    p_fisc1.add_run("As ações de fiscalização foram realizadas pela equipe formada pelos Analistas de Regulação ").font.name = 'Aptos'
+    run_n1 = p_fisc1.add_run("Alcides Vieira de Azevedo Bezerra")
+    run_n1.bold = True
+    run_n1.font.name = 'Aptos'
+    p_fisc1.add_run(", matrícula 40672015/01, ").font.name = 'Aptos'
+    run_n2 = p_fisc1.add_run("Enildo Manoel da Silva Júnior")
+    run_n2.bold = True
+    run_n2.font.name = 'Aptos'
+    p_fisc1.add_run(", matrícula nº 1796500/02 e ").font.name = 'Aptos'
+    run_n3 = p_fisc1.add_run("Maria Fernanda da Silva Novaes")
+    run_n3.bold = True
+    run_n3.font.name = 'Aptos'
+    
+    p_fisc1.add_run(", matrícula nº 18471080/01 nos dias 9 de junho de 2026. Nessas ações foram identificados 33 achados de fiscalização nas áreas sob concessão por meio de um levantamento de campo nas Rodovias com evidências de defeitos que poderiam se caracterizar Não Conformidades.").font.name = 'Aptos'
+    
+    # Parágrafo 2 de Fiscalização
+    p_fisc2 = doc.add_paragraph()
+    p_fisc2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p_fisc2.paragraph_format.space_after = Pt(6)
+    p_fisc2.paragraph_format.line_spacing = 1.15
+    run_fisc2 = p_fisc2.add_run(
+        "Esses achados foram avaliados tomando por base as orientações do PDCL, em especial, o Subitem 4.2.2.1.3 - Parâmetros Mínimos Exigidos, "
+        "visualizando que \"os pavimentos deverão ser analisados quanto às suas condições de superfície, conforto, deformabilidade, vida remanescente e segurança”, "
+        "e ainda que os “parâmetros de aceitabilidade do pavimento para essas condições que deverão ser totalmente atendidas durante o período de CONCESSÃO”."
+    )
+    run_fisc2.font.name = 'Aptos'
+    run_fisc2.font.size = Pt(11)
+    
+    # Parágrafo 3 de Fiscalização
+    p_fisc3 = doc.add_paragraph()
+    p_fisc3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p_fisc3.paragraph_format.space_after = Pt(6)
+    p_fisc3.paragraph_format.line_spacing = 1.15
+    run_fisc3 = p_fisc3.add_run(
+        "As Não Conformidades registradas no Quadro 1, a seguir, associadas aos respectivos subtrechos, foram avaliadas pelos valores do Índice de "
+        "Gravidade Global (IGG) que ultrapassaram o limite máximo previsto ≥ 30, como também os valores do Índice Irregularidade Longitudinal (IRI) "
+        "que ultrapassaram o limite máximo previsto ≥ 2,7 m/km constantes do Relatório Anual 01 de novembro/2025 elaborado pelo Verificador Independente."
+    )
+    run_fisc3.font.name = 'Aptos'
+    run_fisc3.font.size = Pt(11)

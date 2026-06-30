@@ -204,13 +204,13 @@ def gerar_sumario(doc):
     p.paragraph_format.space_after = Pt(24)
     
     linhas = [
-        "\tINTRODUÇÃO\t4",
-        "1.\tOBJETIVO\t4",
-        "2.\tMETODOLOGIA\t5",
-        "3.\tFISCALIZAÇÃO\t7",
-        "4.\tDETERMINAÇÕES GERAIS\t11",
-        "5.\tRECOMENDAÇÕES\t11",
-        "6.\tCONCLUSÕES\t11",
+        "1.\tINTRODUÇÃO\t4",
+        "2.\tOBJETIVO\t4",
+        "3.\tMETODOLOGIA\t5",
+        "4.\tFISCALIZAÇÃO\t7",
+        "5.\tDETERMINAÇÕES GERAIS\t11",
+        "6.\tRECOMENDAÇÕES\t11",
+        "7.\tCONCLUSÕES\t11",
         "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
     ]
     
