@@ -59,9 +59,12 @@ def adicionar_texto_centralizado(doc, texto, tamanho_fonte=12):
 
 def adicionar_titulo_secao(doc, texto):
     """Adiciona um título de seção formatado."""
-
     secao = doc.add_paragraph()
-    secao.add_run(texto).bold = True
+    run = secao.add_run(texto)
+    run.bold = True
+    run.font.size = Pt(12)
+    secao.paragraph_format.space_before = Pt(12)
+    secao.paragraph_format.space_after = Pt(6)
 
 
 # Função para ajustar a largura das colunas
