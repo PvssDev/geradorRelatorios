@@ -31,6 +31,8 @@ def gerar_capa_primeira_pagina(doc, logo_path):
     if os.path.exists(logo_path):
         doc.add_picture(logo_path, width=Inches(4.5))
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+    doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
     
     # 2. Títulos Principais
     titulos = [
@@ -49,8 +51,6 @@ def gerar_capa_primeira_pagina(doc, logo_path):
             p.paragraph_format.space_after = Pt(6)
         else:
             p.paragraph_format.space_after = Pt(24)
-
-
 
     
     # 3. Lista de Analistas
@@ -76,9 +76,11 @@ def gerar_capa_primeira_pagina(doc, logo_path):
         run_cargo = p_cargo.add_run(cargo)
         run_cargo.font.size = Pt(12)
         
-        # Pular uma linha (espaço de 12pt) após o Alcides, e 0 para os outros
         if "Alcides" in nome:
-            p_cargo.paragraph_format.space_after = Pt(12)
+            p_cargo.paragraph_format.space_after = Pt(0)
+            doc.add_paragraph()  # Linha vazia abaixo de Alcides
+        elif "Enildo" in nome:
+            p_cargo.paragraph_format.space_after = Pt(12)  # Espaço após o parágrafo de Enildo
         else:
             p_cargo.paragraph_format.space_after = Pt(0)
     

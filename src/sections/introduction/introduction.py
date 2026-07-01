@@ -8,9 +8,9 @@ def gerar_secao_introducao(doc: Document, row):
     """Gera as seções de Introdução, Objetivo, Informações Gerais, Metodologia e Fiscalização."""
     
     # ----------------------------------------------------
-    # 1. SEÇÃO: INTRODUÇÃO (Sem número)
+    # 1. SEÇÃO: INTRODUÇÃO (Seção 1)
     # ----------------------------------------------------
-    adicionar_titulo_secao(doc, "INTRODUÇÃO")
+    adicionar_titulo_secao(doc, "1. INTRODUÇÃO")
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
     paragraphs_intro = [
@@ -27,14 +27,35 @@ def gerar_secao_introducao(doc: Document, row):
         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         p.paragraph_format.space_after = Pt(6)
         p.paragraph_format.line_spacing = 1.15
-        run = p.add_run(text)
-        run.font.name = 'Aptos'
-        run.font.size = Pt(11)
+        
+        if "302 (Doc. SEI 75605952)" in text:
+            # Divide o texto para colorir "302 (Doc. SEI 75605952)" em vermelho
+            part1 = "É importante observar que foram realizadas ações de fiscalização, no dia 9 de junho de 2026, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº "
+            part2 = "302 (Doc. SEI 75605952)"
+            part3 = "."
+            
+            run1 = p.add_run(part1)
+            run1.font.name = 'Aptos'
+            run1.font.size = Pt(11)
+            
+            run2 = p.add_run(part2)
+            run2.font.name = 'Aptos'
+            run2.font.size = Pt(11)
+            from docx.shared import RGBColor
+            run2.font.color.rgb = RGBColor(255, 0, 0)
+            
+            run3 = p.add_run(part3)
+            run3.font.name = 'Aptos'
+            run3.font.size = Pt(11)
+        else:
+            run = p.add_run(text)
+            run.font.name = 'Aptos'
+            run.font.size = Pt(11)
 
     # ----------------------------------------------------
-    # 2. SEÇÃO: OBJETIVO (Seção 1)
+    # 2. SEÇÃO: OBJETIVO (Seção 2)
     # ----------------------------------------------------
-    adicionar_titulo_secao(doc, "1. OBJETIVO")
+    adicionar_titulo_secao(doc, "2. OBJETIVO")
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
     text_objetivo = (
@@ -160,10 +181,10 @@ def gerar_secao_introducao(doc: Document, row):
             row_obj.cells[1].width = col_widths[1]
 
     # ----------------------------------------------------
-    # 4. SEÇÃO: METODOLOGIA (Seção 2)
+    # 4. SEÇÃO: METODOLOGIA (Seção 3)
     # ----------------------------------------------------
     doc.add_paragraph()  # Pula uma linha antes do título
-    adicionar_titulo_secao(doc, "2. METODOLOGIA")
+    adicionar_titulo_secao(doc, "3. METODOLOGIA")
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
     # Parágrafos iniciais da Metodologia
@@ -216,6 +237,9 @@ def gerar_secao_introducao(doc: Document, row):
         if recuado:
             p.paragraph_format.left_indent = Pt(70.8)
             run = p.add_run(text)
+            run.font.name = 'Aptos'
+            run.font.size = Pt(9)
+            run.font.italic = True
         elif is_bullet:
             p.paragraph_format.left_indent = Pt(36.0)
             p.paragraph_format.first_line_indent = Pt(-18.0)
@@ -223,11 +247,12 @@ def gerar_secao_introducao(doc: Document, row):
             run_bullet.font.name = 'Aptos'
             run_bullet.font.size = Pt(11)
             run = p.add_run(text)
+            run.font.name = 'Aptos'
+            run.font.size = Pt(11)
         else:
             run = p.add_run(text)
-            
-        run.font.name = 'Aptos'
-        run.font.size = Pt(11)
+            run.font.name = 'Aptos'
+            run.font.size = Pt(11)
 
     doc.add_paragraph()
     
@@ -304,9 +329,9 @@ def gerar_secao_introducao(doc: Document, row):
     run_mon_text.font.size = Pt(11)
 
     # ----------------------------------------------------
-    # 5. SEÇÃO: FISCALIZAÇÃO (Seção 3)
+    # 5. SEÇÃO: FISCALIZAÇÃO (Seção 4)
     # ----------------------------------------------------
-    adicionar_titulo_secao(doc, "3. FISCALIZAÇÃO")
+    adicionar_titulo_secao(doc, "4. FISCALIZAÇÃO")
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
     # Parágrafo 1 de Fiscalização
