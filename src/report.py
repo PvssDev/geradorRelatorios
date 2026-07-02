@@ -10,8 +10,9 @@ import os
 import io
 from sections.introduction.introduction import gerar_secao_introducao
 from sections.cabecalho.cabecalho import gerar_capa_primeira_pagina
+from sections.quadros.quadros import gerar_secao_quadros
+from sections.finalizacao.finalizacao import gerar_secao_finalizacao
 from utils import (
-    adicionar_texto_centralizado,
     ajustar_largura_colunas,
     arquivo_em_uso,
     normalizar_status_gerado,
@@ -155,6 +156,8 @@ def gerar_relatorio(
 
         # Geração das Seções
         gerar_secao_introducao(doc, row)
+        gerar_secao_quadros(doc)
+        gerar_secao_finalizacao(doc)
 
         # Sanitização e Salvamento
         id_safe = "".join([c if c not in r'\/:*?"<>|' else "_" for c in str(id_fisc)]).strip()

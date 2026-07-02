@@ -4,11 +4,7 @@ from openpyxl import load_workbook
 import os
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
-from PIL import Image
-import io
 import pandas as pd
-
 
 def normalizar_status_gerado(serie):
     """Converte a coluna 'Relatório Gerado' para bool de forma consistente."""
@@ -32,31 +28,6 @@ def normalizar_status_gerado(serie):
     return serie.map(parse)
 
 
-# Funções auxiliares de formatação:
-def adicionar_paragrafo_justificado(doc, texto, tamanho_fonte=12):
-    """Adiciona um parágrafo com texto justificado."""
-
-    paragrafo = doc.add_paragraph(texto)
-    paragrafo.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY_LOW
-
-    # Ajustar fonte se necessário (o padrão do python-docx é Calibri)
-    # for run in paragraph.runs:
-    #     run.font.name = 'Arial'
-    #     run.font.size = Pt(tamanho_fonte)
-
-
-def adicionar_texto_centralizado(doc, texto, tamanho_fonte=12):
-    """Adiciona um parágrafo com texto centralizado."""
-
-    paragraph = doc.add_paragraph()
-    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = paragraph.add_run(texto)
-    run.bold = True
-
-    # run.font.name = 'Arial'
-    # run.font.size = Pt(tamanho_fonte)
-
-
 def adicionar_titulo_secao(doc, texto):
     """Adiciona um título de seção formatado."""
     secao = doc.add_paragraph()
@@ -67,8 +38,8 @@ def adicionar_titulo_secao(doc, texto):
     secao.paragraph_format.space_after = Pt(6)
 
 
-# Função para ajustar a largura das colunas
 def ajustar_largura_colunas(caminho_planilha):
+    """Ajusta a largura das colunas do Excel para caber o conteúdo."""
     wb = load_workbook(caminho_planilha)
     ws = wb.active
 
@@ -90,47 +61,13 @@ def ajustar_largura_colunas(caminho_planilha):
     wb.save(caminho_planilha)
 
 
-# Função para verificar se arquivo está em uso
 def arquivo_em_uso(caminho):
+    """Verifica se arquivo está em uso/aberto por outro programa."""
     try:
         os.rename(caminho, caminho)
         return False
     except PermissionError:
         return True
-
-
-def aplicar_estilo_texto(
-    run, tamanho=12, negrito=False, fonte="Arial", cor_rgb=(0, 0, 0)
-):
-    run.font.name = fonte
-    run._element.rPr.rFonts.set(qn("w:eastAsia"), fonte)
-    run.font.size = Pt(tamanho)
-    run.bold = negrito
-    run.font.color.rgb = RGBColor(*cor_rgb)
-
-
-def aplicar_borda_paragrafo(paragraph):
-    p = paragraph._element
-    pPr = p.get_or_add_pPr()
-    borders = OxmlElement("w:pBdr")
-    for border_name in ("top", "left", "bottom", "right"):
-        border = OxmlElement(f"w:{border_name}")
-        border.set(qn("w:val"), "single")
-        border.set(qn("w:sz"), "4")
-        border.set(qn("w:space"), "2")
-        border.set(qn("w:color"), "000000")
-        borders.append(border)
-    pPr.append(borders)
-
-
-def aplicar_fundo_cinza_paragrafo(paragraph):
-    p = paragraph._element
-    pPr = p.get_or_add_pPr()
-    shd = OxmlElement('w:shd')
-    shd.set(qn('w:val'), 'clear')
-    shd.set(qn('w:color'), 'auto')
-    shd.set(qn('w:fill'), 'D9D9D9') # Cinza claro
-    pPr.append(shd)
 
 
 def adicionar_texto_caixa_cinza(doc, texto, altura_cm=1.0):
@@ -162,28 +99,3 @@ def adicionar_texto_caixa_cinza(doc, texto, altura_cm=1.0):
     # Ajusta espaçamento interno do parágrafo para 0, já que a célula está centralizada verticalmente
     p.paragraph_format.space_before = Pt(0)
     p.paragraph_format.space_after = Pt(0)
-
-def adicionar_legenda_formatada(doc, texto):
-    par = doc.add_paragraph()
-    run = par.add_run(texto)
-    aplicar_estilo_texto(run, tamanho=10, fonte="Arial", cor_rgb=(90, 90, 90))
-    par.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    aplicar_borda_paragrafo(par)
-
-
-def processar_imagem_para_relatorio(caminho_imagem, largura_max=1024, qualidade=80):
-    # Abre a imagem
-    img = Image.open(caminho_imagem)
-    # Converte para RGB se necessário (evita problemas com PNG/transparência)
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    # Redimensiona mantendo proporção
-    if img.width > largura_max:
-        proporcao = largura_max / float(img.width)
-        altura_nova = int(float(img.height) * proporcao)
-        img = img.resize((largura_max, altura_nova), Image.LANCZOS)
-    # Salva em memória, sem metadados, com compressão JPEG
-    buffer = io.BytesIO()
-    img.save(buffer, format="JPEG", quality=qualidade, optimize=True)
-    buffer.seek(0)
-    return buffer
