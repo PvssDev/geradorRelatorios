@@ -367,16 +367,3 @@ def gerar_secao_introducao(doc: Document, row):
     )
     run_fisc2.font.name = 'Aptos'
     run_fisc2.font.size = Pt(11)
-    
-    # Parágrafo 3 de Fiscalização
-    p_fisc3 = doc.add_paragraph()
-    p_fisc3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p_fisc3.paragraph_format.space_after = Pt(6)
-    p_fisc3.paragraph_format.line_spacing = 1.15
-    run_fisc3 = p_fisc3.add_run(
-        "As Não Conformidades registradas no Quadro 1, a seguir, associadas aos respectivos subtrechos, foram avaliadas pelos valores do Índice de "
-        "Gravidade Global (IGG) que ultrapassaram o limite máximo previsto ≥ 30, como também os valores do Índice Irregularidade Longitudinal (IRI) "
-        "que ultrapassaram o limite máximo previsto ≥ 2,7 m/km constantes do Relatório Anual 01 de novembro/2025 elaborado pelo Verificador Independente."
-    )
-    run_fisc3.font.name = 'Aptos'
-    run_fisc3.font.size = Pt(11)

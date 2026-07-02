@@ -2,7 +2,7 @@ from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_SECTION
 import os
-from utils import adicionar_texto_centralizado, adicionar_texto_caixa_cinza
+from utils import adicionar_texto_caixa_cinza
 
 def gerar_capa_primeira_pagina(doc, logo_path):
     """

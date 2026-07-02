@@ -1,0 +1,25 @@
+P3 [Heading 3]: DETERMINAÇÕES GERAIS
+P5 [Normal]: Considerando os dispositivos contratuais pertinentes e visando garantir a qualidade dos serviços prestados, determina-se que a CRA tome as seguintes medidas através de um plano de ação:
+P6 [Normal]: Medidas de Manutenção / Conservação, detalhando cronograma com trechos a executar de forma que permita à Arpe uma programação mais efetiva do monitoramento de suas soluções a execução de cada subtrecho, conforme o modelo encaminhado para 2025 (Cronograma de Conserva Especial do Pavimento CRA 2025).
+P7 [Normal]: Medidas imediatas resolutividade das NC de Sinalização, nos prazos estabelecidos no subitem 4.1.3.3.2.4. Tachas e Tachões Refletivos do PDCL, conforme disposto no Quadro 1, na coluna denominada Determinações.
+P9 [Heading 3]: RECOMENDAÇÕES
+P11 [Normal]: Considerando as disposições do Contrato de Concessão, em especial, o Anexo IV - PDCL, Outras Sinalizações, dados do Relatório Anual 01 de novembro/2025 elaborado VI, e outras legislação aplicável, devem ser observadas pela CRA as seguintes recomendações:
+P12 [Normal]: Levantar a necessidade de reposição da SINALIZAÇÃO por tachas e tachões em todo o complexo viário Express Way,  em especial a retirada das tachar anteriores danificadas que podem causar risco a segurança dos usuários. O vi verificou deficiências em todos os trechos.
+P14 [Heading 3]: CONCLUSÕES
+P16 [Normal]: Tendo em vista as ações de fiscalização realizadas pela Arpe foram constatadas quatorze (14) pontos ou trechos fiscalizados que apresentaram Não Conformidades distribuídas majoritariamente na PE 009, estas foram analisadas e caracterizadas a partir dos indicadores do Grupo Condição de Superfície definidos no Contrato de Concessão CT. nº 043/2011.
+P17 [Normal]: Assim considerando a Programação de Conserva Especial do Pavimento - CRA 2026, solicita-se a inclusão destas não conformidades no cronograma detalhado de Conserva Especial do Pavimento que permita à Arpe uma realização mais efetiva dos monitoramentos ao longo de 2026.
+P18 [Normal]: Recomenda-se, por fim, o encaminhamento deste Relatório de Fiscalização para que Suape, na qualidade de Gestor do Contrato e Regulador desse Sistema Viário, realize as providências cabíveis junto à Concessionária Rota do Atlântico com o objetivo de garantir a regularização das Não Conformidades pendentes apontadas por esta Agência de Regulação.
+P19 [Normal]: Recife, data da assinatura eletrônica.
+P21 [Heading 3]: APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES
+P27 [Heading 3]: APÊNDICE B – REGISTROS FOTOGRÁFICOS DAS PONTOS DE ATENÇÃO
+P30 [Normal]: Recife, data da assinatura eletrônica.
+P33 [Body Text]: Alcides Vieira de Azevedo Bezerra
+P34 [Normal]: Analista de Regulação
+P35 [Normal]: Matrícula 40672015/01
+P37 [Body Text]: Enildo Manoel da Silva Júnior
+P38 [Normal]: Analista de Regulação
+P39 [Normal]: Matrícula nº 1796500/02
+P41 [Normal]: Ciente e de acordo.
+P43 [Body Text]: Maria Ângela Albuquerque de Freitas
+P44 [Normal]: Coordenadora de Transportes e Rodovias
+P45 [Normal]: Matrícula nº 209640/01
