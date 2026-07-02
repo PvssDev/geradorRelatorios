@@ -5,6 +5,11 @@ import pandas as pd
 import io
 from datetime import datetime
 from report import gerar_relatorio
+from database.manager import (
+    carregar_responsaveis, salvar_responsaveis,
+    carregar_coordenadores, salvar_coordenadores,
+    carregar_contratos, salvar_contratos
+)
 st.set_page_config(page_title="Gerador de Relatórios ARPE", layout="wide")
 
 @st.dialog("Visualização Completa da Imagem", width="large")
@@ -69,6 +74,123 @@ def confirmar_exclusao_nc_modal(nc_keys):
         if st.button("Cancelar", use_container_width=True, key="btn_cancel_nc_del"):
             st.rerun()
 
+@st.dialog("Gerenciar Pessoal Responsável")
+def gerenciar_responsaveis_modal():
+    st.write("Adicione, veja ou remova os responsáveis técnicos pela fiscalização.")
+    
+    # 1. Inputs para adicionar novo
+    novo_resp = st.text_input("Nome do Novo Responsável")
+    nova_matricula = st.text_input("Número de Matrícula (ex: 40672015/01)")
+    nova_funcao = st.text_input("Função / Cargo (ex: Analista de Regulação)")
+    
+    if st.button("➕ Adicionar", use_container_width=True):
+        if not novo_resp.strip():
+            st.error("O nome do responsável é obrigatório.")
+        elif not nova_matricula.strip():
+            st.error("O número de matrícula é obrigatório.")
+        elif not nova_funcao.strip():
+            st.error("A função / cargo é obrigatória.")
+        else:
+            nomes_existentes = [r["nome"].strip().lower() for r in st.session_state.pessoal_responsaveis]
+            if novo_resp.strip().lower() not in nomes_existentes:
+                st.session_state.pessoal_responsaveis.append({
+                    "nome": novo_resp.strip(),
+                    "matricula": nova_matricula.strip(),
+                    "funcao": nova_funcao.strip()
+                })
+                salvar_responsaveis(st.session_state.pessoal_responsaveis)
+                st.success(f"'{novo_resp.strip()}' adicionado!")
+                st.rerun()
+            else:
+                st.warning("Este nome já está cadastrado.")
+            
+    st.divider()
+    
+    # 2. Lista atual com opção de remover
+    st.write("**Responsáveis Cadastrados:**")
+    if not st.session_state.pessoal_responsaveis:
+        st.info("Nenhum responsável cadastrado.")
+    else:
+        for idx, resp in enumerate(st.session_state.pessoal_responsaveis):
+            col_name, col_del = st.columns([4, 1])
+            with col_name:
+                st.markdown(f"- **{resp['nome']}**  \n  *{resp['funcao']} - Matrícula: {resp['matricula']}*")
+            with col_del:
+                if st.button("🗑️", key=f"del_resp_{idx}"):
+                    st.session_state.pessoal_responsaveis.pop(idx)
+                    salvar_responsaveis(st.session_state.pessoal_responsaveis)
+                    st.rerun()
+
+@st.dialog("Gerenciar Coordenadores")
+def gerenciar_coordenadores_modal():
+    st.write("Adicione, veja ou remova os coordenadores da fiscalização.")
+    
+    # 1. Input para adicionar novo
+    novo_coord = st.text_input("Nome do Novo Coordenador")
+    if st.button("➕ Adicionar Coordenador", use_container_width=True):
+        if novo_coord.strip():
+            if novo_coord.strip() not in st.session_state.coordenadores:
+                st.session_state.coordenadores.append(novo_coord.strip())
+                salvar_coordenadores(st.session_state.coordenadores)
+                st.success(f"'{novo_coord.strip()}' adicionado!")
+                st.rerun()
+            else:
+                st.warning("Este nome já está na lista.")
+        else:
+            st.error("O nome não pode ser vazio.")
+            
+    st.divider()
+    
+    # 2. Lista atual com opção de remover
+    st.write("**Coordenadores Cadastrados:**")
+    if not st.session_state.coordenadores:
+        st.info("Nenhum coordenador cadastrado.")
+    else:
+        for idx, coord in enumerate(st.session_state.coordenadores):
+            col_name, col_del = st.columns([4, 1])
+            with col_name:
+                st.write(f"- {coord}")
+            with col_del:
+                if st.button("🗑️", key=f"del_coord_{idx}"):
+                    st.session_state.coordenadores.pop(idx)
+                    salvar_coordenadores(st.session_state.coordenadores)
+                    st.rerun()
+
+@st.dialog("Gerenciar Contratos")
+def gerenciar_contratos_modal():
+    st.write("Adicione, veja ou remova os números de contrato cadastrados.")
+    
+    # 1. Input para adicionar novo
+    novo_contrato = st.text_input("Número do Novo Contrato")
+    if st.button("➕ Adicionar Contrato", use_container_width=True):
+        if novo_contrato.strip():
+            if novo_contrato.strip() not in st.session_state.contratos:
+                st.session_state.contratos.append(novo_contrato.strip())
+                salvar_contratos(st.session_state.contratos)
+                st.success(f"'{novo_contrato.strip()}' adicionado!")
+                st.rerun()
+            else:
+                st.warning("Este contrato já está na lista.")
+        else:
+            st.error("O número do contrato não pode ser vazio.")
+            
+    st.divider()
+    
+    # 2. Lista atual com opção de remover
+    st.write("**Contratos Cadastrados:**")
+    if not st.session_state.contratos:
+        st.info("Nenhum contrato cadastrado.")
+    else:
+        for idx, cont in enumerate(st.session_state.contratos):
+            col_name, col_del = st.columns([4, 1])
+            with col_name:
+                st.write(f"- {cont}")
+            with col_del:
+                if st.button("🗑️", key=f"del_cont_{idx}"):
+                    st.session_state.contratos.pop(idx)
+                    salvar_contratos(st.session_state.contratos)
+                    st.rerun()
+
 st.title("📄 Gerador de Relatórios de Fiscalização")
 
 # Layout principal da aplicação
@@ -127,15 +249,22 @@ with st.container():
     if st.session_state.fill_photos:
         st.session_state.carousel_index = min(st.session_state.carousel_index, len(st.session_state.fill_photos) - 1)
         st.session_state.carousel_index = max(0, st.session_state.carousel_index)
-
     if "temp_fiscalizacoes" not in st.session_state:
         st.session_state.temp_fiscalizacoes = []
     if "temp_nc" not in st.session_state:
         st.session_state.temp_nc = []
     if "nc_form_counter" not in st.session_state:
         st.session_state.nc_form_counter = 0
+    if "pessoal_responsaveis" not in st.session_state or (
+        st.session_state.pessoal_responsaveis and isinstance(st.session_state.pessoal_responsaveis[0], str)
+    ):
+        st.session_state.pessoal_responsaveis = carregar_responsaveis()
+    if "coordenadores" not in st.session_state:
+        st.session_state.coordenadores = carregar_coordenadores()
+    if "contratos" not in st.session_state:
+        st.session_state.contratos = carregar_contratos()
 
-    with st.form("form_fiscalizacao"):
+    with st.container(border=True):
         col1, col2 = st.columns(2)
         with col1:
             id_fisc = st.text_input("ID da Fiscalização (ex: 2026-001)", help="Identificador único para vincular as abas")
@@ -144,12 +273,50 @@ with st.container():
             cidade = st.text_input("Cidade (ex: Recife)", placeholder="Cidade do Terminal")
             local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
         with col2:
-            responsaveis = st.text_input("Pessoal Responsável (ex: Nome 1, Nome 2)", placeholder="Investigadores")
-            coordenador = st.text_input("Coordenador", placeholder="Nome do Coordenador")
-            contrato = st.text_input("Número do Contrato", value="1.041.080/08")
+            col_resp, col_gear = st.columns([5, 1])
+            with col_resp:
+                responsaveis_sel = st.multiselect(
+                    "Pessoal Responsável",
+                    options=st.session_state.pessoal_responsaveis,
+                    default=st.session_state.pessoal_responsaveis,
+                    format_func=lambda x: x["nome"],
+                    help="Selecione os responsáveis pela fiscalização. Use a engrenagem ao lado para gerenciar a lista."
+                )
+                responsaveis = ", ".join([r["nome"] for r in responsaveis_sel])
+            with col_gear:
+                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("⚙️", help="Gerenciar Responsáveis", key="btn_manage_responsaveis"):
+                    gerenciar_responsaveis_modal()
+            
+            # Coordenador
+            col_coord, col_gear_coord = st.columns([5, 1])
+            with col_coord:
+                coordenador = st.selectbox(
+                    "Coordenador",
+                    options=st.session_state.coordenadores,
+                    help="Selecione o coordenador da fiscalização. Use a engrenagem ao lado para gerenciar a lista."
+                )
+            with col_gear_coord:
+                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("⚙️", help="Gerenciar Coordenadores", key="btn_manage_coordenadores"):
+                    gerenciar_coordenadores_modal()
+            
+            # Número do Contrato
+            col_cont, col_gear_cont = st.columns([5, 1])
+            with col_cont:
+                contrato = st.selectbox(
+                    "Número do Contrato",
+                    options=st.session_state.contratos,
+                    help="Selecione o número do contrato. Use a engrenagem ao lado para gerenciar a lista."
+                )
+            with col_gear_cont:
+                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("⚙️", help="Gerenciar Contratos", key="btn_manage_contratos"):
+                    gerenciar_contratos_modal()
+
             periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
 
-        submit_fisc = st.form_submit_button("➕ Adicionar Fiscalização")
+        submit_fisc = st.button("➕ Adicionar Fiscalização")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
             if not id_fisc:
@@ -190,6 +357,7 @@ with st.container():
                     st.warning(f"⚠️ Atenção: Os seguintes campos opcionais de preenchimento ficaram em branco: {', '.join(campos_em_branco)}.")
                 
                 st.success(f"Fiscalização {id_fisc} adicionada!")
+                st.rerun()
 
     st.divider()
     st.subheader("🚩 Não Conformidades (NC)")
