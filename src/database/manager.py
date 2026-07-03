@@ -30,7 +30,11 @@ DEFAULT_RESPONSAVEIS = [
 ]
 
 DEFAULT_COORDENADORES = [
-    "Maria Ângela Albuquerque de Freitas"
+    {
+        "nome": "Maria Ângela Albuquerque de Freitas",
+        "matricula": "209640/01",
+        "funcao": "Coordenadora de Transportes e Rodovias"
+    }
 ]
 
 DEFAULT_CONTRATOS = [
@@ -87,6 +91,21 @@ def carregar_coordenadores():
         with open(COORDENADORES_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, list):
+                # Se for lista de strings (versão antiga), converte para a nova estrutura de dicionários
+                if data and isinstance(data[0], str):
+                    nova_lista = []
+                    for nome in data:
+                        match = next((d for d in DEFAULT_COORDENADORES if d["nome"] == nome), None)
+                        if match:
+                            nova_lista.append(match)
+                        else:
+                            nova_lista.append({
+                                "nome": nome,
+                                "matricula": "xxxxxx/xx",
+                                "funcao": "Coordenador(a)"
+                            })
+                    salvar_coordenadores(nova_lista)
+                    return nova_lista
                 return data
             return DEFAULT_COORDENADORES.copy()
     except Exception:

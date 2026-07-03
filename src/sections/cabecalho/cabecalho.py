@@ -4,13 +4,14 @@ from docx.enum.section import WD_SECTION
 import os
 from utils import adicionar_texto_caixa_cinza
 
-def gerar_capa_primeira_pagina(doc, logo_path):
+def gerar_capa_primeira_pagina(doc, logo_path, row):
     """
-    Gera a primeira página do relatório (Capa) baseada no modelo de referência.
+    Gera a primeira página do relatório (Capa) baseada no modelo de referência com dados dinâmicos.
     """
     from docx.shared import Cm
-    
     from docx.shared import Inches
+    from database.manager import carregar_responsaveis
+    from utils import formatar_mes_ano, extrair_ano
     
     # 0. Ajuste de Estilo e Margens (Explicitas de 0.5 polegadas conforme a referência)
     style = doc.styles['Normal']
@@ -25,7 +26,8 @@ def gerar_capa_primeira_pagina(doc, logo_path):
     section.right_margin = Inches(0.5)
 
     # 1. Texto Superior em Caixa Cinza (tabela 1x1 sem bordas)
-    adicionar_texto_caixa_cinza(doc, "RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº 01/2026")
+    ano = extrair_ano(row["Data"])
+    adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº 01/{ano}")
     
     # 1. Imagem da Capa
     if os.path.exists(logo_path):
@@ -40,7 +42,6 @@ def gerar_capa_primeira_pagina(doc, logo_path):
         "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DO ATLÂNTICO (CRA)",
         "CONTRATO DE CONCESSÃO CT. Nº 043/2011"
     ]
-    from docx.shared import Cm
     for idx, titulo in enumerate(titulos):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -53,14 +54,19 @@ def gerar_capa_primeira_pagina(doc, logo_path):
             p.paragraph_format.space_after = Pt(24)
 
     
-    # 3. Lista de Analistas
-    analistas = [
-        ("Alcides Vieira de Azevedo Bezerra", "Analista de Regulação, matrícula nº 40672015/01"),
-        ("Enildo Manoel da Silva Júnior", "Analista de Regulação, matrícula nº 1796500/02"),
-        ("Maria Fernanda da Silva Novaes", "Auxiliar de Regulação, matrícula nº 18471080/01")
-    ]
+    # 3. Lista de Analistas Dinâmica
+    responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+    db_resp = carregar_responsaveis()
     
-    for nome, cargo in analistas:
+    analistas = []
+    for nome in responsaveis_list:
+        match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
+        if match:
+            analistas.append((match["nome"], f"{match['funcao']}, matrícula nº {match['matricula']}"))
+        else:
+            analistas.append((nome, "Analista de Regulação, matrícula nº xxxxxxx/xx"))
+    
+    for i, (nome, cargo) in enumerate(analistas):
         # Nome em negrito
         p_nome = doc.add_paragraph()
         p_nome.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -76,28 +82,27 @@ def gerar_capa_primeira_pagina(doc, logo_path):
         run_cargo = p_cargo.add_run(cargo)
         run_cargo.font.size = Pt(12)
         
-        if "Alcides" in nome:
-            p_cargo.paragraph_format.space_after = Pt(0)
-            doc.add_paragraph()  # Linha vazia abaixo de Alcides
-        elif "Enildo" in nome:
-            p_cargo.paragraph_format.space_after = Pt(12)  # Espaço após o parágrafo de Enildo
+        if i == len(analistas) - 1:
+            p_cargo.paragraph_format.space_after = Pt(12)  # Espaço após o parágrafo do último
         else:
             p_cargo.paragraph_format.space_after = Pt(0)
+            doc.add_paragraph()  # Linha vazia abaixo de cada analista
     
-    # 4. Data
+    # 4. Data Dinâmica
     p_data = doc.add_paragraph()
     p_data.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_data = p_data.add_run("Dezembro, 2025")
+    data_extenso = formatar_mes_ano(row["Data"])
+    run_data = p_data.add_run(data_extenso)
     run_data.bold = True
     run_data.font.size = Pt(12)
     # Espaçamento superior e inferior para isolar a data nativamente
     p_data.paragraph_format.space_before = Pt(24)
     p_data.paragraph_format.space_after = Pt(24)
     
-    # 5. Processo e SEI
+    # 5. Processo e SEI Dinâmicos
     rodape_textos = [
-        "RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº 07/2025 - CTR",
-        "SEI Nº xxxxxxxxxxxx/2025-XX"
+        f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº 07/{ano} - CTR",
+        f"SEI Nº xxxxxxxxxxxx/{ano}-XX"
     ]
     for idx, texto in enumerate(rodape_textos):
         p_rodape = doc.add_paragraph()
@@ -105,10 +110,7 @@ def gerar_capa_primeira_pagina(doc, logo_path):
         run_rodape = p_rodape.add_run(texto)
         run_rodape.bold = True
         run_rodape.font.size = Pt(12)
-        if idx == 0:
-            p_rodape.paragraph_format.space_after = Pt(0)
-        else:
-            p_rodape.paragraph_format.space_after = Pt(0)
+        p_rodape.paragraph_format.space_after = Pt(0)
     
     # 6. Quebra de página para ir para a Página 2 (Lista de Abreviaturas)
     doc.add_page_break()

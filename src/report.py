@@ -150,14 +150,26 @@ def gerar_relatorio(
         id_fisc = row["ID da Fiscalização"]
         doc = Document()
 
+        # Calcula o total de achados (soma de não conformidades com pontos de atenção)
+        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if not nc_df.empty else pd.DataFrame()
+        total_achados = 0
+        if not current_ncs.empty:
+            has_nc = 0
+            if "Não Conformidade" in current_ncs.columns:
+                has_nc = len(current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""])
+            has_pa = 0
+            if "Ponto de Atenção" in current_ncs.columns:
+                has_pa = len(current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""])
+            total_achados = has_nc + has_pa
+
         # Primeira Página (Capa)
         logo_capa_path = os.path.join(BASE_DIR, "assets/logo_capa.jpeg")
-        gerar_capa_primeira_pagina(doc, logo_capa_path)
+        gerar_capa_primeira_pagina(doc, logo_capa_path, row)
 
         # Geração das Seções
-        gerar_secao_introducao(doc, row)
+        gerar_secao_introducao(doc, row, total_achados)
         gerar_secao_quadros(doc)
-        gerar_secao_finalizacao(doc)
+        gerar_secao_finalizacao(doc, row, total_achados)
 
         # Sanitização e Salvamento
         id_safe = "".join([c if c not in r'\/:*?"<>|' else "_" for c in str(id_fisc)]).strip()

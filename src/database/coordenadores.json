@@ -1,3 +1,12 @@
 [
-  "Maria Ângela Albuquerque de Freitas"
+  {
+    "nome": "Maria Ângela Albuquerque de Freitas",
+    "matricula": "209640/01",
+    "funcao": "Coordenadora de Transportes e Rodovias"
+  },
+  {
+    "nome": "COORDENADOR",
+    "matricula": "NUMERO DE MATRICULA",
+    "funcao": "FUNÇÃO"
+  }
 ]
