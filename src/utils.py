@@ -99,3 +99,92 @@ def adicionar_texto_caixa_cinza(doc, texto, altura_cm=1.0):
     # Ajusta espaçamento interno do parágrafo para 0, já que a célula está centralizada verticalmente
     p.paragraph_format.space_before = Pt(0)
     p.paragraph_format.space_after = Pt(0)
+
+
+def formatar_data_extenso(data_val):
+    """Converte datas (Timestamp, string, datetime) para o formato 'd de mês de ano' em português."""
+    if pd.isna(data_val) or not data_val:
+        return "data da assinatura eletrônica"
+    
+    try:
+        from datetime import datetime
+        if hasattr(data_val, "to_pydatetime"):
+            dt = data_val.to_pydatetime()
+        elif isinstance(data_val, datetime):
+            dt = data_val
+        else:
+            data_str = str(data_val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    dt = datetime.strptime(data_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                return data_str
+        
+        meses = {
+            1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
+            5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+            9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+        }
+        return f"{dt.day} de {meses[dt.month]} de {dt.year}"
+    except Exception:
+        return str(data_val)
+
+
+def formatar_mes_ano(data_val):
+    """Converte datas para o formato 'Mês, Ano' em português (ex: 'Junho, 2026')."""
+    if pd.isna(data_val) or not data_val:
+        return "Dezembro, 2025"
+    
+    try:
+        from datetime import datetime
+        if hasattr(data_val, "to_pydatetime"):
+            dt = data_val.to_pydatetime()
+        elif isinstance(data_val, datetime):
+            dt = data_val
+        else:
+            data_str = str(data_val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    dt = datetime.strptime(data_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                return data_str
+        
+        meses = {
+            1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+            5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+            9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+        }
+        return f"{meses[dt.month]}, {dt.year}"
+    except Exception:
+        return str(data_val)
+
+
+def extrair_ano(data_val):
+    """Extrai o ano de uma data."""
+    if pd.isna(data_val) or not data_val:
+        return "2026"
+    try:
+        from datetime import datetime
+        if hasattr(data_val, "to_pydatetime"):
+            return str(data_val.year)
+        elif isinstance(data_val, datetime):
+            return str(data_val.year)
+        else:
+            data_str = str(data_val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    dt = datetime.strptime(data_str, fmt)
+                    return str(dt.year)
+                except ValueError:
+                    continue
+            if len(data_str) >= 4 and data_str[-4:].isdigit():
+                return data_str[-4:]
+            return "2026"
+    except Exception:
+        return "2026"

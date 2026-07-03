@@ -1,11 +1,32 @@
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from utils import adicionar_titulo_secao
+from utils import adicionar_titulo_secao, extrair_ano
+from database.manager import carregar_responsaveis, carregar_coordenadores
 
-def gerar_secao_finalizacao(doc: Document):
+def numero_por_extenso(n):
+    extenso_map = {
+        0: "zero", 1: "um", 2: "dois", 3: "três", 4: "quatro", 5: "cinco",
+        6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez",
+        11: "onze", 12: "doze", 13: "treze", 14: "quatorze", 15: "quinze",
+        16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove", 20: "vinte",
+        21: "vinte e um", 22: "vinte e dois", 23: "vinte e três", 24: "vinte e quatro",
+        25: "vinte e cinco", 26: "vinte e seis", 27: "vinte e sete", 28: "vinte e oito",
+        29: "vinte e nove", 30: "trinta", 31: "trinta e um", 32: "trinta e dois",
+        33: "trinta e três", 34: "trinta e quatro", 35: "trinta e cinco",
+        36: "trinta e seis", 37: "trinta e sete", 38: "trinta e oito", 39: "trinta e nove",
+        40: "quarenta", 41: "quarenta e um", 42: "quarenta e dois", 43: "quarenta e três",
+        44: "quarenta e quatro", 45: "quarenta e cinco", 46: "quarenta e seis",
+        47: "quarenta e sete", 48: "quarenta e oito", 49: "quarenta e nove", 50: "cinquenta"
+    }
+    return extenso_map.get(n, str(n))
+
+def gerar_secao_finalizacao(doc: Document, row, total_ncs):
     """Gera o restante do relatório a partir da seção 5 (Determinações Gerais) até as assinaturas finais."""
     
+    ano = extrair_ano(row["Data"])
+    ano_anterior = str(int(ano) - 1) if ano.isdigit() else "2025"
+
     # ----------------------------------------------------
     # 5. DETERMINAÇÕES GERAIS
     # ----------------------------------------------------
@@ -35,9 +56,9 @@ def gerar_secao_finalizacao(doc: Document):
     r_det2_1.font.size = Pt(11)
     
     r_det2_2 = p_det2.add_run(
-        " detalhando cronograma com trechos a executar de forma que permita à Arpe uma programação mais efetiva do "
-        "monitoramento de suas soluções a execução de cada subtrecho, conforme o modelo encaminhado para 2025 "
-        "(Cronograma de Conserva Especial do Pavimento CRA 2025)."
+        f" detalhando cronograma com trechos a executar de forma que permita à Arpe uma programação mais efetiva do "
+        f"monitoramento de suas soluções a execução de cada subtrecho, conforme o modelo encaminhado para {ano_anterior} "
+        f"(Cronograma de Conserva Especial do Pavimento CRA {ano_anterior})."
     )
     r_det2_2.font.name = 'Aptos'
     r_det2_2.font.size = Pt(11)
@@ -103,10 +124,12 @@ def gerar_secao_finalizacao(doc: Document):
     p_con1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     p_con1.paragraph_format.space_after = Pt(6)
     p_con1.paragraph_format.line_spacing = 1.15
+    
+    extenso_ncs = numero_por_extenso(total_ncs)
     run_con1 = p_con1.add_run(
-        "Tendo em vista as ações de fiscalização realizadas pela Arpe foram constatadas quatorze (14) pontos ou trechos "
-        "fiscalizados que apresentaram Não Conformidades distribuídas majoritariamente na PE 009, estas foram "
-        "analisadas e caracterizadas a partir dos indicadores do Grupo Condição de Superfície definidos no Contrato de Concessão CT. nº 043/2011."
+        f"Tendo em vista as ações de fiscalização realizadas pela Arpe foram constatadas {extenso_ncs} ({total_ncs}) pontos ou trechos "
+        f"fiscalizados que apresentaram Não Conformidades distribuídas majoritariamente na PE 009, estas foram "
+        f"analisadas e caracterizadas a partir dos indicadores do Grupo Condição de Superfície definidos no Contrato de Concessão CT. nº 043/2011."
     )
     run_con1.font.name = 'Aptos'
     run_con1.font.size = Pt(11)
@@ -116,9 +139,9 @@ def gerar_secao_finalizacao(doc: Document):
     p_con2.paragraph_format.space_after = Pt(6)
     p_con2.paragraph_format.line_spacing = 1.15
     run_con2 = p_con2.add_run(
-        "Assim considerando a Programação de Conserva Especial do Pavimento - CRA 2026, solicita-se a inclusão destas "
-        "não conformidades no cronograma detalhado de Conserva Especial do Pavimento que permita à Arpe uma "
-        "realização mais efetiva dos monitoramentos ao longo de 2026."
+        f"Assim considerando a Programação de Conserva Especial do Pavimento - CRA {ano}, solicita-se a inclusão destas "
+        f"não conformidades no cronograma detalhado de Conserva Especial do Pavimento que permita à Arpe uma "
+        f"realização mais efetiva dos monitoramentos ao longo de {ano}."
     )
     run_con2.font.name = 'Aptos'
     run_con2.font.size = Pt(11)
@@ -166,62 +189,50 @@ def gerar_secao_finalizacao(doc: Document):
     run_loc2.font.size = Pt(11)
     
     # ----------------------------------------------------
-    # ASSINATURAS FINAIS
+    # ASSINATURAS FINAIS DINÂMICAS
     # ----------------------------------------------------
     doc.add_paragraph()
     doc.add_paragraph()
     
-    # Alcides
-    p_ass1 = doc.add_paragraph()
-    p_ass1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_ass1.paragraph_format.space_after = Pt(0)
-    run_ass1 = p_ass1.add_run("Alcides Vieira de Azevedo Bezerra")
-    run_ass1.bold = True
-    run_ass1.font.name = 'Aptos'
-    run_ass1.font.size = Pt(11)
+    responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+    db_resp = carregar_responsaveis()
     
-    p_carg1 = doc.add_paragraph()
-    p_carg1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_carg1.paragraph_format.space_after = Pt(0)
-    run_carg1 = p_carg1.add_run("Analista de Regulação")
-    run_carg1.font.name = 'Aptos'
-    run_carg1.font.size = Pt(11)
-    
-    p_mat1 = doc.add_paragraph()
-    p_mat1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_mat1.paragraph_format.space_after = Pt(12)
-    run_mat1 = p_mat1.add_run("Matrícula 40672015/01")
-    run_mat1.font.name = 'Aptos'
-    run_mat1.font.size = Pt(11)
-    
-    doc.add_paragraph()  # Espaço entre assinaturas
-    
-    # Enildo
-    p_ass2 = doc.add_paragraph()
-    p_ass2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_ass2.paragraph_format.space_after = Pt(0)
-    run_ass2 = p_ass2.add_run("Enildo Manoel da Silva Júnior")
-    run_ass2.bold = True
-    run_ass2.font.name = 'Aptos'
-    run_ass2.font.size = Pt(11)
-    
-    p_carg2 = doc.add_paragraph()
-    p_carg2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_carg2.paragraph_format.space_after = Pt(0)
-    run_carg2 = p_carg2.add_run("Analista de Regulação")
-    run_carg2.font.name = 'Aptos'
-    run_carg2.font.size = Pt(11)
-    
-    p_mat2 = doc.add_paragraph()
-    p_mat2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_mat2.paragraph_format.space_after = Pt(12)
-    run_mat2 = p_mat2.add_run("Matrícula nº 1796500/02")
-    run_mat2.font.name = 'Aptos'
-    run_mat2.font.size = Pt(11)
-    
-    doc.add_paragraph()  # Espaço
-    
-    # Ciente e de acordo
+    for nome in responsaveis_list:
+        match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
+        if match:
+            r_nome = match["nome"]
+            r_funcao = match["funcao"]
+            r_matr = match["matricula"]
+        else:
+            r_nome = nome
+            r_funcao = "Analista de Regulação"
+            r_matr = "xxxxxxx/xx"
+            
+        p_ass = doc.add_paragraph()
+        p_ass.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_ass.paragraph_format.space_after = Pt(0)
+        run_ass = p_ass.add_run(r_nome)
+        run_ass.bold = True
+        run_ass.font.name = 'Aptos'
+        run_ass.font.size = Pt(11)
+        
+        p_carg = doc.add_paragraph()
+        p_carg.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_carg.paragraph_format.space_after = Pt(0)
+        run_carg = p_carg.add_run(r_funcao)
+        run_carg.font.name = 'Aptos'
+        run_carg.font.size = Pt(11)
+        
+        p_mat = doc.add_paragraph()
+        p_mat.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_mat.paragraph_format.space_after = Pt(12)
+        run_mat = p_mat.add_run(f"Matrícula nº {r_matr}")
+        run_mat.font.name = 'Aptos'
+        run_mat.font.size = Pt(11)
+        
+        doc.add_paragraph()  # Espaço entre assinaturas
+        
+    # Ciente e de acordo (Coordenador)
     p_ciente = doc.add_paragraph()
     p_ciente.paragraph_format.space_before = Pt(12)
     p_ciente.paragraph_format.space_after = Pt(12)
@@ -229,13 +240,24 @@ def gerar_secao_finalizacao(doc: Document):
     run_ciente.font.name = 'Aptos'
     run_ciente.font.size = Pt(11)
     
-    doc.add_paragraph()  # Espaço antes de Maria Ângela
+    doc.add_paragraph()  # Espaço antes da assinatura do coordenador
     
-    # Maria Ângela
+    db_coord = carregar_coordenadores()
+    coord_name = str(row["Coordenador"]).strip()
+    match_coord = next((c for c in db_coord if c["nome"].strip().lower() == coord_name.lower()), None)
+    if match_coord:
+        c_nome = match_coord["nome"]
+        c_funcao = match_coord["funcao"]
+        c_matr = match_coord["matricula"]
+    else:
+        c_nome = coord_name
+        c_funcao = "Coordenador(a) de Transportes e Rodovias"
+        c_matr = "xxxxxxx/xx"
+        
     p_ass3 = doc.add_paragraph()
     p_ass3.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_ass3.paragraph_format.space_after = Pt(0)
-    run_ass3 = p_ass3.add_run("Maria Ângela Albuquerque de Freitas")
+    run_ass3 = p_ass3.add_run(c_nome)
     run_ass3.bold = True
     run_ass3.font.name = 'Aptos'
     run_ass3.font.size = Pt(11)
@@ -243,13 +265,13 @@ def gerar_secao_finalizacao(doc: Document):
     p_carg3 = doc.add_paragraph()
     p_carg3.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_carg3.paragraph_format.space_after = Pt(0)
-    run_carg3 = p_carg3.add_run("Coordenadora de Transportes e Rodovias")
+    run_carg3 = p_carg3.add_run(c_funcao)
     run_carg3.font.name = 'Aptos'
     run_carg3.font.size = Pt(11)
     
     p_mat3 = doc.add_paragraph()
     p_mat3.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_mat3.paragraph_format.space_after = Pt(12)
-    run_mat3 = p_mat3.add_run("Matrícula nº 209640/01")
+    run_mat3 = p_mat3.add_run(f"Matrícula nº {c_matr}")
     run_mat3.font.name = 'Aptos'
     run_mat3.font.size = Pt(11)

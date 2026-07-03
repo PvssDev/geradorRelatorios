@@ -1,12 +1,16 @@
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from utils import adicionar_titulo_secao
+from utils import adicionar_titulo_secao, formatar_data_extenso, extrair_ano
 import os
+import pandas as pd
 
-def gerar_secao_introducao(doc: Document, row):
+def gerar_secao_introducao(doc: Document, row, total_achados):
     """Gera as seções de Introdução, Objetivo, Informações Gerais, Metodologia e Fiscalização."""
     
+    ano = extrair_ano(row["Data"])
+    data_extenso = formatar_data_extenso(row["Data"])
+
     # ----------------------------------------------------
     # 1. SEÇÃO: INTRODUÇÃO (Seção 1)
     # ----------------------------------------------------
@@ -14,14 +18,13 @@ def gerar_secao_introducao(doc: Document, row):
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
     paragraphs_intro = [
-        "A Coordenadoria de Transporte e Rodovias da Arpe implementou o cronograma de fiscalização para 2026 do Complexo Viário e Logístico de SUAPE, sob a responsabilidade da Concessionária Rota do Atlântico (CRA), visualizando a necessidade de serem reservados dois dias consecutivos, para melhor estruturar suas ações de fiscalização técnico-operacionais da Rodovia.",
+        f"A Coordenadoria de Transporte e Rodovias da Arpe implementou o cronograma de fiscalização para {ano} do Complexo Viário e Logístico de SUAPE, sob a responsabilidade da Concessionária Rota do Atlântico (CRA), visualizando a necessidade de serem reservados dois dias consecutivos, para melhor estruturar suas ações de fiscalização técnico-operacionais da Rodovia.",
         "Ainda com a visão de implantar melhorias na contribuição da Agência sobre os trabalhos desenvolvidos na rodovia, foi introduzida uma visita técnica prévia, realizada uma semana antes do período de fiscalização, com o objetivo de elaborar um roteiro que é encaminhado para a CRA e SUAPE contendo os trechos mapeados com possíveis Não Conformidades, tornando os levantamentos fotográficos mais ágeis e a fiscalização efetiva.",
         "Posteriormente, as possíveis Não Conformidades levantadas em campo são analisadas de acordo com os critérios elencados no PDCL anexo ao Contrato de Concessão, em conjunto com o último Relatório Anual elaborado pelo Verificador Independente.",
         "Destaca-se preliminarmente que as ações de fiscalização registradas neste Relatório foram concentradas na Rodovia PE-009, do Entroncamento BR-101 ao Entroncamento PE-038, que abrange os subtrechos concedidos, especificamente, o Contorno do Cabo, TDR Norte, TDR Sul e a Ligação Rótula Curva do Boi a Nossa Senhora do Ó; e Rodovia Estadual VPE-034.",
-        "É importante observar que foram realizadas ações de fiscalização, no dia 9 de junho de 2026, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº 302 (Doc. SEI 75605952).",
+        f"É importante observar que foram realizadas ações de fiscalização, no dia {data_extenso}, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº 302 (Doc. SEI 75605952).",
         "Destaca-se que as fiscalizações realizadas pela Arpe são tratadas com caráter educativo, preferencialmente, e contributivo para correção de procedimentos e solução de Não Conformidades evidenciados por defeitos e/ou problemas na infraestrutura disponibilizada e respectivos serviços concedidos pelo Estado."
     ]
-    
     for text in paragraphs_intro:
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -30,7 +33,7 @@ def gerar_secao_introducao(doc: Document, row):
         
         if "302 (Doc. SEI 75605952)" in text:
             # Divide o texto para colorir "302 (Doc. SEI 75605952)" em vermelho
-            part1 = "É importante observar que foram realizadas ações de fiscalização, no dia 9 de junho de 2026, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº "
+            part1 = f"É importante observar que foram realizadas ações de fiscalização, no dia {data_extenso}, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº "
             part2 = "302 (Doc. SEI 75605952)"
             part3 = "."
             
@@ -167,8 +170,13 @@ def gerar_secao_introducao(doc: Document, row):
     format_normal_row(table.rows[16], "Regulador:", "Agência de Regulação de Pernambuco (Arpe)")
     format_normal_row(table.rows[17], "Diretor Presidente:", "CARLOS PORTO FILHO", val_bold=True)
     format_normal_row(table.rows[18], "Endereço:", "Avenida Conselheiro Rosa e Silva, 975, Aflitos, Recife/PE, CEP: 52.050-020.\nEstacionamento: Rua do Futuro, 150, Aflitos, Recife/PE.")
-    format_normal_row(table.rows[19], "Responsáveis pela fiscalização:", "Alcides Vieira de Azevedo Bezerra; Enildo Manoel da Silva Júnior")
-    format_normal_row(table.rows[20], "Período da Fiscalização:", "9 de junho de 2026.")
+    
+    # Responsáveis e Período dinâmicos
+    responsaveis_formatted = str(row["Pessoal Responsável"]).replace(",", ";")
+    periodo_val = str(row["Período"]).strip() if pd.notna(row["Período"]) and str(row["Período"]).strip() else f"{data_extenso}."
+    
+    format_normal_row(table.rows[19], "Responsáveis pela fiscalização:", responsaveis_formatted)
+    format_normal_row(table.rows[20], "Período da Fiscalização:", periodo_val)
     format_normal_row(table.rows[21], "Tipo de Fiscalização:", "Direta e periódica.")
     
     # Ajustar as larguras das colunas
@@ -189,7 +197,7 @@ def gerar_secao_introducao(doc: Document, row):
     
     # Parágrafos iniciais da Metodologia
     paragraphs_metodo_1 = [
-        "A Coordenadoria de Transporte e Rodovias da Arpe implementou o cronograma de fiscalização para 2026 do Complexo Viário e Logístico de SUAPE reservando dois dias consecutivos, para melhor estruturar suas ações de fiscalização técnico-operacionais no Complexo Rodoviário, após uma visita técnica prévia, realizada antes do período de fiscalização, com o objetivo de elaborar um roteiro que é encaminhado para a CRA e SUAPE contendo os trechos mapeados com possíveis Não Conformidades, tornando os levantamentos fotográficos mais ágeis e a fiscalização efetiva.",
+        f"A Coordenadoria de Transporte e Rodovias da Arpe implementou o cronograma de fiscalização para {ano} do Complexo Viário e Logístico de SUAPE reservando dois dias consecutivos, para melhor estruturar suas ações de fiscalização técnico-operacionais no Complexo Rodoviário, após uma visita técnica prévia, realizada antes do período de fiscalização, com o objetivo de elaborar um roteiro que é encaminhado para a CRA e SUAPE contendo os trechos mapeados com possíveis Não Conformidades, tornando os levantamentos fotográficos mais ágeis e a fiscalização efetiva.",
         "Posteriormente, as possíveis Não Conformidades levantadas em campo são analisadas de acordo com os critérios elencados no PDCL (Anexo IV do Contrato de Concessão), em conjunto com o último Relatório Anual elaborado pelo Verificador Independente.",
         "Assim, a fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da Arpe está submetida a uma metodologia organizada em três etapas: Preparação e Planejamento, Execução da Fiscalização e Monitoramento e Avaliação.",
         "Preparação e Planejamento - compreende a organização e estruturação das atividades preliminares à execução da fiscalização, destacando-se a elaboração e o envio de avisos de fiscalização à Concessionária e demais atividades de suporte à fiscalização, bem como a análise de fiscalizações anteriores com a identificação de eventuais Não Conformidades pendentes.",
@@ -334,26 +342,38 @@ def gerar_secao_introducao(doc: Document, row):
     adicionar_titulo_secao(doc, "4. FISCALIZAÇÃO")
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
-    # Parágrafo 1 de Fiscalização
+    # Parágrafo 1 de Fiscalização Dinâmico
     p_fisc1 = doc.add_paragraph()
     p_fisc1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     p_fisc1.paragraph_format.space_after = Pt(6)
     p_fisc1.paragraph_format.line_spacing = 1.15
     
-    p_fisc1.add_run("As ações de fiscalização foram realizadas pela equipe formada pelos Analistas de Regulação ").font.name = 'Aptos'
-    run_n1 = p_fisc1.add_run("Alcides Vieira de Azevedo Bezerra")
-    run_n1.bold = True
-    run_n1.font.name = 'Aptos'
-    p_fisc1.add_run(", matrícula 40672015/01, ").font.name = 'Aptos'
-    run_n2 = p_fisc1.add_run("Enildo Manoel da Silva Júnior")
-    run_n2.bold = True
-    run_n2.font.name = 'Aptos'
-    p_fisc1.add_run(", matrícula nº 1796500/02 e ").font.name = 'Aptos'
-    run_n3 = p_fisc1.add_run("Maria Fernanda da Silva Novaes")
-    run_n3.bold = True
-    run_n3.font.name = 'Aptos'
+    p_fisc1.add_run("As ações de fiscalização foram realizadas pela equipe formada pelos servidores: ").font.name = 'Aptos'
     
-    p_fisc1.add_run(", matrícula nº 18471080/01 nos dias 9 de junho de 2026. Nessas ações foram identificados 33 achados de fiscalização nas áreas sob concessão por meio de um levantamento de campo nas Rodovias com evidências de defeitos que poderiam se caracterizar Não Conformidades.").font.name = 'Aptos'
+    from database.manager import carregar_responsaveis
+    responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+    db_resp = carregar_responsaveis()
+    
+    team_parts = []
+    for nome in responsaveis_list:
+        match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
+        if match:
+            team_parts.append({"nome": match["nome"], "matricula": match["matricula"]})
+        else:
+            team_parts.append({"nome": nome, "matricula": "xxxxxxx/xx"})
+            
+    for i, member in enumerate(team_parts):
+        r_name = p_fisc1.add_run(member["nome"])
+        r_name.bold = True
+        r_name.font.name = 'Aptos'
+        p_fisc1.add_run(f", matrícula nº {member['matricula']}").font.name = 'Aptos'
+        
+        if i < len(team_parts) - 2:
+            p_fisc1.add_run(", ").font.name = 'Aptos'
+        elif i == len(team_parts) - 2:
+            p_fisc1.add_run(" e ").font.name = 'Aptos'
+            
+    p_fisc1.add_run(f" nos dias {data_extenso}. Nessas ações foram identificados {total_achados} achados de fiscalização nas áreas sob concessão por meio de um levantamento de campo nas Rodovias com evidências de defeitos que poderiam se caracterizar Não Conformidades.").font.name = 'Aptos'
     
     # Parágrafo 2 de Fiscalização
     p_fisc2 = doc.add_paragraph()
