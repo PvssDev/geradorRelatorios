@@ -1,8 +1,162 @@
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import os
+import pandas as pd
 from utils import adicionar_titulo_secao, extrair_ano
 from database.manager import carregar_responsaveis, carregar_coordenadores
+
+def formatar_data_dd_mm_yyyy(data_val):
+    if pd.isna(data_val) or not data_val:
+        return ""
+    try:
+        from datetime import datetime
+        if hasattr(data_val, "to_pydatetime"):
+            dt = data_val.to_pydatetime()
+        elif isinstance(data_val, datetime):
+            dt = data_val
+        else:
+            data_str = str(data_val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    dt = datetime.strptime(data_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                return data_str
+        return dt.strftime("%d/%m/%Y")
+    except Exception:
+        return str(data_val)
+
+def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
+    if df_fotos.empty:
+        return
+    
+    # Compatibilidade com planilhas antigas
+    if "Pista" not in df_fotos.columns:
+        df_fotos = df_fotos.copy()
+        df_fotos["Pista"] = ""
+    if "Trecho" not in df_fotos.columns:
+        df_fotos = df_fotos.copy()
+        df_fotos["Trecho"] = ""
+    
+    # Agrupa por Pista mantendo ordem de inserção
+    pistas_unicas = []
+    for p in df_fotos["Pista"].tolist():
+        p_str = str(p).strip() if not pd.isna(p) else ""
+        if not p_str:
+            p_str = "Única"
+        if p_str not in pistas_unicas:
+            pistas_unicas.append(p_str)
+            
+    for pista_val in pistas_unicas:
+        # Filtra os itens desta pista
+        mask = df_fotos["Pista"].apply(lambda x: (str(x).strip() if not pd.isna(x) else "") == (pista_val if pista_val != "Única" else ""))
+        df_pista = df_fotos[mask].copy()
+        if df_pista.empty:
+            continue
+            
+        # Adiciona a tabela de grade (2 colunas)
+        table = doc.add_table(rows=0, cols=2)
+        table.style = 'Table Grid'
+        table.autofit = False
+        
+        # Cabeçalho da Pista
+        if pista_val.lower().startswith("pista"):
+            header_text = f"{terminal_nc}, {pista_val}"
+        else:
+            header_text = f"{terminal_nc}, Pista sentido {pista_val}"
+            
+        row_h = table.add_row()
+        cell_merged = row_h.cells[0].merge(row_h.cells[1])
+        p_h = cell_merged.paragraphs[0]
+        p_h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_h.paragraph_format.space_before = Pt(6)
+        p_h.paragraph_format.space_after = Pt(6)
+        run_h = p_h.add_run(header_text)
+        run_h.bold = True
+        run_h.font.name = 'Aptos'
+        run_h.font.size = Pt(11)
+        
+        records = df_pista.to_dict('records')
+        for i in range(0, len(records), 2):
+            rec_left = records[i]
+            rec_right = records[i+1] if i+1 < len(records) else None
+            
+            # Linha de Imagens
+            row_img = table.add_row()
+            row_img.cells[0].width = Inches(3.25)
+            row_img.cells[1].width = Inches(3.25)
+            
+            # Imagem Esquerda
+            p_img_left = row_img.cells[0].paragraphs[0]
+            p_img_left.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_img_left.paragraph_format.space_before = Pt(4)
+            p_img_left.paragraph_format.space_after = Pt(4)
+            foto_left = rec_left.get("Foto", "")
+            if pd.isna(foto_left) or not isinstance(foto_left, str) or not foto_left.strip():
+                foto_left = ""
+            foto_path_left = os.path.join(fotos_dir, foto_left) if fotos_dir and foto_left else ""
+            if foto_path_left and os.path.exists(foto_path_left):
+                run_img_left = p_img_left.add_run()
+                run_img_left.add_picture(foto_path_left, width=Inches(3.15), height=Inches(3.15))
+                
+            # Imagem Direita
+            p_img_right = row_img.cells[1].paragraphs[0]
+            p_img_right.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_img_right.paragraph_format.space_before = Pt(4)
+            p_img_right.paragraph_format.space_after = Pt(4)
+            if rec_right:
+                foto_right = rec_right.get("Foto", "")
+                if pd.isna(foto_right) or not isinstance(foto_right, str) or not foto_right.strip():
+                    foto_right = ""
+                foto_path_right = os.path.join(fotos_dir, foto_right) if fotos_dir and foto_right else ""
+                if foto_path_right and os.path.exists(foto_path_right):
+                    run_img_right = p_img_right.add_run()
+                    run_img_right.add_picture(foto_path_right, width=Inches(3.15), height=Inches(3.15))
+            else:
+                row_img.cells[1].width = Inches(3.25)
+                    
+            # Linha de Descrições
+            row_desc = table.add_row()
+            row_desc.cells[0].width = Inches(3.25)
+            row_desc.cells[1].width = Inches(3.25)
+            
+            # Descrição Esquerda
+            p_desc_left = row_desc.cells[0].paragraphs[0]
+            p_desc_left.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p_desc_left.paragraph_format.space_before = Pt(4)
+            p_desc_left.paragraph_format.space_after = Pt(4)
+            
+            num_left = str(rec_left.get("Nº", i+1)).zfill(2)
+            trecho_left = str(rec_left.get("Trecho", "")).strip()
+            obs_left = str(rec_left.get("Observações", rec_left.get("Legenda da Foto", ""))).strip()
+            
+            desc_text_left = f"Foto {num_left} – Trecho {trecho_left} apresentando {obs_left}, ({data_fisc})."
+            run_desc_left = p_desc_left.add_run(desc_text_left)
+            run_desc_left.font.name = 'Aptos'
+            run_desc_left.font.size = Pt(10)
+            
+            # Descrição Direita
+            p_desc_right = row_desc.cells[1].paragraphs[0]
+            p_desc_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p_desc_right.paragraph_format.space_before = Pt(4)
+            p_desc_right.paragraph_format.space_after = Pt(4)
+            
+            if rec_right:
+                num_right = str(rec_right.get("Nº", i+2)).zfill(2)
+                trecho_right = str(rec_right.get("Trecho", "")).strip()
+                obs_right = str(rec_right.get("Observações", rec_right.get("Legenda da Foto", ""))).strip()
+                
+                desc_text_right = f"Foto {num_right} – Trecho {trecho_right} apresentando {obs_right}, ({data_fisc})."
+                run_desc_right = p_desc_right.add_run(desc_text_right)
+                run_desc_right.font.name = 'Aptos'
+                run_desc_right.font.size = Pt(10)
+            else:
+                row_desc.cells[1].width = Inches(3.25)
+                
+        doc.add_paragraph()
 
 def numero_por_extenso(n):
     extenso_map = {
@@ -21,8 +175,8 @@ def numero_por_extenso(n):
     }
     return extenso_map.get(n, str(n))
 
-def gerar_secao_finalizacao(doc: Document, row, total_ncs):
-    """Gera o restante do relatório a partir da seção 5 (Determinações Gerais) até as assinaturas finais."""
+def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir=None):
+    """Gera o restante do relatório a partir da seção 5 (Determinações Gerais) até as assinaturas finais e apêndices com fotos."""
     
     ano = extrair_ano(row["Data"])
     ano_anterior = str(int(ano) - 1) if ano.isdigit() else "2025"
@@ -171,15 +325,51 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs):
     # ----------------------------------------------------
     # APÊNDICES
     # ----------------------------------------------------
+    import os
+    import pandas as pd
+
+    id_fisc = row["ID da Fiscalização"]
+    terminal_nc = row.get("Local", "")
+    data_fisc = formatar_data_dd_mm_yyyy(row["Data"])
+    
+    current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None else pd.DataFrame()
+    
+    # 1. Filtra não conformidades reais e pontos de atenção
+    ncs_reais = pd.DataFrame()
+    pas_reais = pd.DataFrame()
+    if not current_ncs.empty:
+        if "Não Conformidade" in current_ncs.columns:
+            ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
+        if "Ponto de Atenção" in current_ncs.columns:
+            pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
+
+    # APÊNDICE A
+    doc.add_page_break()
     adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
     doc.add_paragraph()
-    doc.add_paragraph()
-    doc.add_paragraph()
-    doc.add_paragraph()
     
+    if not ncs_reais.empty:
+        criar_grade_fotos(doc, ncs_reais, terminal_nc, fotos_dir, data_fisc)
+    else:
+        p_empty = doc.add_paragraph()
+        r_empty = p_empty.add_run("Nenhum registro fotográfico de não conformidade cadastrado.")
+        r_empty.font.name = 'Aptos'
+        r_empty.font.size = Pt(11)
+        doc.add_paragraph()
+
+    # APÊNDICE B
+    doc.add_page_break()
     adicionar_titulo_secao(doc, "APÊNDICE B – REGISTROS FOTOGRÁFICOS DAS PONTOS DE ATENÇÃO")
     doc.add_paragraph()
-    doc.add_paragraph()
+    
+    if not pas_reais.empty:
+        criar_grade_fotos(doc, pas_reais, terminal_nc, fotos_dir, data_fisc)
+    else:
+        p_empty = doc.add_paragraph()
+        r_empty = p_empty.add_run("Nenhum registro fotográfico de ponto de atenção cadastrado.")
+        r_empty.font.name = 'Aptos'
+        r_empty.font.size = Pt(11)
+        doc.add_paragraph()
     
     p_loc2 = doc.add_paragraph()
     p_loc2.paragraph_format.space_before = Pt(12)

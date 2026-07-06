@@ -169,7 +169,7 @@ def gerar_relatorio(
         # Geração das Seções
         gerar_secao_introducao(doc, row, total_achados)
         gerar_secao_quadros(doc)
-        gerar_secao_finalizacao(doc, row, total_achados)
+        gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR)
 
         # Sanitização e Salvamento
         id_safe = "".join([c if c not in r'\/:*?"<>|' else "_" for c in str(id_fisc)]).strip()
