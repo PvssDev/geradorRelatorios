@@ -217,7 +217,7 @@ with st.container():
     col_uploader, col_sort, col_clear = st.columns([3, 1, 1])
     with col_uploader:
         uploaded_nc_photos = st.file_uploader(
-            "Faça o upload de todas as fotos da fiscalização para usá-las no carrossel de Não Conformidades", 
+            "Faça o upload de todas as fotos da fiscalização para usá-las no carrossel de Registros", 
             type=["jpg", "jpeg", "png"], 
             accept_multiple_files=True,
             key=f"fill_photos_uploader_{st.session_state.uploader_version}"
@@ -267,6 +267,10 @@ with st.container():
         st.session_state.temp_nc = []
     if "nc_form_counter" not in st.session_state:
         st.session_state.nc_form_counter = 0
+    if "pista_persistida" not in st.session_state:
+        st.session_state.pista_persistida = ""
+    if "trecho_persistido" not in st.session_state:
+        st.session_state.trecho_persistido = ""
     if "pessoal_responsaveis" not in st.session_state or (
         st.session_state.pessoal_responsaveis and isinstance(st.session_state.pessoal_responsaveis[0], str)
     ):
@@ -373,7 +377,7 @@ with st.container():
                 st.rerun()
 
     st.divider()
-    st.subheader("🚩 Não Conformidades (NC)")
+    st.subheader("🚩 Registros")
     
     col_inputs, col_preview = st.columns([1.2, 1.0])
     
@@ -408,17 +412,24 @@ with st.container():
                 "Avançar foto automaticamente",
                 value=True,
                 key="auto_advance_active",
-                help="Avança para a próxima foto do carrossel ao adicionar a Não Conformidade"
+                help="Avança para a próxima foto do carrossel ao adicionar o Registro"
             )
             
             foto_default = current_photo.name
         else:
-            st.info("💡 Faça o upload de fotos no início da página para visualizá-las aqui no carrossel de Não Conformidades.")
+            st.info("💡 Faça o upload de fotos no início da página para visualizá-las aqui no carrossel de Registros.")
             foto_default = ""
 
     with col_inputs:
         id_vinculo = st.selectbox("Vincular ao ID da Fiscalização", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
         
+        # Novas variáveis de Pista e Trecho inseridas de forma compacta (lado a lado)
+        col_pista, col_trecho = st.columns(2)
+        with col_pista:
+            pista = st.text_input("Pista", value=st.session_state.pista_persistida, key=f"nc_pista_{st.session_state.nc_form_counter}", placeholder="Sul, Norte, Única, Táxi...")
+        with col_trecho:
+            trecho = st.text_input("Trecho", value=st.session_state.trecho_persistido, key=f"nc_trecho_{st.session_state.nc_form_counter}", placeholder="Contorno do Cabo, VPE-034...")
+
         # Obtém o terminal associado automaticamente a partir do ID da Fiscalização
         terminal_nc = ""
         if id_vinculo != "Nenhum ID cadastrado" and st.session_state.temp_fiscalizacoes:
@@ -435,34 +446,33 @@ with st.container():
             
         nc_options = ["FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB", "JE", "TBE", "ALP", "ATP", "O", "P", "EX", "D", "R", "ALC", "ATC", "E"]
         
+        tipo_registro = st.pills(
+            "Tipo de Registro",
+            ["Não Conformidade", "Ponto de Atenção"],
+            selection_mode="single",
+            key=f"nc_tipo_{st.session_state.nc_form_counter}",
+            default="Não Conformidade"
+        )
+        
         nc_key = f"nc_desc_{st.session_state.nc_form_counter}"
         pa_key = f"pa_desc_{st.session_state.nc_form_counter}"
         
-        # Ponto de Atenção
-        pa_disabled = False
-        if nc_key in st.session_state and st.session_state[nc_key]:
-            pa_disabled = True
-            
-        ponto_atencao = st.pills(
-            "Ponto de Atenção",
-            nc_options,
-            selection_mode="multi",
-            key=pa_key,
-            disabled=pa_disabled
-        )
-        
-        # Não Conformidade
-        nc_disabled = False
-        if pa_key in st.session_state and st.session_state[pa_key]:
-            nc_disabled = True
-            
-        nc_descricao = st.pills(
-            "Não Conformidade",
-            nc_options,
-            selection_mode="multi",
-            key=nc_key,
-            disabled=nc_disabled
-        )
+        if tipo_registro == "Não Conformidade":
+            nc_descricao = st.pills(
+                "Siglas de Não Conformidade",
+                nc_options,
+                selection_mode="multi",
+                key=nc_key
+            )
+            ponto_atencao = []
+        else:
+            ponto_atencao = st.pills(
+                "Siglas de Ponto de Atenção",
+                nc_options,
+                selection_mode="multi",
+                key=pa_key
+            )
+            nc_descricao = []
         
         nc_legenda = st.text_area("Observações", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva as observações/legenda correspondente...")
         
@@ -481,6 +491,8 @@ with st.container():
                     "ID da Fiscalização": id_vinculo,
                     "Nº": nc_num,
                     "Terminal": terminal_nc,
+                    "Pista": pista,
+                    "Trecho": trecho,
                     "Não Conformidade": nc_desc_str,
                     "Ponto de Atenção": pa_desc_str,
                     "Foto": foto_default,
@@ -489,6 +501,10 @@ with st.container():
                 # Avançar carrossel automaticamente se houver próxima foto e a opção estiver ativada
                 if st.session_state.get("auto_advance_active", True) and st.session_state.fill_photos and st.session_state.carousel_index < len(st.session_state.fill_photos) - 1:
                     st.session_state.carousel_index += 1
+                
+                # Salvar valores atuais de pista e trecho para que persistam no formulário
+                st.session_state.pista_persistida = pista
+                st.session_state.trecho_persistido = trecho
                 
                 st.session_state.nc_form_counter += 1
                 st.success(f"Adicionado com sucesso ao ID {id_vinculo}!")
@@ -549,7 +565,7 @@ with st.container():
                     df_nc_only.insert(0, "Excluir", False)
                     
                     # Garante ordenação exata das colunas
-                    cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Não Conformidade']
+                    cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Não Conformidade']
                     for c in ['Foto', 'Fotos', 'Observações', 'Legenda da Foto']:
                         if c in df_nc_only.columns:
                             cols_order.append(c)
@@ -592,7 +608,7 @@ with st.container():
                     df_pa_only.insert(0, "Excluir", False)
                     
                     # Garante ordenação exata das colunas (Ponto de Atenção após Terminal e antes de Foto)
-                    cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Ponto de Atenção']
+                    cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Ponto de Atenção']
                     for c in ['Foto', 'Fotos', 'Observações', 'Legenda da Foto']:
                         if c in df_pa_only.columns:
                             cols_order.append(c)
@@ -667,6 +683,8 @@ with st.container():
                                     "Fotos": "",
                                     "Não conformidade": "",
                                     "Ponto de Atenção": "",
+                                    "Pista": "",
+                                    "Trecho": "",
                                     "Relatório Gerado": fisc["Relatório Gerado"]
                                 })
                             else:
@@ -685,6 +703,8 @@ with st.container():
                                         "Fotos": nc.get("Foto", nc.get("Fotos", "")),
                                         "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
                                         "Ponto de Atenção": nc.get("Ponto de Atenção", ""),
+                                        "Pista": nc.get("Pista", ""),
+                                        "Trecho": nc.get("Trecho", ""),
                                         "Relatório Gerado": fisc["Relatório Gerado"]
                                     })
 
@@ -751,6 +771,8 @@ with st.container():
                             "Fotos": "",
                             "Não conformidade": "",
                             "Ponto de Atenção": "",
+                            "Pista": "",
+                            "Trecho": "",
                             "Relatório Gerado": fisc["Relatório Gerado"]
                         })
                     else:
@@ -769,6 +791,8 @@ with st.container():
                                 "Fotos": nc.get("Foto", nc.get("Fotos", "")),
                                 "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
                                 "Ponto de Atenção": nc.get("Ponto de Atenção", ""),
+                                "Pista": nc.get("Pista", ""),
+                                "Trecho": nc.get("Trecho", ""),
                                 "Relatório Gerado": fisc["Relatório Gerado"]
                             })
 
