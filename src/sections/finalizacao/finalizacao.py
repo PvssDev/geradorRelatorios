@@ -50,7 +50,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
         if p_str not in pistas_unicas:
             pistas_unicas.append(p_str)
             
-    for pista_val in pistas_unicas:
+    for idx_pista, pista_val in enumerate(pistas_unicas):
         # Filtra os itens desta pista
         mask = df_fotos["Pista"].apply(lambda x: (str(x).strip() if not pd.isna(x) else "") == (pista_val if pista_val != "Única" else ""))
         df_pista = df_fotos[mask].copy()
@@ -156,7 +156,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
             else:
                 row_desc.cells[1].width = Inches(3.25)
                 
-        doc.add_paragraph()
+        if idx_pista < len(pistas_unicas) - 1:
+            doc.add_paragraph()
 
 def numero_por_extenso(n):
     extenso_map = {
@@ -320,9 +321,6 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
     run_loc1.font.name = 'Aptos'
     run_loc1.font.size = Pt(11)
     
-    doc.add_paragraph()  # Espaço antes dos apêndices
-    
-    # ----------------------------------------------------
     # APÊNDICES
     # ----------------------------------------------------
     import os
@@ -344,9 +342,8 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
             pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
 
     # APÊNDICE A
-    doc.add_page_break()
-    adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
-    doc.add_paragraph()
+    p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
+    p_ap_a.paragraph_format.page_break_before = True
     
     if not ncs_reais.empty:
         criar_grade_fotos(doc, ncs_reais, terminal_nc, fotos_dir, data_fisc)
@@ -355,12 +352,10 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         r_empty = p_empty.add_run("Nenhum registro fotográfico de não conformidade cadastrado.")
         r_empty.font.name = 'Aptos'
         r_empty.font.size = Pt(11)
-        doc.add_paragraph()
 
     # APÊNDICE B
-    doc.add_page_break()
-    adicionar_titulo_secao(doc, "APÊNDICE B – REGISTROS FOTOGRÁFICOS DAS PONTOS DE ATENÇÃO")
-    doc.add_paragraph()
+    p_ap_b = adicionar_titulo_secao(doc, "APÊNDICE B – REGISTROS FOTOGRÁFICOS DAS PONTOS DE ATENÇÃO")
+    p_ap_b.paragraph_format.page_break_before = True
     
     if not pas_reais.empty:
         criar_grade_fotos(doc, pas_reais, terminal_nc, fotos_dir, data_fisc)
@@ -369,7 +364,6 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         r_empty = p_empty.add_run("Nenhum registro fotográfico de ponto de atenção cadastrado.")
         r_empty.font.name = 'Aptos'
         r_empty.font.size = Pt(11)
-        doc.add_paragraph()
     
     p_loc2 = doc.add_paragraph()
     p_loc2.paragraph_format.space_before = Pt(12)

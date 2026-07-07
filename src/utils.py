@@ -1,5 +1,5 @@
-from docx.shared import Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from openpyxl import load_workbook
 import os
 from docx.oxml import OxmlElement
@@ -29,13 +29,16 @@ def normalizar_status_gerado(serie):
 
 
 def adicionar_titulo_secao(doc, texto):
-    """Adiciona um título de seção formatado."""
-    secao = doc.add_paragraph()
+    """Adiciona um título de seção formatado usando o estilo Heading 3."""
+    secao = doc.add_paragraph(style='Heading 3')
     run = secao.add_run(texto)
     run.bold = True
+    run.font.name = 'Aptos'
     run.font.size = Pt(12)
-    secao.paragraph_format.space_before = Pt(12)
-    secao.paragraph_format.space_after = Pt(6)
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    secao.paragraph_format.space_before = Pt(8)
+    secao.paragraph_format.space_after = Pt(4)
+    return secao
 
 
 def ajustar_largura_colunas(caminho_planilha):

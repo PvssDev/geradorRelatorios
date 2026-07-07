@@ -267,6 +267,10 @@ with st.container():
         st.session_state.temp_nc = []
     if "nc_form_counter" not in st.session_state:
         st.session_state.nc_form_counter = 0
+    if "pista_persistida" not in st.session_state:
+        st.session_state.pista_persistida = ""
+    if "trecho_persistido" not in st.session_state:
+        st.session_state.trecho_persistido = ""
     if "pessoal_responsaveis" not in st.session_state or (
         st.session_state.pessoal_responsaveis and isinstance(st.session_state.pessoal_responsaveis[0], str)
     ):
@@ -422,9 +426,9 @@ with st.container():
         # Novas variáveis de Pista e Trecho inseridas de forma compacta (lado a lado)
         col_pista, col_trecho = st.columns(2)
         with col_pista:
-            pista = st.text_input("Pista", key=f"nc_pista_{st.session_state.nc_form_counter}", placeholder="Sul, Norte, Única, Táxi...")
+            pista = st.text_input("Pista", value=st.session_state.pista_persistida, key=f"nc_pista_{st.session_state.nc_form_counter}", placeholder="Sul, Norte, Única, Táxi...")
         with col_trecho:
-            trecho = st.text_input("Trecho", key=f"nc_trecho_{st.session_state.nc_form_counter}", placeholder="Contorno do Cabo, VPE-034...")
+            trecho = st.text_input("Trecho", value=st.session_state.trecho_persistido, key=f"nc_trecho_{st.session_state.nc_form_counter}", placeholder="Contorno do Cabo, VPE-034...")
 
         # Obtém o terminal associado automaticamente a partir do ID da Fiscalização
         terminal_nc = ""
@@ -497,6 +501,10 @@ with st.container():
                 # Avançar carrossel automaticamente se houver próxima foto e a opção estiver ativada
                 if st.session_state.get("auto_advance_active", True) and st.session_state.fill_photos and st.session_state.carousel_index < len(st.session_state.fill_photos) - 1:
                     st.session_state.carousel_index += 1
+                
+                # Salvar valores atuais de pista e trecho para que persistam no formulário
+                st.session_state.pista_persistida = pista
+                st.session_state.trecho_persistido = trecho
                 
                 st.session_state.nc_form_counter += 1
                 st.success(f"Adicionado com sucesso ao ID {id_vinculo}!")
