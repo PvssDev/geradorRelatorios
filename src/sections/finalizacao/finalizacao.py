@@ -1,6 +1,7 @@
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
 import os
 import pandas as pd
 from utils import adicionar_titulo_secao, extrair_ano
@@ -60,7 +61,10 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
         # Adiciona a tabela de grade (2 colunas)
         table = doc.add_table(rows=0, cols=2)
         table.style = 'Table Grid'
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = False
+        table.columns[0].width = Inches(3.635)
+        table.columns[1].width = Inches(3.635)
         
         # Cabeçalho da Pista
         if pista_val.lower().startswith("pista"):
@@ -69,7 +73,10 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
             header_text = f"{terminal_nc}, Pista sentido {pista_val}"
             
         row_h = table.add_row()
+        row_h.cells[0].width = Inches(3.635)
+        row_h.cells[1].width = Inches(3.635)
         cell_merged = row_h.cells[0].merge(row_h.cells[1])
+        cell_merged.width = Inches(7.27)
         p_h = cell_merged.paragraphs[0]
         p_h.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_h.paragraph_format.space_before = Pt(6)
@@ -86,12 +93,14 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
             
             # Linha de Imagens
             row_img = table.add_row()
-            row_img.cells[0].width = Inches(3.25)
-            row_img.cells[1].width = Inches(3.25)
+            row_img.cells[0].width = Inches(3.635)
+            row_img.cells[1].width = Inches(3.635)
             
             # Imagem Esquerda
             p_img_left = row_img.cells[0].paragraphs[0]
             p_img_left.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_img_left.paragraph_format.left_indent = Inches(0)
+            p_img_left.paragraph_format.first_line_indent = Inches(0)
             p_img_left.paragraph_format.space_before = Pt(4)
             p_img_left.paragraph_format.space_after = Pt(4)
             foto_left = rec_left.get("Foto", "")
@@ -105,6 +114,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
             # Imagem Direita
             p_img_right = row_img.cells[1].paragraphs[0]
             p_img_right.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_img_right.paragraph_format.left_indent = Inches(0)
+            p_img_right.paragraph_format.first_line_indent = Inches(0)
             p_img_right.paragraph_format.space_before = Pt(4)
             p_img_right.paragraph_format.space_after = Pt(4)
             if rec_right:
@@ -116,16 +127,18 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
                     run_img_right = p_img_right.add_run()
                     run_img_right.add_picture(foto_path_right, width=Inches(3.15), height=Inches(3.15))
             else:
-                row_img.cells[1].width = Inches(3.25)
+                row_img.cells[1].width = Inches(3.635)
                     
             # Linha de Descrições
             row_desc = table.add_row()
-            row_desc.cells[0].width = Inches(3.25)
-            row_desc.cells[1].width = Inches(3.25)
+            row_desc.cells[0].width = Inches(3.635)
+            row_desc.cells[1].width = Inches(3.635)
             
             # Descrição Esquerda
             p_desc_left = row_desc.cells[0].paragraphs[0]
             p_desc_left.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p_desc_left.paragraph_format.left_indent = Inches(0)
+            p_desc_left.paragraph_format.first_line_indent = Inches(0)
             p_desc_left.paragraph_format.space_before = Pt(4)
             p_desc_left.paragraph_format.space_after = Pt(4)
             
@@ -141,6 +154,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
             # Descrição Direita
             p_desc_right = row_desc.cells[1].paragraphs[0]
             p_desc_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p_desc_right.paragraph_format.left_indent = Inches(0)
+            p_desc_right.paragraph_format.first_line_indent = Inches(0)
             p_desc_right.paragraph_format.space_before = Pt(4)
             p_desc_right.paragraph_format.space_after = Pt(4)
             
@@ -153,8 +168,12 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc):
                 run_desc_right = p_desc_right.add_run(desc_text_right)
                 run_desc_right.font.name = 'Aptos'
                 run_desc_right.font.size = Pt(10)
-            else:
-                row_desc.cells[1].width = Inches(3.25)
+            
+            # Forçar a largura de todas as células das duas linhas para 3.635 polegadas (metade exata)
+            row_img.cells[0].width = Inches(3.635)
+            row_img.cells[1].width = Inches(3.635)
+            row_desc.cells[0].width = Inches(3.635)
+            row_desc.cells[1].width = Inches(3.635)
                 
         if idx_pista < len(pistas_unicas) - 1:
             doc.add_paragraph()
