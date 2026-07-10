@@ -1,5 +1,4 @@
 from docx import Document
-from docx2pdf import convert
 from docx.shared import Inches
 import pandas as pd
 from tqdm import tqdm
@@ -168,7 +167,7 @@ def gerar_relatorio(
 
         # Geração das Seções
         gerar_secao_introducao(doc, row, total_achados)
-        gerar_secao_quadros(doc)
+        gerar_secao_quadros(doc, row, nc_df)
         gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR)
 
         # Sanitização e Salvamento
@@ -178,20 +177,6 @@ def gerar_relatorio(
         
         doc.save(caminho_docx)
         arquivos_gerados.append(caminho_docx)
-        
-        try:
-            caminho_pdf = os.path.join(RELATORIOS_DIR, f"{nome_base}.pdf")
-            
-            # CoInitialize é necessário para rodar COM em threads secundárias do Streamlit
-            import pythoncom
-            pythoncom.CoInitialize()
-            try:
-                convert(caminho_docx, caminho_pdf)
-                arquivos_gerados.append(caminho_pdf)
-            finally:
-                pythoncom.CoUninitialize()
-        except Exception as e:
-            print(f"⚠️ Erro ao converter PDF ({id_fisc}): {e}")
         
         # Marca todas as linhas deste ID de fiscalização como geradas
         fiscal_df.loc[fiscal_df["ID da Fiscalização"] == id_fisc, COLUNA_STATUS] = True
