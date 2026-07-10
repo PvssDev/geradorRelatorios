@@ -1,8 +1,211 @@
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+import pandas as pd
+from utils import formatar_mes_ano
 
-def gerar_secao_quadros(doc: Document):
+MAP_SIGLAS = {
+    "FI": "Fissuras",
+    "TTC": "Trincas isoladas transversais curtas",
+    "TTL": "Trincas isoladas transversais longas",
+    "TLC": "Trincas isoladas longitudinais curtas",
+    "TLL": "Trincas isoladas longitudinais longas",
+    "J": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+    "JE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
+    "TRR": "Trincas isoladas no revestimento devido à retração térmica ou dissecação da base (solo-cimento) ou do revestimento",
+    "TB": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+    "TBE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
+    "ALP": "Afundamento local plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
+    "ATP": "Afundamento da trilha plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
+    "ALC": "Afundamento local de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
+    "ATC": "Afundamento da trilha de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
+    "O": "Ondulação/Corrugação, caracterizada por ondulações transversais causadas por instabilidade da mistura betuminosa constituinte do revestimento ou da base",
+    "E": "Escorregamento do revestimento betuminoso",
+    "EX": "Exsudação do ligante betuminoso no revestimento",
+    "D": "Desgaste acentuado na superfície do revestimento",
+    "P": "buracos decorrentes da desagregação do revestimento e às vezes de camadas inferiores",
+    "R": "Remendo"
+}
+
+def expandir_siglas(siglas_str):
+    if not siglas_str or pd.isna(siglas_str):
+        return ""
+    parts = [p.strip() for p in str(siglas_str).split(",") if p.strip()]
+    expanded = []
+    for p in parts:
+        if p in MAP_SIGLAS:
+            expanded.append(f"{MAP_SIGLAS[p]} ({p})")
+        else:
+            expanded.append(p)
+    return ", ".join(expanded)
+
+def set_cell_shading(cell, color_hex):
+    tcPr = cell._tc.get_or_add_tcPr()
+    for shd in tcPr.findall(qn('w:shd')):
+        tcPr.remove(shd)
+    shd = OxmlElement('w:shd')
+    shd.set(qn('w:val'), 'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'), color_hex)
+    tcPr.append(shd)
+
+def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
+    tcPr = cell._tc.get_or_add_tcPr()
+    for tcMar in tcPr.findall(qn('w:tcMar')):
+        tcPr.remove(tcMar)
+    tcMar = OxmlElement('w:tcMar')
+    for m, val in [('w:top', top), ('w:bottom', bottom), ('w:left', left), ('w:right', right)]:
+        node = OxmlElement(m)
+        node.set(qn('w:w'), str(val))
+        node.set(qn('w:type'), 'dxa')
+        tcMar.append(node)
+    tcPr.append(tcMar)
+
+def set_table_borders(table):
+    """Aplica bordas pretas e mais grossas (2.5 pt = sz 20) na tabela para maior legibilidade."""
+    tblPr = table._tbl.tblPr
+    tblBorders = tblPr.find(qn('w:tblBorders'))
+    if tblBorders is not None:
+        tblPr.remove(tblBorders)
+        
+    tblBorders = OxmlElement('w:tblBorders')
+    
+    # sz='20' significa 2.5 pt (cada unidade é 1/8 pt).
+    borders = {
+        'top': {'val': 'single', 'sz': '20', 'space': '0', 'color': '000000'},
+        'left': {'val': 'single', 'sz': '20', 'space': '0', 'color': '000000'},
+        'bottom': {'val': 'single', 'sz': '20', 'space': '0', 'color': '000000'},
+        'right': {'val': 'single', 'sz': '20', 'space': '0', 'color': '000000'},
+        'insideH': {'val': 'single', 'sz': '20', 'space': '0', 'color': '000000'},
+        'insideV': {'val': 'single', 'sz': '20', 'space': '0', 'color': '000000'}
+    }
+    
+    for border_name, border_attrs in borders.items():
+        border = OxmlElement(f'w:{border_name}')
+        for attr, val in border_attrs.items():
+            border.set(qn(f'w:{attr}'), val)
+        tblBorders.append(border)
+        
+    tblPr.append(tblBorders)
+
+def criar_tabela_quadros(doc, df_dados, is_pa):
+    """Cria a tabela formatada de acordo com o padrão do documento de referência."""
+    num_rows = len(df_dados)
+    if num_rows == 0:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run("Nenhum registro encontrado.")
+        run.font.name = 'Aptos'
+        run.font.size = Pt(10)
+        return
+        
+    table = doc.add_table(rows=2 + num_rows, cols=5)
+    table.style = 'Table Grid'
+    set_table_borders(table)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    table.allow_autofit = False
+    
+    # 1. Mesclar células do cabeçalho
+    table.cell(0, 0).merge(table.cell(0, 1))
+    table.cell(0, 2).merge(table.cell(1, 2))
+    table.cell(0, 3).merge(table.cell(1, 3))
+    table.cell(0, 4).merge(table.cell(1, 4))
+    
+    # 2. Definir os textos do cabeçalho
+    if not is_pa:
+        table.cell(0, 0).text = "NÃO CONFORMIDADE (NC)"
+        table.cell(1, 0).text = "IDENTIFICAÇÃO"
+        table.cell(1, 1).text = "DESCRIÇÃO"
+        table.cell(0, 2).text = "LOCALIZAÇÃO/\nREGISTRO FOTOGRÁFICO"
+        table.cell(0, 3).text = "FUNDAMENTO DA INFRAÇÃO (PDCL)"
+        table.cell(0, 4).text = "DETERMINAÇÃO"
+        header_color = "D9D9D9"  # Cinza Quadro 2
+        col_widths = [Inches(1.40), Inches(1.40), Inches(1.22), Inches(1.69), Inches(1.56)]
+    else:
+        table.cell(0, 0).text = "PONTOS DE ATENÇÃO"
+        table.cell(1, 0).text = "IDENTIFICAÇÃO"
+        table.cell(1, 1).text = "DESCRIÇÃO DA EVIDÊNCIA"
+        table.cell(0, 2).text = "LOCALIZAÇÃO/\nREGISTRO FOTOGRÁFICO"
+        table.cell(0, 3).text = "JUSTIFICATIVA PARA PONTOS DE ATENÇÃO"
+        table.cell(0, 4).text = "SOLICITAÇÃO"
+        header_color = "E7E6E6"  # Cinza Claro Quadro 3
+        col_widths = [Inches(1.18), Inches(1.74), Inches(1.14), Inches(1.81), Inches(1.40)]
+        
+    # Formatar cabeçalhos (Linhas 0 e 1)
+    for r_idx in [0, 1]:
+        row = table.rows[r_idx]
+        for c_idx, cell in enumerate(row.cells):
+            set_cell_shading(cell, header_color)
+            set_cell_margins(cell, top=100, bottom=100, left=150, right=150)
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            
+            if cell.paragraphs:
+                p = cell.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.paragraph_format.space_before = Pt(0)
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.line_spacing = 1.0
+                
+                # O python-docx ao atribuir text pode limpar runs, garantimos estilo nos runs gerados
+                for run in p.runs:
+                    run.font.name = 'Aptos'
+                    run.font.size = Pt(10)
+                    run.bold = True
+                    
+    # Preencher dados
+    records = df_dados.to_dict('records')
+    for idx, rec in enumerate(records):
+        r_idx = idx + 2
+        row = table.rows[r_idx]
+        
+        ident = str(rec.get("Identificação", "")).strip()
+        
+        siglas_col = "Não Conformidade" if not is_pa else "Ponto de Atenção"
+        siglas_str = rec.get(siglas_col, "")
+        desc = expandir_siglas(siglas_str)
+        
+        faixa = str(rec.get("Direção (faixa)", "")).strip()
+        num_foto = str(rec.get("Nº", "")).zfill(2)
+        localizacao = f"{faixa}/ Foto {num_foto}" if faixa else f"Foto {num_foto}"
+        
+        fund = str(rec.get("Fundamento da infração", "")).strip()
+        det = str(rec.get("Determinação", "")).strip()
+        
+        row.cells[0].text = ident
+        row.cells[1].text = desc
+        row.cells[2].text = localizacao
+        row.cells[3].text = fund
+        row.cells[4].text = det
+        
+        for c_idx, cell in enumerate(row.cells):
+            set_cell_margins(cell, top=100, bottom=100, left=150, right=150)
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            
+            if cell.paragraphs:
+                p = cell.paragraphs[0]
+                if c_idx in [0, 2, 3, 4]:
+                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                else:
+                    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    
+                p.paragraph_format.space_before = Pt(0)
+                p.paragraph_format.space_after = Pt(0)
+                p.paragraph_format.line_spacing = 1.0
+                
+                for run in p.runs:
+                    run.font.name = 'Aptos'
+                    run.font.size = Pt(10)
+                    
+    # Aplicar larguras fixas de forma robusta
+    for row in table.rows:
+        for c_idx, cell in enumerate(row.cells):
+            cell.width = col_widths[c_idx]
+
+def gerar_secao_quadros(doc: Document, row, nc_df):
     """Gera a seção com as descrições e títulos dos Quadros (Quadros 1 a 5)."""
     
     # Parágrafo 14: Os trechos com Não Conformidades...
@@ -73,7 +276,6 @@ def gerar_secao_quadros(doc: Document):
     p6.paragraph_format.space_after = Pt(6)
     p6.paragraph_format.line_spacing = 1.15
     
-    # Runs de O Quadro 4
     runs_data = [
         ("O ", False),
         ("Quadro 4", True),
@@ -93,6 +295,23 @@ def gerar_secao_quadros(doc: Document):
     # Parágrafo 23: Vazio
     doc.add_paragraph()
     
+    # Obter dados de NC e PA
+    id_fisc = row["ID da Fiscalização"]
+    current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None else pd.DataFrame()
+    
+    ncs_reais = pd.DataFrame()
+    pas_reais = pd.DataFrame()
+    if not current_ncs.empty:
+        if "Não Conformidade" in current_ncs.columns:
+            ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
+        if "Ponto de Atenção" in current_ncs.columns:
+            pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
+            
+    try:
+        mes_ano = formatar_mes_ano(row["Data"]).replace(", ", "/").lower()
+    except Exception:
+        mes_ano = "junho/2026"
+        
     # Parágrafo 24: Quadro 4 title...
     p7 = doc.add_paragraph()
     p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -103,9 +322,12 @@ def gerar_secao_quadros(doc: Document):
     r7_1.font.name = 'Aptos'
     r7_1.font.size = Pt(11)
     
-    r7_2 = p7.add_run(" – Não Conformidades por Rodovia/Sentido")
+    r7_2 = p7.add_run(f" – Determinações para Não Conformidades Identificadas – {mes_ano}")
     r7_2.font.name = 'Aptos'
     r7_2.font.size = Pt(11)
+    
+    # Tabela de Não Conformidades (Quadro 4)
+    criar_tabela_quadros(doc, ncs_reais, is_pa=False)
     
     # Parágrafo 25: Vazio
     doc.add_paragraph()
@@ -123,6 +345,9 @@ def gerar_secao_quadros(doc: Document):
     r8_2 = p8.add_run(" – Pontos de Atenção por Rodovia/Sentido")
     r8_2.font.name = 'Aptos'
     r8_2.font.size = Pt(11)
+    
+    # Tabela de Pontos de Atenção (Quadro 5)
+    criar_tabela_quadros(doc, pas_reais, is_pa=True)
     
     # Parágrafos 27, 28, 29: Vazios
     doc.add_paragraph()

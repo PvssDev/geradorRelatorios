@@ -792,7 +792,7 @@ with st.container():
                         excel_buffer.seek(0)
 
                         # 2. Criar diretório temporário para as fotos já enviadas
-                        with tempfile.TemporaryDirectory() as temp_dir:
+                        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
                             fotos_dir = os.path.join(temp_dir, "fotos")
                             reports_dir = os.path.join(temp_dir, "reports")
                             os.makedirs(fotos_dir, exist_ok=True)
@@ -821,10 +821,13 @@ with st.container():
                                                 "nome": nome_base,
                                                 "bytes": f.read()
                                             })
-                                    st.success(f"✅ {len(arquivos_gerados) // 2} relatório(s) gerado(s) com sucesso!")
+                                    st.success(f"✅ {len(arquivos_gerados)} relatório(s) gerado(s) com sucesso!")
                             except Exception as e:
                                 st.error(f"❌ Erro ao gerar relatórios: {e}")
                                 st.exception(e)
+                            finally:
+                                import gc
+                                gc.collect()
         with col_planilha:
             if st.button("💾 Gerar Planilha Completa", use_container_width=True, key="btn_generate_spreadsheet"):
                 flat_fiscalizacoes = []
@@ -914,30 +917,17 @@ with st.container():
             st.write("") # Espaçamento
             st.markdown("---")
             st.write("### 📥 Baixar Relatórios Gerados")
-            col1, col2 = st.columns(2)
             docx_files = [x for x in st.session_state.relatorios_preenchimento_data if x["nome"].endswith(".docx")]
-            pdf_files = [x for x in st.session_state.relatorios_preenchimento_data if x["nome"].endswith(".pdf")]
             
-            with col1:
-                st.write("**Documentos Word (.docx):**")
-                for i, item in enumerate(docx_files):
-                    st.download_button(
-                        label=f"Baixar {item['nome']}",
-                        data=item["bytes"],
-                        file_name=item["nome"],
-                        key=f"dl_fill_docx_{i}_{item['nome']}",
-                        use_container_width=True
-                    )
-            with col2:
-                st.write("**Documentos PDF (.pdf):**")
-                for i, item in enumerate(pdf_files):
-                    st.download_button(
-                        label=f"Baixar {item['nome']}",
-                        data=item["bytes"],
-                        file_name=item["nome"],
-                        key=f"dl_fill_pdf_{i}_{item['nome']}",
-                        use_container_width=True
-                    )
+            st.write("**Documentos Word (.docx):**")
+            for i, item in enumerate(docx_files):
+                st.download_button(
+                    label=f"Baixar {item['nome']}",
+                    data=item["bytes"],
+                    file_name=item["nome"],
+                    key=f"dl_fill_docx_{i}_{item['nome']}",
+                    use_container_width=True
+                )
 
 st.divider()
 st.info("Nota: Use a aba 'Preencher Planilha' para montar seus dados e depois a aba 'Gerador' para processar os documentos.")
