@@ -299,10 +299,20 @@ with st.container():
         with col1:
             id_fisc = st.text_input("ID da Fiscalização (ex: 2026-001)", help="Identificador único para vincular as abas")
             data_fisc = st.text_input("Data (ex: 15/06/2026)", placeholder="dd/mm/aaaa")
-            hora = st.text_input("Hora (ex: 10:00)", placeholder="Opcional")
-            cidade = st.text_input("Cidade (ex: Recife)", placeholder="Cidade do Terminal")
-            local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                hora = st.text_input("Hora (ex: 10:00)", placeholder="Opcional")
+                cidade = st.text_input("Cidade (ex: Recife)", placeholder="Cidade do Terminal")
+            else:
+                hora = ""
+                cidade = ""
+                local = "Sistema Viário do Paiva"
+                periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
+                submit_fisc = st.button("➕ Adicionar Fiscalização")
         with col2:
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
+                periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
+
             col_resp, col_gear = st.columns([5, 1])
             with col_resp:
                 responsaveis_sel = st.multiselect(
@@ -333,22 +343,11 @@ with st.container():
                 if st.button("⚙️", help="Gerenciar Coordenadores", key="btn_manage_coordenadores"):
                     gerenciar_coordenadores_modal()
             
-            # Número do Contrato
-            col_cont, col_gear_cont = st.columns([5, 1])
-            with col_cont:
-                contrato = st.selectbox(
-                    "Número do Contrato",
-                    options=st.session_state.contratos,
-                    help="Selecione o número do contrato. Use a engrenagem ao lado para gerenciar a lista."
-                )
-            with col_gear_cont:
-                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                if st.button("⚙️", help="Gerenciar Contratos", key="btn_manage_contratos"):
-                    gerenciar_contratos_modal()
+            # Número do Contrato definido automaticamente por tipo de relatório
+            contrato = "CT. nº 043/2011" if st.session_state.get("tipo_relatorio", "CRA") == "CRA" else "CGPE-001/2006"
 
-            periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
-
-        submit_fisc = st.button("➕ Adicionar Fiscalização")
+        if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+            submit_fisc = st.button("➕ Adicionar Fiscalização")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
             if not id_fisc:
@@ -437,11 +436,15 @@ with st.container():
             id_vinculo = st.selectbox("Vincular ao ID da Fiscalização", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
             
             # Novas variáveis de Pista e Trecho inseridas de forma compacta (lado a lado)
-            col_pista, col_trecho = st.columns(2)
-            with col_pista:
-                pista = st.text_input("Pista", value=st.session_state.pista_persistida, key=f"nc_pista_{st.session_state.nc_form_counter}", placeholder="Sul, Norte, Única, Táxi...")
-            with col_trecho:
-                trecho = st.text_input("Trecho", value=st.session_state.trecho_persistido, key=f"nc_trecho_{st.session_state.nc_form_counter}", placeholder="Contorno do Cabo, VPE-034...")
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                col_pista, col_trecho = st.columns(2)
+                with col_pista:
+                    pista = st.text_input("Pista", value=st.session_state.pista_persistida, key=f"nc_pista_{st.session_state.nc_form_counter}", placeholder="Sul, Norte, Única, Táxi...")
+                with col_trecho:
+                    trecho = st.text_input("Trecho", value=st.session_state.trecho_persistido, key=f"nc_trecho_{st.session_state.nc_form_counter}", placeholder="Contorno do Cabo, VPE-034...")
+            else:
+                pista = ""
+                trecho = ""
 
             # Obtém o terminal associado automaticamente a partir do ID da Fiscalização
             terminal_nc = ""
@@ -551,7 +554,10 @@ with st.container():
             st.markdown(f"### Detalhes do Registro (Foto: `{st.session_state.step1_foto_default}`) - Etapa 2")
             
             identificacao = st.text_input("Identificação", key=f"nc_ident_{st.session_state.nc_form_counter}", placeholder="Identificação da infração...")
-            direcao_faixa = st.text_input("Direção (faixa)", key=f"nc_dir_{st.session_state.nc_form_counter}", placeholder="Direção/faixa...")
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                direcao_faixa = st.text_input("Direção (faixa)", key=f"nc_dir_{st.session_state.nc_form_counter}", placeholder="Direção/faixa...")
+            else:
+                direcao_faixa = ""
             fundamento_infracao = st.text_input("Fundamento da infração", key=f"nc_fund_{st.session_state.nc_form_counter}", placeholder="Fundamento legal...")
             determinacao = st.text_input("Determinação", key=f"nc_det_{st.session_state.nc_form_counter}", placeholder="Determinação/Ação recomendada...")
             
@@ -597,6 +603,12 @@ with st.container():
             df_fisc = pd.DataFrame(st.session_state.temp_fiscalizacoes)
             if "Relatório Gerado" in df_fisc.columns:
                 df_fisc = df_fisc.drop(columns=["Relatório Gerado"])
+            if "Contrato" in df_fisc.columns:
+                df_fisc = df_fisc.drop(columns=["Contrato"])
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
+                for col in ["Hora", "Cidade", "Local"]:
+                    if col in df_fisc.columns:
+                        df_fisc = df_fisc.drop(columns=[col])
             df_fisc.insert(0, "Excluir", False)
             
             # Apenas para a visualização, encurta o nome dos responsáveis para exibir apenas o primeiro nome
@@ -644,6 +656,10 @@ with st.container():
                 if not df_nc_only.empty:
                     if "Ponto de Atenção" in df_nc_only.columns:
                         df_nc_only = df_nc_only.drop(columns=["Ponto de Atenção"])
+                    if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
+                        for col in ["Terminal", "Trecho", "Pista", "Direção (faixa)"]:
+                            if col in df_nc_only.columns:
+                                df_nc_only = df_nc_only.drop(columns=[col])
                     df_nc_only.insert(0, "Excluir", False)
                     
                     # Garante ordenação exata das colunas
