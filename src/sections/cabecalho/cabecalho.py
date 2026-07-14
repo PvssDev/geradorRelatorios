@@ -4,7 +4,7 @@ from docx.enum.section import WD_SECTION
 import os
 from utils import adicionar_texto_caixa_cinza
 
-def gerar_capa_primeira_pagina(doc, logo_path, row):
+def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
     """
     Gera a primeira página do relatório (Capa) baseada no modelo de referência com dados dinâmicos.
     """
@@ -27,31 +27,41 @@ def gerar_capa_primeira_pagina(doc, logo_path, row):
 
     # 1. Texto Superior em Caixa Cinza (tabela 1x1 sem bordas)
     ano = extrair_ano(row["Data"])
-    adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº 01/{ano}")
+    if tipo_relatorio == "CRA":
+        adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº 01/{ano}")
+    else:
+        adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 05/{ano}")
     
     # 1. Imagem da Capa
     if os.path.exists(logo_path):
-        doc.add_picture(logo_path, width=Inches(4.5))
+        doc.add_picture(logo_path, width=Inches(4.0))
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
         
     doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
     
     # 2. Títulos Principais
-    titulos = [
-        "FISCALIZAÇÃO DO COMPLEXO VIÁRIO E LOGÍSTICO DE SUAPE – EXPRESSWAY",
-        "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DO ATLÂNTICO (CRA)",
-        "CONTRATO DE CONCESSÃO CT. Nº 043/2011"
-    ]
+    if tipo_relatorio == "CRA":
+        titulos = [
+            "FISCALIZAÇÃO DO COMPLEXO VIÁRIO E LOGÍSTICO DE SUAPE – EXPRESSWAY",
+            "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DO ATLÂNTICO (CRA)",
+            "CONTRATO DE CONCESSÃO CT. Nº 043/2011"
+        ]
+    else:
+        titulos = [
+            "FISCALIZAÇÃO TÉCNICO-OPERACIONAL NO SISTEMA VIÁRIO DO PAIVA (PE – 024)",
+            "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DOS COQUEIROS (CRC)"
+        ]
+        
     for idx, titulo in enumerate(titulos):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(titulo)
         run.bold = True
         # Espaçamento pós parágrafo nas duas primeiras linhas, e um espaçamento maior (24pt) na última
-        if idx < 2:
+        if idx < len(titulos) - 1:
             p.paragraph_format.space_after = Pt(6)
         else:
-            p.paragraph_format.space_after = Pt(24)
+            p.paragraph_format.space_after = Pt(12)
 
     
     # 3. Lista de Analistas Dinâmica
@@ -85,8 +95,7 @@ def gerar_capa_primeira_pagina(doc, logo_path, row):
         if i == len(analistas) - 1:
             p_cargo.paragraph_format.space_after = Pt(12)  # Espaço após o parágrafo do último
         else:
-            p_cargo.paragraph_format.space_after = Pt(0)
-            doc.add_paragraph()  # Linha vazia abaixo de cada analista
+            p_cargo.paragraph_format.space_after = Pt(12)  # Espaço abaixo de cada analista
     
     # 4. Data Dinâmica
     p_data = doc.add_paragraph()
@@ -96,14 +105,21 @@ def gerar_capa_primeira_pagina(doc, logo_path, row):
     run_data.bold = True
     run_data.font.size = Pt(12)
     # Espaçamento superior e inferior para isolar a data nativamente
-    p_data.paragraph_format.space_before = Pt(24)
-    p_data.paragraph_format.space_after = Pt(24)
+    p_data.paragraph_format.space_before = Pt(12)
+    p_data.paragraph_format.space_after = Pt(12)
     
     # 5. Processo e SEI Dinâmicos
-    rodape_textos = [
-        f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº 07/{ano} - CTR",
-        f"SEI Nº xxxxxxxxxxxx/{ano}-XX"
-    ]
+    if tipo_relatorio == "CRA":
+        rodape_textos = [
+            f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº 07/{ano} - CTR",
+            f"SEI Nº xxxxxxxxxxxx/{ano}-XX"
+        ]
+    else:
+        rodape_textos = [
+            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº 05/{ano} - CTR",
+            f"SEI Nº xxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+        
     for idx, texto in enumerate(rodape_textos):
         p_rodape = doc.add_paragraph()
         p_rodape.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -112,23 +128,27 @@ def gerar_capa_primeira_pagina(doc, logo_path, row):
         run_rodape.font.size = Pt(12)
         p_rodape.paragraph_format.space_after = Pt(0)
     
-    # 6. Quebra de página para ir para a Página 2 (Lista de Abreviaturas)
-    doc.add_page_break()
-    
-    # Gerar Lista de Abreviaturas (Página 2)
-    gerar_lista_abreviaturas(doc)
-    
-    # Quebra de página para ir para a Página 3 (Sumário)
-    doc.add_page_break()
-    
-    # Gerar Sumário (Página 3)
-    gerar_sumario(doc)
-    
+    # 6. Geração de Sumário e Lista de Abreviaturas com ordem condicional
+    if tipo_relatorio == "CRA":
+        # CRA: Lista de Abreviaturas na Página 2, Sumário na Página 3
+        doc.add_page_break()
+        gerar_lista_abreviaturas(doc, tipo_relatorio)
+        
+        doc.add_page_break()
+        gerar_sumario(doc, tipo_relatorio)
+    else:
+        # CRC: Sumário na Página 2, Lista de Abreviaturas na Página 3
+        doc.add_page_break()
+        gerar_sumario(doc, tipo_relatorio)
+        
+        doc.add_page_break()
+        gerar_lista_abreviaturas(doc, tipo_relatorio)
+        
     # 7. Quebra de seção para ir para a Página 4 (Introdução)
     doc.add_section(WD_SECTION.NEW_PAGE)
 
 
-def gerar_lista_abreviaturas(doc):
+def gerar_lista_abreviaturas(doc, tipo_relatorio="CRA"):
     """Gera a segunda página do cabeçalho (Lista de Abreviaturas e Siglas)."""
     from docx.enum.table import WD_TABLE_ALIGNMENT
     
@@ -140,21 +160,32 @@ def gerar_lista_abreviaturas(doc):
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(24)
     
-    abreviaturas = [
-        ("CRA", "Concessionária Rota do Atlântico"),
-        ("ECR", "ECR Engenharia Ltda"),
-        ("FD", "Faixa Direita"),
-        ("FE", "Faixa Esquerda"),
-        ("IGG", "Índice de Gravidade Global"),
-        ("IRI", "Índice Irregularidade Longitudinal"),
-        ("NC", "Não Conformidade"),
-        ("PDCL", "Programa de Desenvolvimento do Complexo Logístico, Anexo IV do Contrato de Concessão nº 043/2011"),
-        ("SUAPE", "Poder Concedente e Regulador do Contrato de Concessão firmado com a CRA"),
-        ("TPF", "TPF Engenharia Ltda"),
-        ("TDR", "Tronco Distribuidor Rodoviário"),
-        ("VI", "Verificador Independente contratado por SUAPE, atualmente o Consórcio formado pelas Empresas TPF e ECR")
-    ]
-    
+    if tipo_relatorio == "CRA":
+        abreviaturas = [
+            ("CRA", "Concessionária Rota do Atlântico"),
+            ("ECR", "ECR Engenharia Ltda"),
+            ("FD", "Faixa Direita"),
+            ("FE", "Faixa Esquerda"),
+            ("IGG", "Índice de Gravidade Global"),
+            ("IRI", "Índice Irregularidade Longitudinal"),
+            ("NC", "Não Conformidade"),
+            ("PDCL", "Programa de Desenvolvimento do Complexo Logístico, Anexo IV do Contrato de Concessão nº 043/2011"),
+            ("SUAPE", "Poder Concedente e Regulador do Contrato de Concessão firmado com a CRA"),
+            ("TPF", "TPF Engenharia Ltda"),
+            ("TDR", "Tronco Distribuidor Rodoviário"),
+            ("VI", "Verificador Independente contratado por SUAPE, atualmente o Consórcio formado pelas Empresas TPF e ECR")
+        ]
+    else:
+        abreviaturas = [
+            ("ABNT", "Associação Brasileira de Normas Técnicas"),
+            ("ARPE", "Agência de Regulação de Pernambuco"),
+            ("SEPPE", "Secretaria Executiva de Parcerias e Projetos Estratégicos"),
+            ("NC", "Não Conformidade"),
+            ("CRC", "Concessionária Rota dos Coqueiros S. A."),
+            ("PER", "Programa de Exploração da Rodovia, anexo ao Contrato de Concessão Patrocinada CGPE-001/2006"),
+            ("VI", "Verificador Independente, atualmente, o Consórcio formado pelas empresas Maciel Consultores S/S Ltda e Estratégica Serviços de Engenharia Consultiva Ltda")
+        ]
+        
     table = doc.add_table(rows=1 + len(abreviaturas), cols=2)
     table.style = 'Table Grid'
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -195,7 +226,7 @@ def gerar_lista_abreviaturas(doc):
             row.cells[idx].width = width
 
 
-def gerar_sumario(doc):
+def gerar_sumario(doc, tipo_relatorio="CRA"):
     """Gera a terceira página do cabeçalho (Sumário dinâmico utilizando tabulações e líderes de ponto)."""
     from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
     
@@ -207,17 +238,28 @@ def gerar_sumario(doc):
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(24)
     
-    linhas = [
-        "1.\tINTRODUÇÃO\t4",
-        "2.\tOBJETIVO\t4",
-        "3.\tMETODOLOGIA\t5",
-        "4.\tFISCALIZAÇÃO\t7",
-        "5.\tDETERMINAÇÕES GERAIS\t11",
-        "6.\tRECOMENDAÇÕES\t11",
-        "7.\tCONCLUSÕES\t11",
-        "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
-    ]
-    
+    if tipo_relatorio == "CRA":
+        linhas = [
+            "1.\tINTRODUÇÃO\t4",
+            "2.\tOBJETIVO\t4",
+            "3.\tMETODOLOGIA\t5",
+            "4.\tFISCALIZAÇÃO\t7",
+            "5.\tDETERMINAÇÕES GERAIS\t11",
+            "6.\tRECOMENDAÇÕES\t11",
+            "7.\tCONCLUSÕES\t11",
+            "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
+        ]
+    else:
+        linhas = [
+            "1.\tINTRODUÇÃO\t4",
+            "2.\tOBJETIVO\t4",
+            "3.\tINFORMAÇÕES GERAIS\t4",
+            "4.\tMETODOLOGIA\t5",
+            "5.\tFISCALIZAÇÃO\t7",
+            "6.\tCONCLUSÕES\t11",
+            "\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO\t12"
+        ]
+        
     for idx, linha in enumerate(linhas):
         p_line = doc.add_paragraph()
         p_line.paragraph_format.space_after = Pt(6)

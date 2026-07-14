@@ -82,8 +82,9 @@ def gerar_relatorio(
     fotos_dir=None,
     relatorios_dir=None,
     gerar_todos=False,
+    tipo_relatorio="CRA",
 ):
-    """Gera o relatório completo (docx + pdf) com base nos dados da fiscalização."""
+    """Gera o relatório completo com base nos dados da fiscalização."""
 
     BASE_DIR, FOTOS_DIR, RELATORIOS_DIR = _obter_caminhos_base(fotos_dir, relatorios_dir)
     
@@ -149,7 +150,7 @@ def gerar_relatorio(
         id_fisc = row["ID da Fiscalização"]
         doc = Document()
 
-        # Calcula o total de achados (soma de não conformidades com pontos de atenção)
+        # Calcula o total de achados (soma de não conformidades com pontos de atenção no caso de CRA)
         current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if not nc_df.empty else pd.DataFrame()
         total_achados = 0
         if not current_ncs.empty:
@@ -157,18 +158,18 @@ def gerar_relatorio(
             if "Não Conformidade" in current_ncs.columns:
                 has_nc = len(current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""])
             has_pa = 0
-            if "Ponto de Atenção" in current_ncs.columns:
+            if tipo_relatorio == "CRA" and "Ponto de Atenção" in current_ncs.columns:
                 has_pa = len(current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""])
             total_achados = has_nc + has_pa
 
         # Primeira Página (Capa)
         logo_capa_path = os.path.join(BASE_DIR, "assets/logo_capa.jpeg")
-        gerar_capa_primeira_pagina(doc, logo_capa_path, row)
+        gerar_capa_primeira_pagina(doc, logo_capa_path, row, tipo_relatorio)
 
         # Geração das Seções
-        gerar_secao_introducao(doc, row, total_achados)
-        gerar_secao_quadros(doc, row, nc_df)
-        gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR)
+        gerar_secao_introducao(doc, row, total_achados, tipo_relatorio)
+        gerar_secao_quadros(doc, row, nc_df, tipo_relatorio)
+        gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR, tipo_relatorio=tipo_relatorio)
 
         # Sanitização e Salvamento
         id_safe = "".join([c if c not in r'\/:*?"<>|' else "_" for c in str(id_fisc)]).strip()
