@@ -44,22 +44,24 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
         
     records = df_fotos.to_dict('records')
     
-    if tipo_relatorio == "CRC":
-        # No CRC cada foto é uma tabela de 1 coluna, com parágrafo de identificação acima dela
+    if tipo_relatorio in ["CRC", "SOCICAM"]:
+        # No CRC/SOCICAM cada foto é uma tabela de 1 coluna
         for idx, rec in enumerate(records):
-            p_nc_desc = doc.add_paragraph()
-            p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            p_nc_desc.paragraph_format.space_before = Pt(12)
-            p_nc_desc.paragraph_format.space_after = Pt(6)
-            p_nc_desc.paragraph_format.line_spacing = 1.15
-            
-            ident = str(rec.get("Identificação", "")).strip()
             obs_text = str(rec.get("Observações", rec.get("Legenda da Foto", ""))).strip()
             
-            run_nc_desc = p_nc_desc.add_run(f"{ident} – {obs_text}")
-            run_nc_desc.bold = True
-            run_nc_desc.font.name = 'Aptos'
-            run_nc_desc.font.size = Pt(11)
+            if tipo_relatorio == "CRC":
+                p_nc_desc = doc.add_paragraph()
+                p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_nc_desc.paragraph_format.space_before = Pt(12)
+                p_nc_desc.paragraph_format.space_after = Pt(6)
+                p_nc_desc.paragraph_format.line_spacing = 1.15
+                
+                ident = str(rec.get("Identificação", "")).strip()
+                
+                run_nc_desc = p_nc_desc.add_run(f"{ident} – {obs_text}")
+                run_nc_desc.bold = True
+                run_nc_desc.font.name = 'Aptos'
+                run_nc_desc.font.size = Pt(11)
             
             # Tabela de 1 coluna com 2 linhas
             table = doc.add_table(rows=2, cols=1)
@@ -344,11 +346,104 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         run_rec2.font.size = Pt(11)
         
         doc.add_paragraph()  # Espaço
+    elif tipo_relatorio == "SOCICAM":
+        # ----------------------------------------------------
+        # 5. DETERMINAÇÕES GERAIS
+        # ----------------------------------------------------
+        doc.add_paragraph()  # Espaço
+        adicionar_titulo_secao(doc, "5. DETERMINAÇÕES GERAIS")
+        doc.add_paragraph()  # Pula linha abaixo do título
+        
+        p_det1 = doc.add_paragraph()
+        p_det1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_det1.paragraph_format.space_after = Pt(6)
+        p_det1.paragraph_format.line_spacing = 1.15
+        run_det1 = p_det1.add_run(
+            "Considerando os dispositivos contratuais pertinentes e visando garantir a qualidade dos serviços prestados, "
+            "determina-se que a SOCICAM tome as seguintes medidas através de plano de ação:"
+        )
+        run_det1.font.name = 'Aptos'
+        run_det1.font.size = Pt(11)
+        
+        p_det2 = doc.add_paragraph()
+        p_det2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_det2.paragraph_format.space_after = Pt(6)
+        p_det2.paragraph_format.line_spacing = 1.15
+        r_det2_1 = p_det2.add_run("Manutenção e Monitoramento:")
+        r_det2_1.bold = True
+        r_det2_1.font.name = 'Aptos'
+        r_det2_1.font.size = Pt(11)
+        r_det2_2 = p_det2.add_run(
+            " adotar medidas para assegurar a manutenção, o monitoramento contínuo e o cumprimento do Programa de Manutenção dos Terminais Rodoviários, constante da proposta da SOICICAM nos subitens 9.1.1 Manutenção Preventiva; 9.1.2 manutenção Corretiva e 9.13 tabela de Classificação de Níveis de Falha (tabela de tempos máximos para os níveis de atendimento)."
+        )
+        r_det2_2.bold = True
+        r_det2_2.font.name = 'Aptos'
+        r_det2_2.font.size = Pt(11)
+        
+        p_det3 = doc.add_paragraph()
+        p_det3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_det3.paragraph_format.space_after = Pt(6)
+        p_det3.paragraph_format.line_spacing = 1.15
+        f_extenso = {
+            1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
+            6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
+        }
+        extenso_ncs = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
+        run_det3 = p_det3.add_run(
+            f"Medidas imediatas para resolutividade das {total_ncs} ({extenso_ncs}) novas Não Conformidades constatadas, nos prazos estabelecidos, conforme disposto no Quadro 1, na coluna denominada Determinações."
+        )
+        run_det3.bold = True
+        run_det3.font.name = 'Aptos'
+        run_det3.font.size = Pt(11)
+        
+        doc.add_paragraph()  # Espaço
+        
+        # ----------------------------------------------------
+        # 6. RECOMENDAÇÕES
+        # ----------------------------------------------------
+        adicionar_titulo_secao(doc, "6. RECOMENDAÇÕES")
+        doc.add_paragraph()  # Pula linha abaixo do título
+        
+        p_rec1 = doc.add_paragraph()
+        p_rec1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_rec1.paragraph_format.space_after = Pt(6)
+        p_rec1.paragraph_format.line_spacing = 1.15
+        run_rec1 = p_rec1.add_run(
+            "Considerando as disposições do Contrato de Concessão, em especial, o Anexo III – Regulamento Interno dos Terminais Rodoviários, "
+            "aprovado pela Resolução Arpe nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), bem como a legislação aplicável, "
+            "devem ser observadas pela SOCICAM as seguintes recomendações:"
+        )
+        run_rec1.font.name = 'Aptos'
+        run_rec1.font.size = Pt(11)
+        
+        recomendacoes_list = [
+            "Garantir condições de segurança, higiene, acessibilidade e conforto aos usuários dos Terminais Rodoviários, sejam passageiros, público em geral, comerciantes neles estabelecidos, empresas de transportes e de seus empregados.",
+            "Exigir a utilização de EPI adequados, inclusive por funcionários de empresas terceirizadas que prestem serviços nos Terminais Rodoviários.",
+            "Providenciar a correta manutenção (evitar o vencimento) de extintores de incêndios nos Terminais Rodoviários.",
+            "Instalar, sempre que necessário, aviso de sinalização de segurança, principalmente em pontos de risco de acidentes."
+        ]
+        for rec_text in recomendacoes_list:
+            p_rec_item = doc.add_paragraph()
+            p_rec_item.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p_rec_item.paragraph_format.space_after = Pt(6)
+            p_rec_item.paragraph_format.line_spacing = 1.15
+            p_rec_item.paragraph_format.left_indent = Pt(18.0)
+            p_rec_item.paragraph_format.first_line_indent = Pt(-18.0)
+            
+            run_bullet = p_rec_item.add_run("•\t")
+            run_bullet.font.name = 'Aptos'
+            run_bullet.font.size = Pt(11)
+            
+            run_text = p_rec_item.add_run(rec_text)
+            run_text.font.name = 'Aptos'
+            run_text.font.size = Pt(11)
+            
+        doc.add_paragraph()  # Espaço
 
     # ----------------------------------------------------
     # CONCLUSÕES
     # ----------------------------------------------------
-    concl_title = "7. CONCLUSÕES" if tipo_relatorio == "CRA" else "6. CONCLUSÕES"
+    concl_title = "7. CONCLUSÕES" if tipo_relatorio in ["CRA", "SOCICAM"] else "6. CONCLUSÕES"
     adicionar_titulo_secao(doc, concl_title)
     doc.add_paragraph()  # Pula linha abaixo do título
     
@@ -390,7 +485,7 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         )
         run_con3.font.name = 'Aptos'
         run_con3.font.size = Pt(11)
-    else:
+    elif tipo_relatorio == "CRC":
         # Modo CRC
         p_con1 = doc.add_paragraph()
         p_con1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -419,6 +514,37 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
             "Por fim, solicita-se o encaminhamento deste Relatório de Fiscalização à Concessionária Rota dos Coqueiros, "
             "para adoção das providências necessárias à regularização das não conformidades apontadas por esta Agência "
             "Reguladora, bem como dar conhecimento à SEPPE, gestora do Contrato de Concessão."
+        )
+        run_con2.font.name = 'Aptos'
+        run_con2.font.size = Pt(11)
+    else: # SOCICAM
+        p_con1 = doc.add_paragraph()
+        p_con1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_con1.paragraph_format.space_after = Pt(6)
+        p_con1.paragraph_format.line_spacing = 1.15
+        
+        f_extenso = {
+            1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
+            6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
+        }
+        extenso_f = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
+        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
+        
+        run_con1 = p_con1.add_run(
+            f"Tendo em vista as ações de fiscalização realizadas pela ARPE foram constatadas {extenso_f} novas Não Conformidades no {local_val}, "
+            f"que devem ser solucionadas pela SOCICAM de acordo com as Determinações desta Agência de Regulação (v. Quadro 1)."
+        )
+        run_con1.bold = True
+        run_con1.font.name = 'Aptos'
+        run_con1.font.size = Pt(11)
+        
+        p_con2 = doc.add_paragraph()
+        p_con2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_con2.paragraph_format.space_after = Pt(6)
+        p_con2.paragraph_format.line_spacing = 1.15
+        run_con2 = p_con2.add_run(
+            "Por fim, solicita-se o encaminhamento deste Processo de Fiscalização para conhecimento e acompanhamento da EPTI, "
+            "na qualidade de Poder Concedente do Contrato de Concessão e gestora do Sistema de Transporte Coletivo Intermunicipal de Passageiros (STCIP-PE)."
         )
         run_con2.font.name = 'Aptos'
         run_con2.font.size = Pt(11)
@@ -454,8 +580,18 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
     # APÊNDICE A (CRA) / APÊNDICE ÚNICO (CRC)
     if tipo_relatorio == "CRA":
         p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
-    else:
+    elif tipo_relatorio == "CRC":
         p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO EM {data_fisc}")
+    else: # SOCICAM
+        local_sigla = "TIP"
+        local_val = str(row.get("Local", "TIP")).upper()
+        if "TIP" in local_val:
+            local_sigla = "TIP"
+        elif "(" in local_val:
+            local_sigla = local_val.split("(")[0].strip()
+        else:
+            local_sigla = local_val
+        p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}")
         
     p_ap_a.paragraph_format.page_break_before = True
     
@@ -522,11 +658,11 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
         if match:
             r_nome = match["nome"]
-            r_funcao = match["funcao"]
+            r_funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else match["funcao"]
             r_matr = match["matricula"]
         else:
             r_nome = nome
-            r_funcao = "Analista de Regulação"
+            r_funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else "Analista de Regulação"
             r_matr = "xxxxxxx/xx"
             
         p_ass = doc.add_paragraph()

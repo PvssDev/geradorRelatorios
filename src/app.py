@@ -211,8 +211,13 @@ with col_title:
     st.title(f"📄 Gerador de Relatórios {st.session_state.tipo_relatorio}")
 with col_switch:
     st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-    if st.button("🔄", key="btn_swap_tipo", help="Clique para alternar entre CRA e CRC"):
-        st.session_state.tipo_relatorio = "CRC" if st.session_state.tipo_relatorio == "CRA" else "CRA"
+    if st.button("🔄", key="btn_swap_tipo", help="Clique para alternar entre CRA, CRC e SOCICAM"):
+        if st.session_state.tipo_relatorio == "CRA":
+            st.session_state.tipo_relatorio = "CRC"
+        elif st.session_state.tipo_relatorio == "CRC":
+            st.session_state.tipo_relatorio = "SOCICAM"
+        else:
+            st.session_state.tipo_relatorio = "CRA"
         st.rerun()
 
 # Layout principal da aplicação
@@ -305,12 +310,18 @@ with st.container():
             else:
                 hora = ""
                 cidade = ""
+                
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
                 local = "Sistema Viário do Paiva"
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
                 submit_fisc = st.button("➕ Adicionar Fiscalização")
+            elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
+                local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
         with col2:
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                 local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
+                periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
+            elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
 
             col_resp, col_gear = st.columns([5, 1])
@@ -344,9 +355,14 @@ with st.container():
                     gerenciar_coordenadores_modal()
             
             # Número do Contrato definido automaticamente por tipo de relatório
-            contrato = "CT. nº 043/2011" if st.session_state.get("tipo_relatorio", "CRA") == "CRA" else "CGPE-001/2006"
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                contrato = "CT. nº 043/2011"
+            elif st.session_state.get("tipo_relatorio", "CRA") == "CRC":
+                contrato = "CGPE-001/2006"
+            else:
+                contrato = "CT. nº 1.041.080/08"
 
-        if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+        if st.session_state.get("tipo_relatorio", "CRA") in ["CRA", "SOCICAM"]:
             submit_fisc = st.button("➕ Adicionar Fiscalização")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
@@ -501,7 +517,7 @@ with st.container():
                     if id_vinculo == "Nenhum ID cadastrado":
                         st.error("Adicione uma fiscalização primeiro.")
                     elif not nc_descricao and not ponto_atencao:
-                        msg_erro = "O campo 'Não Conformidade' é obrigatório." if st.session_state.get("tipo_relatorio", "CRA") == "CRC" else "O campo 'Não Conformidade' ou 'Ponto de Atenção' é obrigatório."
+                        msg_erro = "O campo 'Não Conformidade' é obrigatório." if st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"] else "O campo 'Não Conformidade' ou 'Ponto de Atenção' é obrigatório."
                         st.error(msg_erro)
                     elif not foto_default:
                         st.error("É obrigatório ter uma foto selecionada no carrossel para continuar.")
@@ -609,6 +625,10 @@ with st.container():
                 for col in ["Hora", "Cidade", "Local"]:
                     if col in df_fisc.columns:
                         df_fisc = df_fisc.drop(columns=[col])
+            elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
+                for col in ["Hora", "Cidade"]:
+                    if col in df_fisc.columns:
+                        df_fisc = df_fisc.drop(columns=[col])
             df_fisc.insert(0, "Excluir", False)
             
             # Apenas para a visualização, encurta o nome dos responsáveis para exibir apenas o primeiro nome
@@ -656,7 +676,7 @@ with st.container():
                 if not df_nc_only.empty:
                     if "Ponto de Atenção" in df_nc_only.columns:
                         df_nc_only = df_nc_only.drop(columns=["Ponto de Atenção"])
-                    if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
+                    if st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"]:
                         for col in ["Terminal", "Trecho", "Pista", "Direção (faixa)"]:
                             if col in df_nc_only.columns:
                                 df_nc_only = df_nc_only.drop(columns=[col])

@@ -26,12 +26,17 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             f"É importante observar que foram realizadas ações de fiscalização, no dia {data_extenso}, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº 302 (Doc. SEI 75605952).",
             "Destaca-se que as fiscalizações realizadas pela Arpe são tratadas com caráter educativo, preferencialmente, e contributivo para correção de procedimentos e solução de Não Conformidades evidenciados por defeitos e/ou problemas na infraestrutura disponibilizada e respectivos serviços concedidos pelo Estado."
         ]
-    else:
+    elif tipo_relatorio == "CRC":
         paragraphs_intro = [
             f"A Coordenadoria de Transportes e Rodovias da ARPE, em cumprimento ao cronograma de fiscalização de {ano}, realizou fiscalização na Concessão Patrocinada da Ponte de Acesso e Sistema Viário da Praia do Paiva, sob responsabilidade da Concessionária Rota dos Coqueiros (CRC). A ação foi comunicada à concessionária por meio do Ofício ARPE/DTO nº 145/2026, de 26/05/2026 (Doc. SEI nº 86328395), e à Secretaria Executiva de Parcerias e Projetos Estratégicos (SEPPE) por meio do Ofício ARPE/DTO nº 146/2026, de 26/05/2026 (Doc. SEI nº 86328735).",
             "As ações de fiscalização registradas neste Relatório se referem à Rodovia Estadual PE-024, trecho Barra de Jangada – Itapuama, medindo 6,5 Km de extensão, compreendendo duas praças de pedágio, pela Ponte sobre o Rio Jaboatão e a via principal do Destino de Turismo e Lazer Praia do Paiva.",
-            "Este relatório apresenta as observações realizadas pela equipe da Coordenadoria de Transportes e Rodovias da ARPE, sob a perspectiva técnico-operacional, com o objetivo de verificar as condições de operação, conservação, manutenção e segurança do trecho rodoviário concedido, bem como o cumprimento da legislação aplicável e a eficiência dos serviços prestados.",
+            "Este relatório apresenta as observações realizadas pela equipe da Coordenadoria de Transportes e Rodovias da ARPE, sob a perspectiva técnico-operacional, com o objetivo de verificar as condições de operação, conservação, manutenção e segurança del trecho rodoviário concedido, bem como o cumprimento da legislação aplicável e a eficiência dos serviços prestados.",
             "As fiscalizações realizadas pela ARPE possuem, prioritariamente, caráter orientativo e corretivo, visando contribuir para o aperfeiçoamento dos procedimentos e para a correção de não conformidades identificadas na infraestrutura disponibilizada e nos serviços concedidos pelo Estado."
+        ]
+    else: # SOCICAM
+        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
+        paragraphs_intro = [
+            f"A Coordenadoria de Transportes e Rodovias da Arpe realiza vistorias no {local_val} com o objetivo de verificar as condições operacionais, de conservação, de manutenção e de segurança e da qualidade do serviço prestado nos referidos terminais, conforme Contrato de Concessão de Serviço Público No 1.041.080/08, firmado entre o Governo do Estado, atualmente representado pela Empresa Pernambucana de Transportes Intermunicipal (EPTI) e a SOCICAM - Administração, Projetos e Representações Ltda (SOCICAM) visando a operação, manutenção e administração de terminais rodoviários no Estado de Pernambuco, com execução de obras de reforma e construção, incluindo, ainda, a cessão de uso de espaços para a exploração comercial através de locação e publicidade."
         ]
 
     for text in paragraphs_intro:
@@ -59,6 +64,20 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             run3 = p.add_run(part3)
             run3.font.name = 'Aptos'
             run3.font.size = Pt(11)
+        elif tipo_relatorio == "SOCICAM" and local_val in text:
+            parts = text.split(local_val, 1)
+            run1 = p.add_run(parts[0])
+            run1.font.name = 'Aptos'
+            run1.font.size = Pt(11)
+            
+            run_bold = p.add_run(local_val)
+            run_bold.bold = True
+            run_bold.font.name = 'Aptos'
+            run_bold.font.size = Pt(11)
+            
+            run2 = p.add_run(parts[1])
+            run2.font.name = 'Aptos'
+            run2.font.size = Pt(11)
         else:
             run = p.add_run(text)
             run.font.name = 'Aptos'
@@ -88,7 +107,7 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
         run_obj = p_obj.add_run(text_objetivo)
         run_obj.font.name = 'Aptos'
         run_obj.font.size = Pt(11)
-    else:
+    elif tipo_relatorio == "CRC":
         text_obj_1 = (
             "A fiscalização direta e periódica do Sistema Viário do Paiva, concedido à CRC, tem por objetivo verificar "
             "as condições de operação, manutenção, segurança viária e níveis de serviço, bem como identificar não "
@@ -110,6 +129,46 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             run_obj = p_obj.add_run(text)
             run_obj.font.name = 'Aptos'
             run_obj.font.size = Pt(11)
+    else: # SOCICAM
+        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
+        if "RECIFE" in local_val.upper() or "TIP" in local_val.upper():
+            nome_negrito = "Terminal Rodoviário do Recife"
+        else:
+            nome_negrito = local_val.split("(")[0].strip()
+            
+        text_objetivo = (
+            f"A fiscalização direta e periódica dos Terminais Rodoviários de Passageiros concedidos à SOCICAM, tem por "
+            f"objetivo verificar as condições de conservação, limpeza e higiene das áreas de embarque e desembarque, dos "
+            f"sanitários, as condições do pavimento das vias de circulação interna, a infraestrutura oferecida, a segurança "
+            f"e o atendimento ao usuário, bem como toda estrutura para funcionamento desse terminal. Dessa forma a ação de "
+            f"fiscalização no {nome_negrito}, realizada pela ARPE verificou o grau de conformidade dessas instalações com o "
+            f"Contrato de Concessão, bem como com a legislação e normas vigentes de modo a determinar e/ou recomendar "
+            f"medidas corretivas, com foco na qualidade dos serviços prestados."
+        )
+        
+        p_obj = doc.add_paragraph()
+        p_obj.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_obj.paragraph_format.space_after = Pt(6)
+        p_obj.paragraph_format.line_spacing = 1.15
+        
+        if nome_negrito in text_objetivo:
+            parts_obj = text_objetivo.split(nome_negrito, 1)
+            run1 = p_obj.add_run(parts_obj[0])
+            run1.font.name = 'Aptos'
+            run1.font.size = Pt(11)
+            
+            run_bold = p_obj.add_run(nome_negrito)
+            run_bold.bold = True
+            run_bold.font.name = 'Aptos'
+            run_bold.font.size = Pt(11)
+            
+            run2 = p_obj.add_run(parts_obj[1])
+            run2.font.name = 'Aptos'
+            run2.font.size = Pt(11)
+        else:
+            run_obj = p_obj.add_run(text_objetivo)
+            run_obj.font.name = 'Aptos'
+            run_obj.font.size = Pt(11)
 
     # ----------------------------------------------------
     # 3. SEÇÃO: INFORMAÇÕES GERAIS (Tabela)
@@ -127,7 +186,12 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
     
     # Construção da tabela de Informações Gerais
     from docx.enum.table import WD_TABLE_ALIGNMENT
-    num_rows = 22 if tipo_relatorio == "CRA" else 20
+    if tipo_relatorio == "CRA":
+        num_rows = 22
+    elif tipo_relatorio == "CRC":
+        num_rows = 20
+    else: # SOCICAM
+        num_rows = 17
     table = doc.add_table(rows=num_rows, cols=2)
     table.style = 'Table Grid'
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -214,7 +278,7 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
         format_normal_row(table.rows[19], "Responsáveis pela fiscalização:", responsaveis_formatted)
         format_normal_row(table.rows[20], "Período da Fiscalização:", periodo_val)
         format_normal_row(table.rows[21], "Tipo de Fiscalização:", "Direta e periódica.")
-    else:
+    elif tipo_relatorio == "CRC":
         # Preencher a estrutura da tabela conforme a referência (Seções 3.1, 3.2, 3.3, 3.4)
         format_header_row(table.rows[0], "3.1 DO PODER CONCEDENTE")
         format_normal_row(table.rows[1], "Titular:", "Conselho do Programa de Parcerias Estratégicas de Pernambuco– CPPPE")
@@ -240,13 +304,43 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
         format_normal_row(table.rows[17], "Responsáveis pela fiscalização:", responsaveis_formatted)
         format_normal_row(table.rows[18], "Período da Fiscalização:", periodo_val)
         format_normal_row(table.rows[19], "Tipo de Fiscalização:", "Direta e periódica.")
+    else: # SOCICAM
+        # Preencher a estrutura da tabela conforme a referência (Seções 3.1, 3.2, 3.3)
+        format_header_row(table.rows[0], "3.1 DO TITULAR")
+        format_normal_row(table.rows[1], "Titular:", "Empresa Pernambucana de Transportes Intermunicipal (EPTI)")
+        format_normal_row(table.rows[2], "Endereço:", "Av. Caxangá, 2.200 Cordeiro Recife/PE CEP: 50.711-000")
+        format_normal_row(table.rows[3], "Responsável:", "THIAGO EDGLES SOBRAL DE SOUZA", val_bold=True)
+        
+        format_header_row(table.rows[4], "3.2 DO REGULADO")
+        format_normal_row(table.rows[5], "Regulado:", "SOCICAM - Administração, Projetos e Representações Ltda")
+        format_normal_row(table.rows[6], "Responsável:", "THIAGO DUARTE PIMENTEL", val_bold=True)
+        format_normal_row(table.rows[7], "Endereço:", "Avenida Prefeito Antônio Pereira, S/N Várzea Recife/PE CEP: 50.950-030")
+        format_normal_row(table.rows[8], "Representantes para acompanhar:", "Recife (TIP): Monalisa Pereira")
+        
+        format_header_row(table.rows[9], "3.3 DO REGULADOR")
+        format_normal_row(table.rows[10], "Regulador:", "Agência de Regulação de Pernambuco (Arpe)")
+        format_normal_row(table.rows[11], "Diretor Presidente:", "CARLOS PORTO FILHO", val_bold=True)
+        format_normal_row(table.rows[12], "Endereço:", "Av. Cons. Rosa e Silva, 975, Aflitos, Recife/PE, CEP: 52.050-020")
+        format_normal_row(table.rows[13], "Estacionamento:", "Rua do Futuro, 150, Aflitos, Recife/PE")
+        format_normal_row(table.rows[14], "Responsáveis pela fiscalização:", responsaveis_formatted)
+        format_normal_row(table.rows[15], "Período da Fiscalização:", periodo_val)
+        format_normal_row(table.rows[16], "Tipo de Fiscalização:", "Direta e periódica.")
         
     # Ajustar as larguras das colunas
-    col_widths = [Inches(2.3), Inches(5.2)]
-    headers_indices = [0, 5, 10, 15] if tipo_relatorio == "CRA" else [0, 4, 8, 13]
+    if tipo_relatorio == "SOCICAM":
+        col_widths = [Inches(3.0), Inches(4.57)]
+    else:
+        col_widths = [Inches(2.3), Inches(5.2)]
+        
+    if tipo_relatorio == "CRA":
+        headers_indices = [0, 5, 10, 15]
+    elif tipo_relatorio == "CRC":
+        headers_indices = [0, 4, 8, 13]
+    else: # SOCICAM
+        headers_indices = [0, 4, 9]
     for r_idx, row_obj in enumerate(table.rows):
         if r_idx in headers_indices:
-            row_obj.cells[0].width = Inches(7.5)
+            row_obj.cells[0].width = Inches(7.57) if tipo_relatorio == "SOCICAM" else Inches(7.5)
         else:
             row_obj.cells[0].width = col_widths[0]
             row_obj.cells[1].width = col_widths[1]
@@ -268,11 +362,17 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             "Preparação e Planejamento - compreende a organização e estruturação das atividades preliminares à execução da fiscalização, destacando-se a elaboração e o envio de avisos de fiscalização à Concessionária e demais atividades de suporte à fiscalização, bem como a análise de fiscalizações anteriores com a identificação de eventuais Não Conformidades pendentes.",
             "Execução da Fiscalização - a execução da fiscalização é pautada por um arcabouço de normas e diretrizes, possibilitando que todas as etapas sejam desenvolvidas de maneira eficiente e em conformidade aos padrões estabelecidos, destacando-se:"
         ]
-    else:
+    elif tipo_relatorio == "CRC":
         paragraphs_metodo_1 = [
             f"A Coordenadoria de Transporte e Rodovias da ARPE realizou fiscalização direta e periódica no Sistema Viário do Paiva em {data_extenso}, seguindo metodologia estruturada em três etapas: Preparação e Planejamento, Execução da Fiscalização e Monitoramento e Avaliação.",
-            "Preparação e Planejamento- compreende a organização e estruturação das atividades preliminares à execução da fiscalização, destacando-se a elaboração e o envio de avisos de fiscalização à Concessionária e demais atividades de suporte à fiscalização, bem como a análise de fiscalizações anteriores com a identificação de eventuais Não Conformidades pendentes.",
-            "Execução da Fiscalização- as possíveis Não Conformidades levantadas em campo são analisadas de acordo com os critérios elencados no PER (Contrato de Concessão). A execução da fiscalização é pautada por um arcabouço de normas e diretrizes, possibilitando que todas as etapas sejam desenvolvidas de maneira eficiente e em conformidade aos padrões estabelecidos, destacando-se:"
+            "Preparação e Planejamento - compreende a organização e estruturação das atividades preliminares à execução da fiscalização, destacando-se a elaboração e o envio de avisos de fiscalização à Concessionária e demais atividades de suporte à fiscalização, bem como a análise de fiscalizações anteriores com a identificação de eventuais Não Conformidades pendentes.",
+            "Execução da Fiscalização - as possíveis Não Conformidades levantadas em campo são analisadas de acordo com os critérios elencados no PER (Contrato de Concessão). A execução da fiscalização é pautada por um arcabouço de normas e diretrizes, possibilitando que todas as etapas sejam desenvolvidas de maneira eficiente e em conformidade aos padrões estabelecidos, destacando-se:"
+        ]
+    else: # SOCICAM
+        paragraphs_metodo_1 = [
+            "A fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da Arpe está submetida a uma metodologia organizada em três etapas: Preparação e Planejamento, Execução da Fiscalização e Monitoramento e Avaliação.",
+            "Preparação e Planejamento - compreende a organização e estruturação das atividades preliminares à execução da fiscalização, destacando-se a elaboração e o envio de avisos de fiscalização à Concessionária e demais atividades de suporte à fiscalização, bem como a análise de fiscalizações anteriores com a identificação de eventuais Não Conformidades pendentes.",
+            "Execução da Fiscalização - a execução da fiscalização é pautada por um arcabouço de normas e diretrizes, possibilitando que todas as etapas sejam desenvolvidas de maneira eficiente e em conformidade aos padrões estabelecidos, destacando-se:"
         ]
     
     for text in paragraphs_metodo_1:
@@ -280,9 +380,21 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         p.paragraph_format.space_after = Pt(6)
         p.paragraph_format.line_spacing = 1.15
-        run = p.add_run(text)
-        run.font.name = 'Aptos'
-        run.font.size = Pt(11)
+        
+        parts = text.split(" - ", 1)
+        if len(parts) == 2 and tipo_relatorio in ["CRC", "SOCICAM"]:
+            run_bold = p.add_run(parts[0])
+            run_bold.bold = True
+            run_bold.font.name = 'Aptos'
+            run_bold.font.size = Pt(11)
+            
+            run_normal = p.add_run(" - " + parts[1])
+            run_normal.font.name = 'Aptos'
+            run_normal.font.size = Pt(11)
+        else:
+            run = p.add_run(text)
+            run.font.name = 'Aptos'
+            run.font.size = Pt(11)
         
     # Referências com recuo de parágrafo estruturado nativamente no Word (Hanging Indent)
     if tipo_relatorio == "CRA":
@@ -295,7 +407,7 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             ("[...]", True, False),
             ("Art. 4º Compete ainda à ARPE:", True, False),
             ("[...]", True, False),
-            ("X - Fiscalizar diretamente ou mediante convênio com o Estado de Pernambuco, através de seus órgãos ou entidades vinculadas, com sua supervisão, os aspectos técnico, econômico, contábil, financeiro, operacional e jurídico dos serviços públicos delegados, valendo-se inclusive, de indicadores e procedimentos amostrais.", True, False),
+            ("X - Fiscalizar diretamente ou mediante convênio com o Estado de Pernambuco, através de seus órgãos ou entidades vinculadas, com sua supervisão, os aspects técnico, econômico, contábil, financeiro, operacional e jurídico dos serviços públicos delegados, valendo-se inclusive, de indicadores e procedimentos amostrais.", True, False),
             ("", False, False),
             ("Contrato de Concessão CT. nº 043/2011, de 18 de julho de 2011, para a delegação da exploração do Complexo Viário e Logístico de SUAPE – EXPRESSWAY, conforme detalhado no Anexo IV do Edital (PDCL) e regidos pela Constituição Federal; pela Lei Federal Nº 8.987/95; Lei Federal Nº 9.074/95; Lei Federal 8.666/93 e Lei Estadual Nº 14.233/2010.", False, True),
             ("", False, False),
@@ -305,7 +417,7 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             ("", False, False),
             ("Relatórios elaborados pelo Verificador Independente.", False, True)
         ]
-    else:
+    elif tipo_relatorio == "CRC":
         referencias = [
             ("Lei Estadual nº. 12.524, de 30 de dezembro de 2003, regulamentada pelo Decreto Estadual nº. 30.200, de 09 de fevereiro de 2007, que altera e consolida as disposições da Lei nº. 12.126, de 12 de dezembro de 2001, que cria a Agência de Regulação dos Serviços Públicos Delegados do Estado de Pernambuco - ARPE, e dá outras providências;", False, True),
             ("", False, False),
@@ -314,6 +426,16 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             ("Resolução ARPE nº 083, de 30 de julho de 2013, que dispõe sobre os procedimentos de fiscalização, autuação e aplicação de penalidades aos prestadores de serviços públicos delegados no Estado de Pernambuco fiscalizados pela ARPE mediante delegação.", False, True),
             ("", False, False),
             ("Norma DNIT 005/2003 – que define os termos técnicos empregados em defeitos que ocorrem nos pavimentos flexíveis e semirrígidos e serve para padronizar a linguagem adotada na elaboração das normas, manuais, projetos e textos relativos aos pavimentos flexíveis e semirrígidos.", False, True)
+        ]
+    else: # SOCICAM
+        referencias = [
+            ("Lei nº 13.254, de 21 de junho de 2007, alterada pela Lei nº 15.200, de 17 de dezembro de 2013, e regulamentada pelo Decreto nº 40.559, de 31 de março de 2014.", False, True),
+            ("", False, False),
+            ("Resoluções Arpe nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), alterada pela Resolução ARPE nº 53, de 26 de janeiro de 2009 (Antiga 003/2009); e nº 083, de 30 de julho de 2013.", False, True),
+            ("", False, False),
+            ("Contrato de Concessão de Serviço Público Nº 1.041.080/08, de 19 de setembro de 2008 e aditivos, em especial, o Segundo Termo Aditivo ao Contrato de Concessão, de 29 de setembro de 2017.", False, True),
+            ("", False, False),
+            ("Normas Técnicas da ABNT.", False, True)
         ]
         
     for text, recuado, is_bullet in referencias:
@@ -331,7 +453,10 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
             run.font.size = Pt(9)
             run.font.italic = True
         elif is_bullet:
-            p.paragraph_format.left_indent = Pt(36.0)
+            if tipo_relatorio in ["CRC", "SOCICAM"]:
+                p.paragraph_format.left_indent = Pt(53.4)
+            else:
+                p.paragraph_format.left_indent = Pt(36.0)
             p.paragraph_format.first_line_indent = Pt(-18.0)
             run_bullet = p.add_run("•\t")
             run_bullet.font.name = 'Aptos'
@@ -346,92 +471,108 @@ def gerar_secao_introducao(doc: Document, row, total_achados, tipo_relatorio="CR
 
     doc.add_paragraph()
     
-    # Texto de codificação das NCs
-    p_cod = doc.add_paragraph()
-    p_cod.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p_cod.paragraph_format.space_after = Pt(6)
-    p_cod.paragraph_format.line_spacing = 1.15
-    run_cod = p_cod.add_run("Registra-se que as Não conformidades (NC) são codificadas de acordo com os seguintes níveis de informação, separados por “.” (ponto):")
-    run_cod.font.name = 'Aptos'
-    run_cod.font.size = Pt(11)
-    
-    if tipo_relatorio == "CRA":
-        niveis = [
-            "Nível 1 - três dígitos, caracterizando a concessionária: CRA ou CRC.",
-            "Nível 2 - composto por cinco dígitos: os dois primeiros representam as subdivisões utilizadas na rodovia concedida, por exemplo, Trecho (TR); Subtrecho (ST); Segmento Homogêneo (SH) e os três últimos dígitos identificam a subdivisão utilizada em cada contrato.",
-            "Nível 3 – composto por nove dígitos os quatro primeiros e os quatro últimos delimitam a localização das NC em escala de 0,01Km e o dígito intermediário informa se a NC é pontual \"+\" ou distribuída.",
-            "Nível 4 – informa o ano da constatação da NC com quatro dígitos, antecedido de “/”.",
-            "Nível 5 - contendo o sequencial numérico da NC no ano, expresso em três dígitos."
-        ]
+    if tipo_relatorio == "SOCICAM":
+        p_mon = doc.add_paragraph()
+        p_mon.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_mon.paragraph_format.space_after = Pt(6)
+        p_mon.paragraph_format.line_spacing = 1.15
+        
+        run_bold = p_mon.add_run("Monitoramento e Avaliação")
+        run_bold.bold = True
+        run_bold.font.name = 'Aptos'
+        run_bold.font.size = Pt(11)
+        
+        run_normal = p_mon.add_run(" - Esta etapa é fundamental para garantir a eficácia das ações corretivas a serem executadas pela Concessionária para a melhoria contínua dos serviços prestados. Os principais instrumentos do Monitoramento e Avaliação são: Termo de Notificação e respectivo Relatório de Fiscalização, Plano de Ação da Concessionária e Relatórios de Monitoramento e Avaliação Final.")
+        run_normal.font.name = 'Aptos'
+        run_normal.font.size = Pt(11)
     else:
-        niveis = [
-            "Nível 1 - três dígitos, caracterizando a concessionária, nesse caso \"CRC\";",
-            "Nível 2 - composto por cinco dígitos, os dois primeiros indicam a subdivisão utilizada na rodovia, neste caso, Segmento Homogêneo (SH) e os três últimos dígitos identificam a subdivisão utilizada no Contrato (nesse caso de 001 a 015);",
-            "Nível 3 – composto por nove dígitos os quatro primeiros e os quatro últimos delimitam a localização das NC em escala de 0,01Km e o dígito intermediário informa se a NC é pontual \"+\" ou distribuída \"-\";",
-            "Nível 4 – informa o ano da constatação da NC com quatro dígitos, antecedido de “/”; e",
-            "Nível 5 - contém o sequencial numérico da NC no ano, expresso em três dígitos."
-        ]
-        
-    for niv in niveis:
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p.paragraph_format.space_after = Pt(0)  # Uma linha abaixo da outra, sem espaço extra
-        p.paragraph_format.line_spacing = 1.15
-        p.paragraph_format.left_indent = Pt(54.0)       # Recuo da margem para o texto (0.75 in)
-        p.paragraph_format.first_line_indent = Pt(-18.0) # Hanging Indent para o marcador (bullet)
-        
-        run_bullet = p.add_run("•\t")
-        run_bullet.font.name = 'Aptos'
-        run_bullet.font.size = Pt(11)
-        
-        run = p.add_run(niv)
-        run.font.name = 'Aptos'
-        run.font.size = Pt(11)
-        
-    # Exemplo (Sem pular linha antes)
-    p_ex_label = doc.add_paragraph()
-    p_ex_label.paragraph_format.left_indent = Pt(72.0)
-    p_ex_label.paragraph_format.space_after = Pt(6)
-    run_ex_lbl = p_ex_label.add_run("Exemplo:")
-    run_ex_lbl.font.name = 'Aptos'
-    run_ex_lbl.font.size = Pt(11)
+        # Texto de codificação das NCs
+        p_cod = doc.add_paragraph()
+        p_cod.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_cod.paragraph_format.space_after = Pt(6)
+        p_cod.paragraph_format.line_spacing = 1.15
+        run_cod = p_cod.add_run("Registra-se que as Não conformidades (NC) são codificadas de acordo com os seguintes níveis de informação, separados por “.” (ponto):")
+        run_cod.font.name = 'Aptos'
+        run_cod.font.size = Pt(11)
     
-    p_ex_val = doc.add_paragraph()
-    p_ex_val.paragraph_format.left_indent = Pt(120.5)
-    p_ex_val.paragraph_format.space_after = Pt(6)
-    ex_str = "CRA.ST601.2794-2834/2025.013" if tipo_relatorio == "CRA" else "CRC.SH015.0646+0648/2026.001"
-    run_ex_val = p_ex_val.add_run(ex_str)
-    run_ex_val.bold = True
-    run_ex_val.font.name = 'Aptos'
-    run_ex_val.font.size = Pt(11)
-    
-    p_ex_desc = doc.add_paragraph()
-    p_ex_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p_ex_desc.paragraph_format.left_indent = Pt(120.5)
-    p_ex_desc.paragraph_format.space_after = Pt(6)
-    p_ex_desc.paragraph_format.line_spacing = 1.15
-    ex_desc_str = (
-        "Indica que esta Não Conformidade foi apontada para a CRA, no subtrecho 6.01, distribuída do km 27,94 ao km 28,34, sendo a 13ª NC registrada pela Arpe em 2025"
-        if tipo_relatorio == "CRA" else
-        "Indica que esta Não Conformidade foi apontada para a CRC, no Segmento Homogêneo 15, concentrado na praça de pedágio do km 6,46 ao km 6,48, sendo a primeira NC registrada pela ARPE em 2026."
-    )
-    run_ex_desc = p_ex_desc.add_run(ex_desc_str)
-    run_ex_desc.font.name = 'Aptos'
-    run_ex_desc.font.size = Pt(11)
-    
-    # Monitoramento e Avaliação (Sem pular linha antes)
-    p_mon = doc.add_paragraph()
-    p_mon.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p_mon.paragraph_format.space_after = Pt(6)
-    p_mon.paragraph_format.line_spacing = 1.15
-    run_mon_bold = p_mon.add_run("Monitoramento e Avaliação")
-    run_mon_bold.bold = True
-    run_mon_bold.font.name = 'Aptos'
-    run_mon_bold.font.size = Pt(11)
-    
-    run_mon_text = p_mon.add_run(" - Esta etapa é fundamental para garantir a eficácia das ações corretivas a serem executadas pela Concessionária para a melhoria contínua dos serviços prestados. Os principais instrumentos do Monitoramento e Avaliação são: Termo de Notificação e respectivo Relatório de Fiscalização, Plano de Ação da Concessionária e Relatórios de Monitoramento e Avaliação Final.")
-    run_mon_text.font.name = 'Aptos'
-    run_mon_text.font.size = Pt(11)
+    if tipo_relatorio != "SOCICAM":
+        if tipo_relatorio == "CRA":
+            niveis = [
+                "Nível 1 - três dígitos, caracterizando a concessionária: CRA ou CRC.",
+                "Nível 2 - composto por cinco dígitos: os dois primeiros representam as subdivisões utilizadas na rodovia concedida, por exemplo, Trecho (TR); Subtrecho (ST); Segmento Homogêneo (SH) e os três últimos dígitos identificam a subdivisão utilizada em cada contrato.",
+                "Nível 3 – composto por nove dígitos os quatro primeiros e os quatro últimos delimitam a localização das NC em escala de 0,01Km e o dígito intermediário informa se a NC é pontual \"+\" ou distribuída.",
+                "Nível 4 – informa o ano da constatação da NC com quatro dígitos, antecedido de “/”.",
+                "Nível 5 - contendo o sequencial numérico da NC no ano, expresso em três dígitos."
+            ]
+        else:
+            niveis = [
+                "Nível 1 - três dígitos, caracterizando a concessionária, nesse caso \"CRC\";",
+                "Nível 2 - composto por cinco dígitos, os dois primeiros indicam a subdivisão utilizada na rodovia, neste caso, Segmento Homogêneo (SH) e os três últimos dígitos identificam a subdivisão utilizada no Contrato (nesse caso de 001 a 015);",
+                "Nível 3 – composto por nove dígitos os quatro primeiros e os quatro últimos delimitam a localização das NC em escala de 0,01Km e o dígito intermediário informa se a NC é pontual \"+\" ou distribuída \"-\";",
+                "Nível 4 – informa o ano da constatação da NC com quatro dígitos, antecedido de “/”; e",
+                "Nível 5 - contém o sequencial numérico da NC no ano, expresso em três dígitos."
+            ]
+            
+        for niv in niveis:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p.paragraph_format.space_after = Pt(0)  # Uma linha abaixo da outra, sem espaço extra
+            p.paragraph_format.line_spacing = 1.15
+            p.paragraph_format.left_indent = Pt(54.0)       # Recuo da margem para o texto (0.75 in)
+            p.paragraph_format.first_line_indent = Pt(-18.0) # Hanging Indent para o marcador (bullet)
+            
+            run_bullet = p.add_run("•\t")
+            run_bullet.font.name = 'Aptos'
+            run_bullet.font.size = Pt(11)
+            
+            run = p.add_run(niv)
+            run.font.name = 'Aptos'
+            run.font.size = Pt(11)
+            
+        # Exemplo (Sem pular linha antes)
+        p_ex_label = doc.add_paragraph()
+        p_ex_label.paragraph_format.left_indent = Pt(72.0)
+        p_ex_label.paragraph_format.space_after = Pt(6)
+        run_ex_lbl = p_ex_label.add_run("Exemplo:")
+        run_ex_lbl.font.name = 'Aptos'
+        run_ex_lbl.font.size = Pt(11)
+        
+        p_ex_val = doc.add_paragraph()
+        p_ex_val.paragraph_format.left_indent = Pt(120.5)
+        p_ex_val.paragraph_format.space_after = Pt(6)
+        ex_str = "CRA.ST601.2794-2834/2025.013" if tipo_relatorio == "CRA" else "CRC.SH015.0646+0648/2026.001"
+        run_ex_val = p_ex_val.add_run(ex_str)
+        run_ex_val.bold = True
+        run_ex_val.font.name = 'Aptos'
+        run_ex_val.font.size = Pt(11)
+        
+        p_ex_desc = doc.add_paragraph()
+        p_ex_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_ex_desc.paragraph_format.left_indent = Pt(120.5)
+        p_ex_desc.paragraph_format.space_after = Pt(6)
+        p_ex_desc.paragraph_format.line_spacing = 1.15
+        ex_desc_str = (
+            "Indica que esta Não Conformidade foi apontada para a CRA, no subtrecho 6.01, distribuída do km 27,94 ao km 28,34, sendo a 13ª NC registrada pela Arpe em 2025"
+            if tipo_relatorio == "CRA" else
+            "Indica que esta Não Conformidade foi apontada para a CRC, no Segmento Homogêneo 15, concentrado na praça de pedágio do km 6,46 ao km 6,48, sendo a primeira NC registrada pela ARPE em 2026."
+        )
+        run_ex_desc = p_ex_desc.add_run(ex_desc_str)
+        run_ex_desc.font.name = 'Aptos'
+        run_ex_desc.font.size = Pt(11)
+        
+        # Monitoramento e Avaliação (Sem pular linha antes)
+        p_mon = doc.add_paragraph()
+        p_mon.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_mon.paragraph_format.space_after = Pt(6)
+        p_mon.paragraph_format.line_spacing = 1.15
+        run_mon_bold = p_mon.add_run("Monitoramento e Avaliação")
+        run_mon_bold.bold = True
+        run_mon_bold.font.name = 'Aptos'
+        run_mon_bold.font.size = Pt(11)
+        
+        run_mon_text = p_mon.add_run(" - Esta etapa é fundamental para garantir a eficácia das ações corretivas a serem executadas pela Concessionária para a melhoria contínua dos serviços prestados. Os principais instrumentos do Monitoramento e Avaliação são: Termo de Notificação e respectivo Relatório de Fiscalização, Plano de Ação da Concessionária e Relatórios de Monitoramento e Avaliação Final.")
+        run_mon_text.font.name = 'Aptos'
+        run_mon_text.font.size = Pt(11)
 
     # ----------------------------------------------------
     # 5. SEÇÃO: FISCALIZAÇÃO
