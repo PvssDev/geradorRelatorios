@@ -29,8 +29,10 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
     ano = extrair_ano(row["Data"])
     if tipo_relatorio == "CRA":
         adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº 01/{ano}")
-    else:
+    elif tipo_relatorio == "CRC":
         adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 05/{ano}")
+    else: # SOCICAM
+        adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 03/{ano}")
     
     # 1. Imagem da Capa
     if os.path.exists(logo_path):
@@ -46,10 +48,19 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
             "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DO ATLÂNTICO (CRA)",
             "CONTRATO DE CONCESSÃO CT. Nº 043/2011"
         ]
-    else:
+    elif tipo_relatorio == "CRC":
         titulos = [
             "FISCALIZAÇÃO TÉCNICO-OPERACIONAL NO SISTEMA VIÁRIO DO PAIVA (PE – 024)",
             "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DOS COQUEIROS (CRC)"
+        ]
+    else: # SOCICAM
+        local_val = str(row.get("Local", "TIP")).upper()
+        # If local_val already has Terminal/TIP, use it; otherwise wrap it nicely
+        if "TERMINAL" not in local_val and "FISCALIZAÇÃO" not in local_val:
+            local_val = f"TERMINAL RODOVIÁRIO DE PASSAGEIROS DO RECIFE ({local_val})" if "RECIFE" in local_val or "TIP" in local_val else f"TERMINAL RODOVIÁRIO DE PASSAGEIROS ({local_val})"
+        titulos = [
+            f"FISCALIZAÇÃO NO {local_val}",
+            "PRESTADOR DE SERVIÇO: SOCICAM - ADMINISTRAÇÃO, PROJETOS E REPRESENTAÇÕES LTDA"
         ]
         
     for idx, titulo in enumerate(titulos):
@@ -72,9 +83,11 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
     for nome in responsaveis_list:
         match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
         if match:
-            analistas.append((match["nome"], f"{match['funcao']}, matrícula nº {match['matricula']}"))
+            funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else match["funcao"]
+            analistas.append((match["nome"], f"{funcao}, matrícula nº {match['matricula']}"))
         else:
-            analistas.append((nome, "Analista de Regulação, matrícula nº xxxxxxx/xx"))
+            funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else "Analista de Regulação"
+            analistas.append((nome, f"{funcao}, matrícula nº xxxxxxx/xx"))
     
     for i, (nome, cargo) in enumerate(analistas):
         # Nome em negrito
@@ -114,10 +127,15 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
             f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº 07/{ano} - CTR",
             f"SEI Nº xxxxxxxxxxxx/{ano}-XX"
         ]
-    else:
+    elif tipo_relatorio == "CRC":
         rodape_textos = [
             f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº 05/{ano} - CTR",
             f"SEI Nº xxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+    else: # SOCICAM
+        rodape_textos = [
+            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº 04/{ano} - CTR",
+            f"SEI Nº 0030200023.002186/2026-99"
         ]
         
     for idx, texto in enumerate(rodape_textos):
@@ -135,11 +153,11 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
         gerar_lista_abreviaturas(doc, tipo_relatorio)
         
         doc.add_page_break()
-        gerar_sumario(doc, tipo_relatorio)
+        gerar_sumario(doc, row, tipo_relatorio)
     else:
-        # CRC: Sumário na Página 2, Lista de Abreviaturas na Página 3
+        # CRC/SOCICAM: Sumário na Página 2, Lista de Abreviaturas na Página 3
         doc.add_page_break()
-        gerar_sumario(doc, tipo_relatorio)
+        gerar_sumario(doc, row, tipo_relatorio)
         
         doc.add_page_break()
         gerar_lista_abreviaturas(doc, tipo_relatorio)
@@ -175,7 +193,7 @@ def gerar_lista_abreviaturas(doc, tipo_relatorio="CRA"):
             ("TDR", "Tronco Distribuidor Rodoviário"),
             ("VI", "Verificador Independente contratado por SUAPE, atualmente o Consórcio formado pelas Empresas TPF e ECR")
         ]
-    else:
+    elif tipo_relatorio == "CRC":
         abreviaturas = [
             ("ABNT", "Associação Brasileira de Normas Técnicas"),
             ("ARPE", "Agência de Regulação de Pernambuco"),
@@ -184,6 +202,13 @@ def gerar_lista_abreviaturas(doc, tipo_relatorio="CRA"):
             ("CRC", "Concessionária Rota dos Coqueiros S. A."),
             ("PER", "Programa de Exploração da Rodovia, anexo ao Contrato de Concessão Patrocinada CGPE-001/2006"),
             ("VI", "Verificador Independente, atualmente, o Consórcio formado pelas empresas Maciel Consultores S/S Ltda e Estratégica Serviços de Engenharia Consultiva Ltda")
+        ]
+    else: # SOCICAM
+        abreviaturas = [
+            ("ABNT", "Associação Brasileira de Normas Técnicas"),
+            ("ARPE", "Agência de Regulação de Pernambuco"),
+            ("EPTI", "Empresa Pernambucana de Transporte Coletivo Intermunicipal"),
+            ("NC", "Não Conformidade")
         ]
         
     table = doc.add_table(rows=1 + len(abreviaturas), cols=2)
@@ -226,7 +251,7 @@ def gerar_lista_abreviaturas(doc, tipo_relatorio="CRA"):
             row.cells[idx].width = width
 
 
-def gerar_sumario(doc, tipo_relatorio="CRA"):
+def gerar_sumario(doc, row, tipo_relatorio="CRA"):
     """Gera a terceira página do cabeçalho (Sumário dinâmico utilizando tabulações e líderes de ponto)."""
     from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
     
@@ -249,7 +274,7 @@ def gerar_sumario(doc, tipo_relatorio="CRA"):
             "7.\tCONCLUSÕES\t11",
             "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
         ]
-    else:
+    elif tipo_relatorio == "CRC":
         linhas = [
             "1.\tINTRODUÇÃO\t4",
             "2.\tOBJETIVO\t4",
@@ -258,6 +283,25 @@ def gerar_sumario(doc, tipo_relatorio="CRA"):
             "5.\tFISCALIZAÇÃO\t7",
             "6.\tCONCLUSÕES\t11",
             "\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO\t12"
+        ]
+    else: # SOCICAM
+        local_val = str(row.get("Local", "TIP")).upper()
+        local_sigla = "TIP"
+        if "TIP" in local_val:
+            local_sigla = "TIP"
+        elif "(" in local_val:
+            local_sigla = local_val.split("(")[0].strip()
+        else:
+            local_sigla = local_val
+        linhas = [
+            "1.\tINTRODUÇÃO\t4",
+            "2.\tOBJETIVO\t4",
+            "3.\tMETODOLOGIA\t5",
+            "4.\tFISCALIZAÇÃO\t5",
+            "5.\tDETERMINAÇÕES GERAIS\t6",
+            "6.\tRECOMENDAÇÕES\t6",
+            "7.\tCONCLUSÕES\t7",
+            f"\tAPÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}\t7"
         ]
         
     for idx, linha in enumerate(linhas):

@@ -160,7 +160,11 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
         run.font.size = Pt(10)
         return
         
-    table = doc.add_table(rows=2 + num_rows, cols=5)
+    if tipo_relatorio == "SOCICAM":
+        table = doc.add_table(rows=1 + num_rows, cols=5)
+    else:
+        table = doc.add_table(rows=2 + num_rows, cols=5)
+        
     table.style = 'Table Grid'
     set_table_borders(table)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -168,13 +172,22 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
     table.allow_autofit = False
     
     # 1. Mesclar células do cabeçalho
-    table.cell(0, 0).merge(table.cell(0, 1))
-    table.cell(0, 2).merge(table.cell(1, 2))
-    table.cell(0, 3).merge(table.cell(1, 3))
-    table.cell(0, 4).merge(table.cell(1, 4))
+    if tipo_relatorio != "SOCICAM":
+        table.cell(0, 0).merge(table.cell(0, 1))
+        table.cell(0, 2).merge(table.cell(1, 2))
+        table.cell(0, 3).merge(table.cell(1, 3))
+        table.cell(0, 4).merge(table.cell(1, 4))
     
     # 2. Definir os textos do cabeçalho
-    if not is_pa:
+    if tipo_relatorio == "SOCICAM":
+        table.cell(0, 0).text = "IDENTIFICAÇÃO"
+        table.cell(0, 1).text = "DESCRIÇÃO"
+        table.cell(0, 2).text = "REGISTRO\nFOTOGRÁFICO"
+        table.cell(0, 3).text = "FUNDAMENTO DA INFRAÇÃO\n(ANEXO V CONTRATO DE CONCESSÃO)"
+        table.cell(0, 4).text = "DETERMINAÇÃO"
+        header_color = "D9D9D9"
+        col_widths = [Inches(1.24), Inches(1.62), Inches(1.26), Inches(1.69), Inches(2.25)]
+    elif not is_pa:
         if tipo_relatorio == "CRA":
             table.cell(0, 0).text = "NÃO CONFORMIDADE (NC)"
             table.cell(1, 0).text = "IDENTIFICAÇÃO"
@@ -203,8 +216,9 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
         header_color = "E7E6E6"  # Cinza Claro Quadro 3
         col_widths = [Inches(1.18), Inches(1.74), Inches(1.14), Inches(1.81), Inches(1.40)]
         
-    # Formatar cabeçalhos (Linhas 0 e 1)
-    for r_idx in [0, 1]:
+    # Formatar cabeçalhos
+    header_rows = [0] if tipo_relatorio == "SOCICAM" else [0, 1]
+    for r_idx in header_rows:
         row = table.rows[r_idx]
         for c_idx, cell in enumerate(row.cells):
             set_cell_shading(cell, header_color)
@@ -225,8 +239,9 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
                     run.bold = True
                     
     # Preencher dados
+    start_r_idx = 1 if tipo_relatorio == "SOCICAM" else 2
     for idx, rec in enumerate(grouped_records):
-        r_idx = idx + 2
+        r_idx = idx + start_r_idx
         row = table.rows[r_idx]
         
         ident = str(rec.get("Identificação", "")).strip()
@@ -270,20 +285,30 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
         for c_idx, cell in enumerate(row.cells):
             cell.width = col_widths[c_idx]
 
-    if tipo_relatorio == "CRC" and not is_pa:
+    if tipo_relatorio in ["CRC", "SOCICAM"] and not is_pa:
         # Add TOTAL row
         r_total = table.add_row()
-        # Merge first three cells (0, 1, 2)
-        r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2])
-        r_total.cells[0].text = "TOTAL"
-        r_total.cells[3].text = ""
-        r_total.cells[4].text = str(num_rows)
-        
-        # Set widths for cells after merging
-        r_total.cells[0].width = col_widths[0] + col_widths[1] + col_widths[2]
-        r_total.cells[3].width = col_widths[3]
-        r_total.cells[4].width = col_widths[4]
-        
+        if tipo_relatorio == "CRC":
+            # Merge first three cells (0, 1, 2)
+            r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2])
+            r_total.cells[0].text = "TOTAL"
+            r_total.cells[3].text = ""
+            r_total.cells[4].text = str(num_rows)
+            
+            # Set widths for cells after merging
+            r_total.cells[0].width = col_widths[0] + col_widths[1] + col_widths[2]
+            r_total.cells[3].width = col_widths[3]
+            r_total.cells[4].width = col_widths[4]
+        else: # SOCICAM
+            # Merge first four cells (0, 1, 2, 3)
+            r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2]).merge(r_total.cells[3])
+            r_total.cells[0].text = "TOTAL"
+            r_total.cells[4].text = str(num_rows)
+            
+            # Set widths for cells after merging
+            r_total.cells[0].width = col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3]
+            r_total.cells[4].width = col_widths[4]
+            
         # Format the cells
         for c_idx, cell in enumerate(r_total.cells):
             set_cell_margins(cell, top=100, bottom=100, left=150, right=150)
@@ -389,7 +414,7 @@ def gerar_secao_quadros(doc: Document, row, nc_df, tipo_relatorio="CRA"):
                 
         # Parágrafo 23: Vazio
         doc.add_paragraph()
-    else:
+    elif tipo_relatorio == "CRC":
         # Modo CRC
         from utils import formatar_data_extenso
         data_extenso = formatar_data_extenso(row["Data"])
@@ -404,6 +429,53 @@ def gerar_secao_quadros(doc: Document, row, nc_df, tipo_relatorio="CRA"):
         run1 = p1.add_run(f"As NC identificadas, em {data_extenso}, pela equipe de fiscalização da ARPE estão detalhadas no Quadro 1 a seguir.")
         run1.font.name = 'Aptos'
         run1.font.size = Pt(11)
+        
+        doc.add_paragraph() # Parágrafo vazio
+    else: # SOCICAM
+        from utils import formatar_data_extenso
+        data_extenso = formatar_data_extenso(row["Data"])
+        
+        adicionar_titulo_secao(doc, "4. FISCALIZAÇÃO")
+        doc.add_paragraph() # Pula linha abaixo do título
+        
+        # Formatar equipe de fiscalização
+        responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+        from database.manager import carregar_responsaveis
+        db_resp = carregar_responsaveis()
+        team_parts = []
+        for nome in responsaveis_list:
+            match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
+            if match:
+                team_parts.append(f"{match['nome']} (matrícula nº {match['matricula']})")
+            else:
+                team_parts.append(f"{nome} (matrícula nº xxxxxxx/xx)")
+                
+        if len(team_parts) == 1:
+            team_str = team_parts[0]
+        elif len(team_parts) == 2:
+            team_str = f"{team_parts[0]} e {team_parts[1]}"
+        else:
+            team_str = ", ".join(team_parts[:-1]) + " e " + team_parts[-1]
+            
+        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
+        
+        p1 = doc.add_paragraph()
+        p1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p1.paragraph_format.space_after = Pt(6)
+        p1.paragraph_format.line_spacing = 1.15
+        run1 = p1.add_run(f"As ações de fiscalização foram realizadas, em {data_extenso}, pela equipe formada pelos Especialista em Regulação {team_str}, no {local_val}.")
+        run1.bold = True
+        run1.font.name = 'Aptos'
+        run1.font.size = Pt(11)
+        
+        p2 = doc.add_paragraph()
+        p2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p2.paragraph_format.space_after = Pt(6)
+        p2.paragraph_format.line_spacing = 1.15
+        run2 = p2.add_run("As Não Conformidades constatadas estão relacionadas ao Programa de Manutenção dos Terminais Rodoviários, Anexo V do Contrato de Concessão, conforme descritas no Quadro 1, a seguir, com indicação dos respectivos registros fotográficos no Apêndice A.")
+        run2.bold = True
+        run2.font.name = 'Aptos'
+        run2.font.size = Pt(11)
         
         doc.add_paragraph() # Parágrafo vazio
 
@@ -473,7 +545,7 @@ def gerar_secao_quadros(doc: Document, row, nc_df, tipo_relatorio="CRA"):
         doc.add_paragraph()
         doc.add_paragraph()
         doc.add_paragraph()
-    else:
+    elif tipo_relatorio == "CRC":
         # Quadro 1 do CRC
         p7 = doc.add_paragraph()
         p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -503,3 +575,22 @@ def gerar_secao_quadros(doc: Document, row, nc_df, tipo_relatorio="CRA"):
         run8 = p8.add_run("É importante destacar que as Não Conformidades apontadas se referem à segurança dos pedestres na rodovia, visando evitar a ocorrência de acidentes.")
         run8.font.name = 'Aptos'
         run8.font.size = Pt(11)
+    else: # SOCICAM
+        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
+        p7 = doc.add_paragraph()
+        p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p7.paragraph_format.space_after = Pt(6)
+        
+        r7_1 = p7.add_run("Quadro 1")
+        r7_1.bold = True
+        r7_1.font.name = 'Aptos'
+        r7_1.font.size = Pt(11)
+        
+        r7_2 = p7.add_run(f" – Não Conformidades do {local_val}")
+        r7_2.font.name = 'Aptos'
+        r7_2.font.size = Pt(11)
+        
+        # Tabela de Não Conformidades (Quadro 1)
+        criar_tabela_quadros(doc, ncs_reais, is_pa=False, tipo_relatorio=tipo_relatorio)
+        
+        doc.add_paragraph() # Parágrafo vazio
