@@ -4,7 +4,7 @@ from docx.enum.section import WD_SECTION
 import os
 from utils import adicionar_texto_caixa_cinza
 
-def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
+def gerar_capa_primeira_pagina(doc, logo_path, row, report_config):
     """
     Gera a primeira página do relatório (Capa) baseada no modelo de referência com dados dinâmicos.
     """
@@ -27,12 +27,8 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
 
     # 1. Texto Superior em Caixa Cinza (tabela 1x1 sem bordas)
     ano = extrair_ano(row["Data"])
-    if tipo_relatorio == "CRA":
-        adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº 01/{ano}")
-    elif tipo_relatorio == "CRC":
-        adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 05/{ano}")
-    else: # SOCICAM
-        adicionar_texto_caixa_cinza(doc, f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 03/{ano}")
+    ctr_text = report_config.capa_ctr_number_template.format(ano=ano)
+    adicionar_texto_caixa_cinza(doc, ctr_text)
     
     # 1. Imagem da Capa
     if os.path.exists(logo_path):
@@ -42,26 +38,7 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
     doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
     
     # 2. Títulos Principais
-    if tipo_relatorio == "CRA":
-        titulos = [
-            "FISCALIZAÇÃO DO COMPLEXO VIÁRIO E LOGÍSTICO DE SUAPE – EXPRESSWAY",
-            "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DO ATLÂNTICO (CRA)",
-            "CONTRATO DE CONCESSÃO CT. Nº 043/2011"
-        ]
-    elif tipo_relatorio == "CRC":
-        titulos = [
-            "FISCALIZAÇÃO TÉCNICO-OPERACIONAL NO SISTEMA VIÁRIO DO PAIVA (PE – 024)",
-            "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DOS COQUEIROS (CRC)"
-        ]
-    else: # SOCICAM
-        local_val = str(row.get("Local", "TIP")).upper()
-        # If local_val already has Terminal/TIP, use it; otherwise wrap it nicely
-        if "TERMINAL" not in local_val and "FISCALIZAÇÃO" not in local_val:
-            local_val = f"TERMINAL RODOVIÁRIO DE PASSAGEIROS DO RECIFE ({local_val})" if "RECIFE" in local_val or "TIP" in local_val else f"TERMINAL RODOVIÁRIO DE PASSAGEIROS ({local_val})"
-        titulos = [
-            f"FISCALIZAÇÃO NO {local_val}",
-            "PRESTADOR DE SERVIÇO: SOCICAM - ADMINISTRAÇÃO, PROJETOS E REPRESENTAÇÕES LTDA"
-        ]
+    titulos = report_config.get_capa_titulos(row, ano)
         
     for idx, titulo in enumerate(titulos):
         p = doc.add_paragraph()
@@ -83,10 +60,10 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
     for nome in responsaveis_list:
         match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
         if match:
-            funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else match["funcao"]
+            funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
             analistas.append((match["nome"], f"{funcao}, matrícula nº {match['matricula']}"))
         else:
-            funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else "Analista de Regulação"
+            funcao = report_config.analyst_title if report_config.key == "SOCICAM" else "Analista de Regulação"
             analistas.append((nome, f"{funcao}, matrícula nº xxxxxxx/xx"))
     
     for i, (nome, cargo) in enumerate(analistas):
@@ -122,21 +99,7 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
     p_data.paragraph_format.space_after = Pt(12)
     
     # 5. Processo e SEI Dinâmicos
-    if tipo_relatorio == "CRA":
-        rodape_textos = [
-            f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº 07/{ano} - CTR",
-            f"SEI Nº xxxxxxxxxxxx/{ano}-XX"
-        ]
-    elif tipo_relatorio == "CRC":
-        rodape_textos = [
-            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº 05/{ano} - CTR",
-            f"SEI Nº xxxxxxxxxxxxxxxxxxxxxxx"
-        ]
-    else: # SOCICAM
-        rodape_textos = [
-            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº 04/{ano} - CTR",
-            f"SEI Nº 0030200023.002186/2026-99"
-        ]
+    rodape_textos = report_config.get_process_sei_texts(ano)
         
     for idx, texto in enumerate(rodape_textos):
         p_rodape = doc.add_paragraph()
@@ -147,26 +110,26 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, tipo_relatorio="CRA"):
         p_rodape.paragraph_format.space_after = Pt(0)
     
     # 6. Geração de Sumário e Lista de Abreviaturas com ordem condicional
-    if tipo_relatorio == "CRA":
-        # CRA: Lista de Abreviaturas na Página 2, Sumário na Página 3
-        doc.add_page_break()
-        gerar_lista_abreviaturas(doc, tipo_relatorio)
-        
-        doc.add_page_break()
-        gerar_sumario(doc, row, tipo_relatorio)
-    else:
+    if report_config.sumario_before_abreviaturas:
         # CRC/SOCICAM: Sumário na Página 2, Lista de Abreviaturas na Página 3
         doc.add_page_break()
-        gerar_sumario(doc, row, tipo_relatorio)
+        gerar_sumario(doc, row, report_config)
         
         doc.add_page_break()
-        gerar_lista_abreviaturas(doc, tipo_relatorio)
+        gerar_lista_abreviaturas(doc, report_config)
+    else:
+        # CRA: Lista de Abreviaturas na Página 2, Sumário na Página 3
+        doc.add_page_break()
+        gerar_lista_abreviaturas(doc, report_config)
+        
+        doc.add_page_break()
+        gerar_sumario(doc, row, report_config)
         
     # 7. Quebra de seção para ir para a Página 4 (Introdução)
     doc.add_section(WD_SECTION.NEW_PAGE)
 
 
-def gerar_lista_abreviaturas(doc, tipo_relatorio="CRA"):
+def gerar_lista_abreviaturas(doc, report_config):
     """Gera a segunda página do cabeçalho (Lista de Abreviaturas e Siglas)."""
     from docx.enum.table import WD_TABLE_ALIGNMENT
     
@@ -178,38 +141,7 @@ def gerar_lista_abreviaturas(doc, tipo_relatorio="CRA"):
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(24)
     
-    if tipo_relatorio == "CRA":
-        abreviaturas = [
-            ("CRA", "Concessionária Rota do Atlântico"),
-            ("ECR", "ECR Engenharia Ltda"),
-            ("FD", "Faixa Direita"),
-            ("FE", "Faixa Esquerda"),
-            ("IGG", "Índice de Gravidade Global"),
-            ("IRI", "Índice Irregularidade Longitudinal"),
-            ("NC", "Não Conformidade"),
-            ("PDCL", "Programa de Desenvolvimento do Complexo Logístico, Anexo IV do Contrato de Concessão nº 043/2011"),
-            ("SUAPE", "Poder Concedente e Regulador do Contrato de Concessão firmado com a CRA"),
-            ("TPF", "TPF Engenharia Ltda"),
-            ("TDR", "Tronco Distribuidor Rodoviário"),
-            ("VI", "Verificador Independente contratado por SUAPE, atualmente o Consórcio formado pelas Empresas TPF e ECR")
-        ]
-    elif tipo_relatorio == "CRC":
-        abreviaturas = [
-            ("ABNT", "Associação Brasileira de Normas Técnicas"),
-            ("ARPE", "Agência de Regulação de Pernambuco"),
-            ("SEPPE", "Secretaria Executiva de Parcerias e Projetos Estratégicos"),
-            ("NC", "Não Conformidade"),
-            ("CRC", "Concessionária Rota dos Coqueiros S. A."),
-            ("PER", "Programa de Exploração da Rodovia, anexo ao Contrato de Concessão Patrocinada CGPE-001/2006"),
-            ("VI", "Verificador Independente, atualmente, o Consórcio formado pelas empresas Maciel Consultores S/S Ltda e Estratégica Serviços de Engenharia Consultiva Ltda")
-        ]
-    else: # SOCICAM
-        abreviaturas = [
-            ("ABNT", "Associação Brasileira de Normas Técnicas"),
-            ("ARPE", "Agência de Regulação de Pernambuco"),
-            ("EPTI", "Empresa Pernambucana de Transporte Coletivo Intermunicipal"),
-            ("NC", "Não Conformidade")
-        ]
+    abreviaturas = report_config.get_abbreviations()
         
     table = doc.add_table(rows=1 + len(abreviaturas), cols=2)
     table.style = 'Table Grid'
@@ -251,7 +183,7 @@ def gerar_lista_abreviaturas(doc, tipo_relatorio="CRA"):
             row.cells[idx].width = width
 
 
-def gerar_sumario(doc, row, tipo_relatorio="CRA"):
+def gerar_sumario(doc, row, report_config):
     """Gera a terceira página do cabeçalho (Sumário dinâmico utilizando tabulações e líderes de ponto)."""
     from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
     
@@ -263,46 +195,7 @@ def gerar_sumario(doc, row, tipo_relatorio="CRA"):
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(24)
     
-    if tipo_relatorio == "CRA":
-        linhas = [
-            "1.\tINTRODUÇÃO\t4",
-            "2.\tOBJETIVO\t4",
-            "3.\tMETODOLOGIA\t5",
-            "4.\tFISCALIZAÇÃO\t7",
-            "5.\tDETERMINAÇÕES GERAIS\t11",
-            "6.\tRECOMENDAÇÕES\t11",
-            "7.\tCONCLUSÕES\t11",
-            "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
-        ]
-    elif tipo_relatorio == "CRC":
-        linhas = [
-            "1.\tINTRODUÇÃO\t4",
-            "2.\tOBJETIVO\t4",
-            "3.\tINFORMAÇÕES GERAIS\t4",
-            "4.\tMETODOLOGIA\t5",
-            "5.\tFISCALIZAÇÃO\t7",
-            "6.\tCONCLUSÕES\t11",
-            "\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO\t12"
-        ]
-    else: # SOCICAM
-        local_val = str(row.get("Local", "TIP")).upper()
-        local_sigla = "TIP"
-        if "TIP" in local_val:
-            local_sigla = "TIP"
-        elif "(" in local_val:
-            local_sigla = local_val.split("(")[0].strip()
-        else:
-            local_sigla = local_val
-        linhas = [
-            "1.\tINTRODUÇÃO\t4",
-            "2.\tOBJETIVO\t4",
-            "3.\tMETODOLOGIA\t5",
-            "4.\tFISCALIZAÇÃO\t5",
-            "5.\tDETERMINAÇÕES GERAIS\t6",
-            "6.\tRECOMENDAÇÕES\t6",
-            "7.\tCONCLUSÕES\t7",
-            f"\tAPÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}\t7"
-        ]
+    linhas = report_config.get_sumario_linhas(row)
         
     for idx, linha in enumerate(linhas):
         p_line = doc.add_paragraph()

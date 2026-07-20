@@ -249,306 +249,93 @@ def numero_por_extenso(n):
         36: "trinta e seis", 37: "trinta e sete", 38: "trinta e oito", 39: "trinta e nove",
         40: "quarenta", 41: "quarenta e um", 42: "quarenta e dois", 43: "quarenta e três",
         44: "quarenta e quatro", 45: "quarenta e cinco", 46: "quarenta e seis",
-        47: "quarenta e sete", 48: "quarenta e oito", 49: "quarenta e nove", 50: "cinquenta"
     }
     return extenso_map.get(n, str(n))
-
-def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir=None, tipo_relatorio="CRA"):
+def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir=None, report_config=None):
     """Gera o restante do relatório a partir da seção 5 (Determinações Gerais) até as assinaturas finais e apêndices com fotos."""
     
     ano = extrair_ano(row["Data"])
-    ano_anterior = str(int(ano) - 1) if ano.isdigit() else "2025"
+    local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
 
-    if tipo_relatorio == "CRA":
-        # ----------------------------------------------------
-        # 5. DETERMINAÇÕES GERAIS
-        # ----------------------------------------------------
-        doc.add_paragraph()  # Espaço
-        adicionar_titulo_secao(doc, "5. DETERMINAÇÕES GERAIS")
-        doc.add_paragraph()  # Pula linha abaixo do título
+    # Helper function to append paragraph runs
+    def add_formatted_paragraph(paragraph_runs):
+        if not paragraph_runs:
+            doc.add_paragraph()
+            return
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p.paragraph_format.space_after = Pt(6)
+        p.paragraph_format.line_spacing = 1.15
         
-        p_det1 = doc.add_paragraph()
-        p_det1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_det1.paragraph_format.space_after = Pt(6)
-        p_det1.paragraph_format.line_spacing = 1.15
-        run_det1 = p_det1.add_run(
-            "Considerando os dispositivos contratuais pertinentes e visando garantir a qualidade dos serviços prestados, "
-            "determina-se que a CRA tome as seguintes medidas através de um plano de ação:"
-        )
-        run_det1.font.name = 'Aptos'
-        run_det1.font.size = Pt(11)
-        
-        p_det2 = doc.add_paragraph()
-        p_det2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_det2.paragraph_format.space_after = Pt(6)
-        p_det2.paragraph_format.line_spacing = 1.15
-        
-        r_det2_1 = p_det2.add_run("Medidas de Manutenção / Conservação,")
-        r_det2_1.bold = True
-        r_det2_1.font.name = 'Aptos'
-        r_det2_1.font.size = Pt(11)
-        
-        r_det2_2 = p_det2.add_run(
-            f" detalhando cronograma com trechos a executar de forma que permita à Arpe uma programação mais efetiva do "
-            f"monitoramento de suas soluções a execução de cada subtrecho, conforme o modelo encaminhado para {ano_anterior} "
-            f"(Cronograma de Conserva Especial do Pavimento CRA {ano_anterior})."
-        )
-        r_det2_2.font.name = 'Aptos'
-        r_det2_2.font.size = Pt(11)
-        
-        p_det3 = doc.add_paragraph()
-        p_det3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_det3.paragraph_format.space_after = Pt(6)
-        p_det3.paragraph_format.line_spacing = 1.15
-        
-        r_det3_1 = p_det3.add_run("Medidas imediatas")
-        r_det3_1.bold = True
-        r_det3_1.font.name = 'Aptos'
-        r_det3_1.font.size = Pt(11)
-        
-        r_det3_2 = p_det3.add_run(
-            " resolutividade das NC de Sinalização, nos prazos estabelecidos no subitem 4.1.3.3.2.4. Tachas e Tachões "
-            "Refletivos do PDCL, conforme disposto no Quadro 1, na coluna denominada Determinações."
-        )
-        r_det3_2.font.name = 'Aptos'
-        r_det3_2.font.size = Pt(11)
-        
-        doc.add_paragraph()  # Espaço
-        
-        # ----------------------------------------------------
-        # 6. RECOMENDAÇÕES
-        # ----------------------------------------------------
-        adicionar_titulo_secao(doc, "6. RECOMENDAÇÕES")
-        doc.add_paragraph()  # Pula linha abaixo do título
-        
-        p_rec1 = doc.add_paragraph()
-        p_rec1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_rec1.paragraph_format.space_after = Pt(6)
-        p_rec1.paragraph_format.line_spacing = 1.15
-        run_rec1 = p_rec1.add_run(
-            "Considerando as disposições do Contrato de Concessão, em especial, o Anexo IV - PDCL, Outras Sinalizações, "
-            "dados do Relatório Anual 01 de novembro/2025 elaborado VI, e outras legislação aplicável, devem ser "
-            "observadas pela CRA as seguintes recomendações:"
-        )
-        run_rec1.font.name = 'Aptos'
-        run_rec1.font.size = Pt(11)
-        
-        p_rec2 = doc.add_paragraph()
-        p_rec2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_rec2.paragraph_format.space_after = Pt(6)
-        p_rec2.paragraph_format.line_spacing = 1.15
-        run_rec2 = p_rec2.add_run(
-            "Levantar a necessidade de reposição da SINALIZAÇÃO por tachas e tachões em todo o complexo viário Express Way, "
-            " em especial a retirada das tachar anteriores danificadas que podem causar risco a segurança dos usuários. "
-            "O vi verificou deficiências em todos os trechos."
-        )
-        run_rec2.font.name = 'Aptos'
-        run_rec2.font.size = Pt(11)
-        
-        doc.add_paragraph()  # Espaço
-    elif tipo_relatorio == "SOCICAM":
-        # ----------------------------------------------------
-        # 5. DETERMINAÇÕES GERAIS
-        # ----------------------------------------------------
-        doc.add_paragraph()  # Espaço
-        adicionar_titulo_secao(doc, "5. DETERMINAÇÕES GERAIS")
-        doc.add_paragraph()  # Pula linha abaixo do título
-        
-        p_det1 = doc.add_paragraph()
-        p_det1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_det1.paragraph_format.space_after = Pt(6)
-        p_det1.paragraph_format.line_spacing = 1.15
-        run_det1 = p_det1.add_run(
-            "Considerando os dispositivos contratuais pertinentes e visando garantir a qualidade dos serviços prestados, "
-            "determina-se que a SOCICAM tome as seguintes medidas através de plano de ação:"
-        )
-        run_det1.font.name = 'Aptos'
-        run_det1.font.size = Pt(11)
-        
-        p_det2 = doc.add_paragraph()
-        p_det2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_det2.paragraph_format.space_after = Pt(6)
-        p_det2.paragraph_format.line_spacing = 1.15
-        r_det2_1 = p_det2.add_run("Manutenção e Monitoramento:")
-        r_det2_1.bold = True
-        r_det2_1.font.name = 'Aptos'
-        r_det2_1.font.size = Pt(11)
-        r_det2_2 = p_det2.add_run(
-            " adotar medidas para assegurar a manutenção, o monitoramento contínuo e o cumprimento do Programa de Manutenção dos Terminais Rodoviários, constante da proposta da SOICICAM nos subitens 9.1.1 Manutenção Preventiva; 9.1.2 manutenção Corretiva e 9.13 tabela de Classificação de Níveis de Falha (tabela de tempos máximos para os níveis de atendimento)."
-        )
-        r_det2_2.bold = True
-        r_det2_2.font.name = 'Aptos'
-        r_det2_2.font.size = Pt(11)
-        
-        p_det3 = doc.add_paragraph()
-        p_det3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_det3.paragraph_format.space_after = Pt(6)
-        p_det3.paragraph_format.line_spacing = 1.15
-        f_extenso = {
-            1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
-            6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
-        }
-        extenso_ncs = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
-        run_det3 = p_det3.add_run(
-            f"Medidas imediatas para resolutividade das {total_ncs} ({extenso_ncs}) novas Não Conformidades constatadas, nos prazos estabelecidos, conforme disposto no Quadro 1, na coluna denominada Determinações."
-        )
-        run_det3.bold = True
-        run_det3.font.name = 'Aptos'
-        run_det3.font.size = Pt(11)
-        
-        doc.add_paragraph()  # Espaço
-        
-        # ----------------------------------------------------
-        # 6. RECOMENDAÇÕES
-        # ----------------------------------------------------
-        adicionar_titulo_secao(doc, "6. RECOMENDAÇÕES")
-        doc.add_paragraph()  # Pula linha abaixo do título
-        
-        p_rec1 = doc.add_paragraph()
-        p_rec1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_rec1.paragraph_format.space_after = Pt(6)
-        p_rec1.paragraph_format.line_spacing = 1.15
-        run_rec1 = p_rec1.add_run(
-            "Considerando as disposições do Contrato de Concessão, em especial, o Anexo III – Regulamento Interno dos Terminais Rodoviários, "
-            "aprovado pela Resolução Arpe nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), bem como a legislação aplicável, "
-            "devem ser observadas pela SOCICAM as seguintes recomendações:"
-        )
-        run_rec1.font.name = 'Aptos'
-        run_rec1.font.size = Pt(11)
-        
-        recomendacoes_list = [
-            "Garantir condições de segurança, higiene, acessibilidade e conforto aos usuários dos Terminais Rodoviários, sejam passageiros, público em geral, comerciantes neles estabelecidos, empresas de transportes e de seus empregados.",
-            "Exigir a utilização de EPI adequados, inclusive por funcionários de empresas terceirizadas que prestem serviços nos Terminais Rodoviários.",
-            "Providenciar a correta manutenção (evitar o vencimento) de extintores de incêndios nos Terminais Rodoviários.",
-            "Instalar, sempre que necessário, aviso de sinalização de segurança, principalmente em pontos de risco de acidentes."
-        ]
-        for rec_text in recomendacoes_list:
-            p_rec_item = doc.add_paragraph()
-            p_rec_item.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            p_rec_item.paragraph_format.space_after = Pt(6)
-            p_rec_item.paragraph_format.line_spacing = 1.15
-            p_rec_item.paragraph_format.left_indent = Pt(18.0)
-            p_rec_item.paragraph_format.first_line_indent = Pt(-18.0)
-            
-            run_bullet = p_rec_item.add_run("•\t")
-            run_bullet.font.name = 'Aptos'
-            run_bullet.font.size = Pt(11)
-            
-            run_text = p_rec_item.add_run(rec_text)
-            run_text.font.name = 'Aptos'
-            run_text.font.size = Pt(11)
-            
-        doc.add_paragraph()  # Espaço
+        for text, bold, italic, color_rgb in paragraph_runs:
+            run = p.add_run(text)
+            run.font.name = 'Aptos'
+            run.font.size = Pt(11)
+            if bold:
+                run.bold = True
+            if italic:
+                run.italic = True
+            if color_rgb:
+                from docx.shared import RGBColor
+                run.font.color.rgb = RGBColor(*color_rgb)
 
     # ----------------------------------------------------
-    # CONCLUSÕES
+    # DYNAMIC SECTIONS (Determinações, Recomendações, Conclusões)
     # ----------------------------------------------------
-    concl_title = "7. CONCLUSÕES" if tipo_relatorio in ["CRA", "SOCICAM"] else "6. CONCLUSÕES"
-    adicionar_titulo_secao(doc, concl_title)
-    doc.add_paragraph()  # Pula linha abaixo do título
+    sections_config = report_config.finalizacao_sections_config
     
-    if tipo_relatorio == "CRA":
-        p_con1 = doc.add_paragraph()
-        p_con1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_con1.paragraph_format.space_after = Pt(6)
-        p_con1.paragraph_format.line_spacing = 1.15
-        
-        extenso_ncs = numero_por_extenso(total_ncs)
-        run_con1 = p_con1.add_run(
-            f"Tendo em vista as ações de fiscalização realizadas pela Arpe foram constatadas {extenso_ncs} ({total_ncs}) pontos ou trechos "
-            f"fiscalizados que apresentaram Não Conformidades distribuídas majoritariamente na PE 009, estas foram "
-            f"analisadas e caracterizadas a partir dos indicadores do Grupo Condição de Superfície definidos no Contrato de Concessão CT. nº 043/2011."
-        )
-        run_con1.font.name = 'Aptos'
-        run_con1.font.size = Pt(11)
-        
-        p_con2 = doc.add_paragraph()
-        p_con2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_con2.paragraph_format.space_after = Pt(6)
-        p_con2.paragraph_format.line_spacing = 1.15
-        run_con2 = p_con2.add_run(
-            f"Assim considerando a Programação de Conserva Especial do Pavimento - CRA {ano}, solicita-se a inclusão destas "
-            f"não conformidades no cronograma detalhado de Conserva Especial do Pavimento que permita à Arpe uma "
-            f"realização mais efetiva dos monitoramentos ao longo de {ano}."
-        )
-        run_con2.font.name = 'Aptos'
-        run_con2.font.size = Pt(11)
-        
-        p_con3 = doc.add_paragraph()
-        p_con3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_con3.paragraph_format.space_after = Pt(6)
-        p_con3.paragraph_format.line_spacing = 1.15
-        run_con3 = p_con3.add_run(
-            "Recomenda-se, por fim, o encaminhamento deste Relatório de Fiscalização para que Suape, na qualidade de "
-            "Gestor do Contrato e Regulador desse Sistema Viário, realize as providências cabíveis junto à Concessionária Rota do "
-            "Atlântico com o objetivo de garantir a regularização das Não Conformidades pendentes apontadas por esta Agência de Regulação."
-        )
-        run_con3.font.name = 'Aptos'
-        run_con3.font.size = Pt(11)
-    elif tipo_relatorio == "CRC":
-        # Modo CRC
-        p_con1 = doc.add_paragraph()
-        p_con1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_con1.paragraph_format.space_after = Pt(6)
-        p_con1.paragraph_format.line_spacing = 1.15
-        
-        f_extenso = {
-            1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
-            6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
-        }
-        extenso_f = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
-        extenso_com_parenteses = f"{total_ncs} ({extenso_f})" if total_ncs > 0 else "0 (zero)"
-        
-        run_con1 = p_con1.add_run(
-            f"Em decorrência das ações de fiscalização realizadas pela ARPE foram identificadas {extenso_com_parenteses} "
-            f"novas Não Conformidades na fiscalização do trecho rodoviário sob a responsabilidade da Concessionária Rota dos Coqueiros."
-        )
-        run_con1.font.name = 'Aptos'
-        run_con1.font.size = Pt(11)
-        
-        p_con2 = doc.add_paragraph()
-        p_con2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_con2.paragraph_format.space_after = Pt(6)
-        p_con2.paragraph_format.line_spacing = 1.15
-        run_con2 = p_con2.add_run(
-            "Por fim, solicita-se o encaminhamento deste Relatório de Fiscalização à Concessionária Rota dos Coqueiros, "
-            "para adoção das providências necessárias à regularização das não conformidades apontadas por esta Agência "
-            "Reguladora, bem como dar conhecimento à SEPPE, gestora do Contrato de Concessão."
-        )
-        run_con2.font.name = 'Aptos'
-        run_con2.font.size = Pt(11)
-    else: # SOCICAM
-        p_con1 = doc.add_paragraph()
-        p_con1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_con1.paragraph_format.space_after = Pt(6)
-        p_con1.paragraph_format.line_spacing = 1.15
-        
-        f_extenso = {
-            1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
-            6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
-        }
-        extenso_f = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        
-        run_con1 = p_con1.add_run(
-            f"Tendo em vista as ações de fiscalização realizadas pela ARPE foram constatadas {extenso_f} novas Não Conformidades no {local_val}, "
-            f"que devem ser solucionadas pela SOCICAM de acordo com as Determinações desta Agência de Regulação (v. Quadro 1)."
-        )
-        run_con1.bold = True
-        run_con1.font.name = 'Aptos'
-        run_con1.font.size = Pt(11)
-        
-        p_con2 = doc.add_paragraph()
-        p_con2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_con2.paragraph_format.space_after = Pt(6)
-        p_con2.paragraph_format.line_spacing = 1.15
-        run_con2 = p_con2.add_run(
-            "Por fim, solicita-se o encaminhamento deste Processo de Fiscalização para conhecimento e acompanhamento da EPTI, "
-            "na qualidade de Poder Concedente do Contrato de Concessão e gestora do Sistema de Transporte Coletivo Intermunicipal de Passageiros (STCIP-PE)."
-        )
-        run_con2.font.name = 'Aptos'
-        run_con2.font.size = Pt(11)
-        
+    # Render sections in order
+    for num_str, sec_type in sorted(sections_config.items(), key=lambda x: int(x[0])):
+        if sec_type == "determinações":
+            doc.add_paragraph()  # Espaço
+            adicionar_titulo_secao(doc, f"{num_str}. DETERMINAÇÕES GERAIS")
+            doc.add_paragraph()  # Pula linha abaixo do título
+            for runs in report_config.get_determinations_paragraphs(total_ncs):
+                add_formatted_paragraph(runs)
+                
+        elif sec_type == "recomendações":
+            doc.add_paragraph()  # Espaço
+            adicionar_titulo_secao(doc, f"{num_str}. RECOMENDAÇÕES")
+            doc.add_paragraph()  # Pula linha abaixo do título
+            
+            # Special formatting for bullets
+            recoms = report_config.get_recommendations_paragraphs()
+            # The first paragraph is the introduction
+            if recoms:
+                add_formatted_paragraph(recoms[0])
+                for runs in recoms[1:]:
+                    p = doc.add_paragraph()
+                    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    p.paragraph_format.space_after = Pt(6)
+                    p.paragraph_format.line_spacing = 1.15
+                    p.paragraph_format.left_indent = Pt(18.0)
+                    p.paragraph_format.first_line_indent = Pt(-18.0)
+                    
+                    run_bullet = p.add_run("•\t")
+                    run_bullet.font.name = 'Aptos'
+                    run_bullet.font.size = Pt(11)
+                    
+                    for text, bold, italic, color_rgb in runs:
+                        run = p.add_run(text)
+                        run.font.name = 'Aptos'
+                        run.font.size = Pt(11)
+                        if bold:
+                            run.bold = True
+                        if italic:
+                            run.italic = True
+                            
+        elif sec_type == "conclusões":
+            doc.add_paragraph()  # Espaço
+            adicionar_titulo_secao(doc, f"{num_str}. CONCLUSÕES")
+            doc.add_paragraph()  # Pula linha abaixo do título
+            for runs in report_config.get_conclusions_paragraphs(total_ncs, local_val):
+                # Replace placeholder template strings if present
+                resolved_runs = []
+                for text, bold, italic, color_rgb in runs:
+                    resolved_text = text.replace("{ano}", ano).replace("{ano_anterior}", str(int(ano) - 1))
+                    resolved_runs.append((resolved_text, bold, italic, color_rgb))
+                add_formatted_paragraph(resolved_runs)
+
     # Local e Data após conclusões
     p_loc1 = doc.add_paragraph()
     p_loc1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -557,18 +344,14 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
     run_loc1.font.name = 'Aptos'
     run_loc1.font.size = Pt(11)
     
+    # ----------------------------------------------------
     # APÊNDICES
     # ----------------------------------------------------
-    import os
-    import pandas as pd
-
     id_fisc = row["ID da Fiscalização"]
-    terminal_nc = row.get("Local", "")
     data_fisc = formatar_data_dd_mm_yyyy(row["Data"])
     
     current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None else pd.DataFrame()
     
-    # 1. Filtra não conformidades reais e pontos de atenção
     ncs_reais = pd.DataFrame()
     pas_reais = pd.DataFrame()
     if not current_ncs.empty:
@@ -577,67 +360,9 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         if "Ponto de Atenção" in current_ncs.columns:
             pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
 
-    # APÊNDICE A (CRA) / APÊNDICE ÚNICO (CRC)
-    if tipo_relatorio == "CRA":
-        p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
-    elif tipo_relatorio == "CRC":
-        p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO EM {data_fisc}")
-    else: # SOCICAM
-        local_sigla = "TIP"
-        local_val = str(row.get("Local", "TIP")).upper()
-        if "TIP" in local_val:
-            local_sigla = "TIP"
-        elif "(" in local_val:
-            local_sigla = local_val.split("(")[0].strip()
-        else:
-            local_sigla = local_val
-        p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}")
-        
-    p_ap_a.paragraph_format.page_break_before = True
-    
-    if tipo_relatorio == "CRC":
-        # Parágrafo introdutório das fotos no CRC
-        total_ncs_val = len(ncs_reais)
-        if total_ncs_val == 1:
-            fotos_str = "foto 01"
-        elif total_ncs_val == 2:
-            fotos_str = "fotos 01 e 02"
-        else:
-            fotos_str = f"fotos 01 a {str(total_ncs_val).zfill(2)}"
-            
-        p_intro_fotos = doc.add_paragraph()
-        p_intro_fotos.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_intro_fotos.paragraph_format.space_before = Pt(6)
-        p_intro_fotos.paragraph_format.space_after = Pt(12)
-        p_intro_fotos.paragraph_format.line_spacing = 1.15
-        run_intro_fotos = p_intro_fotos.add_run(
-            f"Estão evidenciadas a seguir as Não Conformidades apontadas neste Relatório de Fiscalização Técnico-Operacional "
-            f"ARPE/CTR Nº 05/{ano} ({fotos_str})."
-        )
-        run_intro_fotos.font.name = 'Aptos'
-        run_intro_fotos.font.size = Pt(11)
-        
-    if not ncs_reais.empty:
-        criar_grade_fotos(doc, ncs_reais, terminal_nc, fotos_dir, data_fisc, tipo_relatorio)
-    else:
-        p_empty = doc.add_paragraph()
-        r_empty = p_empty.add_run("Nenhum registro fotográfico de não conformidade cadastrado.")
-        r_empty.font.name = 'Aptos'
-        r_empty.font.size = Pt(11)
+    # Delegate appendix rendering to the strategy
+    report_config.render_apendices(doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos)
 
-    # APÊNDICE B
-    if tipo_relatorio == "CRA":
-        p_ap_b = adicionar_titulo_secao(doc, "APÊNDICE B – REGISTROS FOTOGRÁFICOS DAS PONTOS DE ATENÇÃO")
-        p_ap_b.paragraph_format.page_break_before = True
-        
-        if not pas_reais.empty:
-            criar_grade_fotos(doc, pas_reais, terminal_nc, fotos_dir, data_fisc, tipo_relatorio)
-        else:
-            p_empty = doc.add_paragraph()
-            r_empty = p_empty.add_run("Nenhum registro fotográfico de ponto de atenção cadastrado.")
-            r_empty.font.name = 'Aptos'
-            r_empty.font.size = Pt(11)
-    
     p_loc2 = doc.add_paragraph()
     p_loc2.paragraph_format.space_before = Pt(12)
     p_loc2.paragraph_format.space_after = Pt(12)
@@ -658,11 +383,11 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
         if match:
             r_nome = match["nome"]
-            r_funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else match["funcao"]
+            r_funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
             r_matr = match["matricula"]
         else:
             r_nome = nome
-            r_funcao = "Especialista em Regulação" if tipo_relatorio == "SOCICAM" else "Analista de Regulação"
+            r_funcao = report_config.analyst_title
             r_matr = "xxxxxxx/xx"
             
         p_ass = doc.add_paragraph()
