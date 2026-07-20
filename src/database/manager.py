@@ -145,3 +145,31 @@ def salvar_contratos(lista):
         return True
     except Exception:
         return False
+
+# --- CUSTOM NCS ---
+CUSTOM_NCS_FILE = os.path.join(DB_DIR, "custom_ncs.json")
+DEFAULT_CUSTOM_NCS = []
+
+def carregar_custom_ncs():
+    """Carrega a lista de não conformidades customizadas do banco de dados local (JSON)."""
+    if not os.path.exists(CUSTOM_NCS_FILE):
+        salvar_custom_ncs(DEFAULT_CUSTOM_NCS)
+        return DEFAULT_CUSTOM_NCS.copy()
+    try:
+        with open(CUSTOM_NCS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            return DEFAULT_CUSTOM_NCS.copy()
+    except Exception:
+        return DEFAULT_CUSTOM_NCS.copy()
+
+def salvar_custom_ncs(lista):
+    """Salva a lista de não conformidades customizadas no banco de dados local (JSON)."""
+    try:
+        os.makedirs(DB_DIR, exist_ok=True)
+        with open(CUSTOM_NCS_FILE, "w", encoding="utf-8") as f:
+            json.dump(lista, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False

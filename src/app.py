@@ -8,7 +8,8 @@ from report import gerar_relatorio
 from database.manager import (
     carregar_responsaveis, salvar_responsaveis,
     carregar_coordenadores, salvar_coordenadores,
-    carregar_contratos, salvar_contratos
+    carregar_contratos, salvar_contratos,
+    carregar_custom_ncs, salvar_custom_ncs
 )
 st.set_page_config(page_title="Gerador de Relatórios CRA", layout="wide")
 
@@ -203,6 +204,107 @@ def gerenciar_contratos_modal():
                     salvar_contratos(st.session_state.contratos)
                     st.rerun()
 
+def inject_plus_button_css():
+    st.markdown("""
+    <style>
+    /* Styling specifically for the + button next to pills */
+    .green-btn-marker + div div.stButton button {
+        background-color: #28a745 !important;
+        color: white !important;
+        border-color: #28a745 !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        border-radius: 4px !important;
+        height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .green-btn-marker + div div.stButton button:hover {
+        background-color: #218838 !important;
+        border-color: #1e7e34 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+@st.dialog("Adicionar Não Conformidade Personalizada")
+def adicionar_nc_personalizada_modal(pills_key):
+    st.write("Escolha uma Não Conformidade existente ou cadastre uma nova:")
+    
+    # 1. Escolher existente
+    custom_ncs = st.session_state.custom_ncs
+    opcoes_existentes = ["-- Selecionar Existente --"] + [
+        f"{item.get('sigla', '')} - {item.get('descricao', '')}" if item.get('sigla') else item.get('descricao')
+        for item in custom_ncs
+    ]
+    
+    selected_existente = st.selectbox(
+        "Não Conformidades Adicionadas Anteriormente",
+        options=opcoes_existentes,
+        index=0
+    )
+    
+    st.markdown("---")
+    st.write("**Ou cadastre uma nova Não Conformidade:**")
+    
+    nova_sigla = st.text_input("Sigla (opcional)", placeholder="Ex: ABC")
+    nova_desc = st.text_input("Descrição (obrigatório)", placeholder="Ex: Minha descrição personalizada...")
+    
+    col_salvar, col_cancelar = st.columns(2)
+    with col_salvar:
+        if st.button("Confirmar", type="primary", use_container_width=True, key="btn_confirm_add_custom_nc"):
+            if selected_existente != "-- Selecionar Existente --":
+                # Find matching item
+                idx = opcoes_existentes.index(selected_existente) - 1
+                item = custom_ncs[idx]
+                sigla = item.get("sigla", "")
+                desc = item.get("descricao", "")
+                val_to_select = sigla if sigla else desc
+                
+                # Make sure it's in options
+                if val_to_select not in st.session_state.nc_options:
+                    st.session_state.nc_options.append(val_to_select)
+                
+                # Add to selection
+                current_sel = list(st.session_state.get(pills_key, []))
+                if val_to_select not in current_sel:
+                    st.session_state[pills_key] = current_sel + [val_to_select]
+                
+                st.success("Não conformidade adicionada!")
+                st.rerun()
+            else:
+                desc_strip = nova_desc.strip()
+                sigla_strip = nova_sigla.strip().upper()
+                
+                if not desc_strip:
+                    st.error("O campo 'Descrição' é obrigatório para cadastrar uma nova não conformidade.")
+                else:
+                    # Save new custom NC
+                    new_item = {"sigla": sigla_strip, "descricao": desc_strip}
+                    st.session_state.custom_ncs.append(new_item)
+                    salvar_custom_ncs(st.session_state.custom_ncs)
+                    
+                    # Update MAP_SIGLAS and options
+                    from sections.quadros.quadros import MAP_SIGLAS
+                    val_to_select = sigla_strip if sigla_strip else desc_strip
+                    if sigla_strip:
+                        MAP_SIGLAS[sigla_strip] = desc_strip
+                    
+                    if val_to_select not in st.session_state.nc_options:
+                        st.session_state.nc_options.append(val_to_select)
+                        
+                    # Add to selection
+                    current_sel = list(st.session_state.get(pills_key, []))
+                    if val_to_select not in current_sel:
+                        st.session_state[pills_key] = current_sel + [val_to_select]
+                        
+                    st.success("Nova não conformidade cadastrada e selecionada!")
+                    st.rerun()
+                    
+    with col_cancelar:
+        if st.button("Cancelar", use_container_width=True, key="btn_cancel_add_custom_nc"):
+            st.rerun()
+
 if "tipo_relatorio" not in st.session_state:
     st.session_state.tipo_relatorio = "CRA"
 
@@ -298,6 +400,26 @@ with st.container():
         st.session_state.coordenadores = carregar_coordenadores()
     if "contratos" not in st.session_state:
         st.session_state.contratos = carregar_contratos()
+
+    if "custom_ncs" not in st.session_state:
+        st.session_state.custom_ncs = carregar_custom_ncs()
+        
+    from sections.quadros.quadros import MAP_SIGLAS
+    for item in st.session_state.custom_ncs:
+        sigla = item.get("sigla", "")
+        desc = item.get("descricao", "")
+        if sigla:
+            MAP_SIGLAS[sigla] = desc
+            
+    if "nc_options" not in st.session_state:
+        base_options = ["FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB", "JE", "TBE", "ALP", "ATP", "O", "P", "EX", "D", "R", "ALC", "ATC", "E"]
+        for item in st.session_state.custom_ncs:
+            sigla = item.get("sigla", "")
+            desc = item.get("descricao", "")
+            val_to_add = sigla if sigla else desc
+            if val_to_add not in base_options:
+                base_options.append(val_to_add)
+        st.session_state.nc_options = base_options
 
     with st.container(border=True):
         col1, col2 = st.columns(2)
@@ -476,8 +598,6 @@ with st.container():
                 ncs_existentes = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_vinculo]
                 nc_num = len(ncs_existentes) + 1
                 
-            nc_options = ["FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB", "JE", "TBE", "ALP", "ATP", "O", "P", "EX", "D", "R", "ALC", "ATC", "E"]
-            
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                 tipo_registro = st.pills(
                     "Tipo de Registro",
@@ -493,20 +613,34 @@ with st.container():
             pa_key = f"pa_desc_{st.session_state.nc_form_counter}"
             
             if tipo_registro == "Não Conformidade":
-                nc_descricao = st.pills(
-                    "Siglas de Não Conformidade",
-                    nc_options,
-                    selection_mode="multi",
-                    key=nc_key
-                )
+                col_pills, col_plus = st.columns([11, 1])
+                with col_pills:
+                    nc_descricao = st.pills(
+                        "Siglas de Não Conformidade",
+                        st.session_state.nc_options,
+                        selection_mode="multi",
+                        key=nc_key
+                    )
+                with col_plus:
+                    st.markdown("<div style='height: 28px;' class='green-btn-marker'></div>", unsafe_allow_html=True)
+                    inject_plus_button_css()
+                    if st.button("+", key=f"btn_add_custom_nc_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
+                        adicionar_nc_personalizada_modal(nc_key)
                 ponto_atencao = []
             else:
-                ponto_atencao = st.pills(
-                    "Siglas de Ponto de Atenção",
-                    nc_options,
-                    selection_mode="multi",
-                    key=pa_key
-                )
+                col_pills, col_plus = st.columns([11, 1])
+                with col_pills:
+                    ponto_atencao = st.pills(
+                        "Siglas de Ponto de Atenção",
+                        st.session_state.nc_options,
+                        selection_mode="multi",
+                        key=pa_key
+                    )
+                with col_plus:
+                    st.markdown("<div style='height: 28px;' class='green-btn-marker'></div>", unsafe_allow_html=True)
+                    inject_plus_button_css()
+                    if st.button("+", key=f"btn_add_custom_pa_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
+                        adicionar_nc_personalizada_modal(pa_key)
                 nc_descricao = []
             
             nc_legenda = st.text_area("Observações", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva as observações/legenda correspondente...")

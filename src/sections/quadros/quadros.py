@@ -34,10 +34,29 @@ def expandir_siglas(siglas_str):
     if not siglas_str or pd.isna(siglas_str):
         return ""
     parts = [p.strip() for p in str(siglas_str).split(",") if p.strip()]
+    
+    # Load custom NCs and merge into local map
+    local_map = MAP_SIGLAS.copy()
+    try:
+        import os
+        import json
+        quadros_dir = os.path.dirname(os.path.abspath(__file__))
+        custom_ncs_path = os.path.abspath(os.path.join(quadros_dir, "..", "..", "database", "custom_ncs.json"))
+        if os.path.exists(custom_ncs_path):
+            with open(custom_ncs_path, "r", encoding="utf-8") as f:
+                custom_list = json.load(f)
+                for item in custom_list:
+                    sigla = item.get("sigla", "")
+                    desc = item.get("descricao", "")
+                    if sigla:
+                        local_map[sigla] = desc
+    except Exception as e:
+        print(f"Error loading custom NCs in expandir_siglas: {e}")
+        
     expanded = []
     for p in parts:
-        if p in MAP_SIGLAS:
-            expanded.append(f"{MAP_SIGLAS[p]} ({p})")
+        if p in local_map:
+            expanded.append(f"{local_map[p]} ({p})")
         else:
             expanded.append(p)
     return ", ".join(expanded)
@@ -148,7 +167,7 @@ def agrupar_registros(df):
         
     return grouped
 
-def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
+def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
     """Cria a tabela formatada de acordo com o padrão do documento de referência."""
     grouped_records = agrupar_registros(df_dados)
     num_rows = len(grouped_records)
@@ -160,7 +179,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
         run.font.size = Pt(10)
         return
         
-    if tipo_relatorio == "SOCICAM":
+    if report_config.key == "SOCICAM":
         table = doc.add_table(rows=1 + num_rows, cols=5)
     else:
         table = doc.add_table(rows=2 + num_rows, cols=5)
@@ -172,23 +191,23 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
     table.allow_autofit = False
     
     # 1. Mesclar células do cabeçalho
-    if tipo_relatorio != "SOCICAM":
+    if report_config.key != "SOCICAM":
         table.cell(0, 0).merge(table.cell(0, 1))
         table.cell(0, 2).merge(table.cell(1, 2))
         table.cell(0, 3).merge(table.cell(1, 3))
         table.cell(0, 4).merge(table.cell(1, 4))
     
     # 2. Definir os textos do cabeçalho
-    if tipo_relatorio == "SOCICAM":
+    if report_config.key == "SOCICAM":
         table.cell(0, 0).text = "IDENTIFICAÇÃO"
         table.cell(0, 1).text = "DESCRIÇÃO"
         table.cell(0, 2).text = "REGISTRO\nFOTOGRÁFICO"
         table.cell(0, 3).text = "FUNDAMENTO DA INFRAÇÃO\n(ANEXO V CONTRATO DE CONCESSÃO)"
         table.cell(0, 4).text = "DETERMINAÇÃO"
         header_color = "D9D9D9"
-        col_widths = [Inches(1.24), Inches(1.62), Inches(1.26), Inches(1.69), Inches(2.25)]
+        col_widths = report_config.nc_table_col_widths
     elif not is_pa:
-        if tipo_relatorio == "CRA":
+        if report_config.key == "CRA":
             table.cell(0, 0).text = "NÃO CONFORMIDADE (NC)"
             table.cell(1, 0).text = "IDENTIFICAÇÃO"
             table.cell(1, 1).text = "DESCRIÇÃO"
@@ -205,7 +224,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
             table.cell(0, 3).text = "FUNDAMENTO DA INFRAÇÃO (PER ANEXO IV - CONTRATO DE CONCESSÃO)"
             table.cell(0, 4).text = "DETERMINAÇÃO"
             header_color = "D9D9D9"
-            col_widths = [Inches(1.34), Inches(1.68), Inches(0.81), Inches(2.46), Inches(0.98)]
+            col_widths = report_config.nc_table_col_widths
     else:
         table.cell(0, 0).text = "PONTOS DE ATENÇÃO"
         table.cell(1, 0).text = "IDENTIFICAÇÃO"
@@ -217,7 +236,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
         col_widths = [Inches(1.18), Inches(1.74), Inches(1.14), Inches(1.81), Inches(1.40)]
         
     # Formatar cabeçalhos
-    header_rows = [0] if tipo_relatorio == "SOCICAM" else [0, 1]
+    header_rows = [0] if report_config.key == "SOCICAM" else [0, 1]
     for r_idx in header_rows:
         row = table.rows[r_idx]
         for c_idx, cell in enumerate(row.cells):
@@ -239,7 +258,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
                     run.bold = True
                     
     # Preencher dados
-    start_r_idx = 1 if tipo_relatorio == "SOCICAM" else 2
+    start_r_idx = 1 if report_config.key == "SOCICAM" else 2
     for idx, rec in enumerate(grouped_records):
         r_idx = idx + start_r_idx
         row = table.rows[r_idx]
@@ -285,30 +304,11 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
         for c_idx, cell in enumerate(row.cells):
             cell.width = col_widths[c_idx]
 
-    if tipo_relatorio in ["CRC", "SOCICAM"] and not is_pa:
+    if report_config.key in ["CRC", "SOCICAM"] and not is_pa:
         # Add TOTAL row
         r_total = table.add_row()
-        if tipo_relatorio == "CRC":
-            # Merge first three cells (0, 1, 2)
-            r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2])
-            r_total.cells[0].text = "TOTAL"
-            r_total.cells[3].text = ""
-            r_total.cells[4].text = str(num_rows)
-            
-            # Set widths for cells after merging
-            r_total.cells[0].width = col_widths[0] + col_widths[1] + col_widths[2]
-            r_total.cells[3].width = col_widths[3]
-            r_total.cells[4].width = col_widths[4]
-        else: # SOCICAM
-            # Merge first four cells (0, 1, 2, 3)
-            r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2]).merge(r_total.cells[3])
-            r_total.cells[0].text = "TOTAL"
-            r_total.cells[4].text = str(num_rows)
-            
-            # Set widths for cells after merging
-            r_total.cells[0].width = col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3]
-            r_total.cells[4].width = col_widths[4]
-            
+        report_config.format_nc_table_total_row(table, len(table.rows) - 1, num_rows)
+        
         # Format the cells
         for c_idx, cell in enumerate(r_total.cells):
             set_cell_margins(cell, top=100, bottom=100, left=150, right=150)
@@ -324,273 +324,6 @@ def criar_tabela_quadros(doc, df_dados, is_pa, tipo_relatorio="CRA"):
                 run.font.size = Pt(10)
                 run.bold = True
 
-def gerar_secao_quadros(doc: Document, row, nc_df, tipo_relatorio="CRA"):
+def gerar_secao_quadros(doc: Document, row, nc_df, report_config):
     """Gera a seção com as descrições e títulos dos Quadros (Quadros 1 a 5)."""
-    
-    if tipo_relatorio == "CRA":
-        # Parágrafo 14: Os trechos com Não Conformidades...
-        p1 = doc.add_paragraph()
-        p1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p1.paragraph_format.space_after = Pt(6)
-        p1.paragraph_format.line_spacing = 1.15
-        run1 = p1.add_run(
-            "Os trechos com Não Conformidades registradas no Quadro 1 e Quadro 2, a seguir, associadas aos respectivos "
-            "subtrechos, foram avaliadas pelos valores do Índice de Gravidade Global (IGG) que ultrapassaram o limite "
-            "máximo previsto ≥ 30, como também os valores do Índice Irregularidade Longitudinal (IRI) que ultrapassaram o "
-            "limite máximo previsto ≥ 2,7 m/km constantes do Relatório Anual 01 de novembro/2025 elaborado pelo Verificador Independente."
-        )
-        run1.font.name = 'Aptos'
-        run1.font.size = Pt(11)
-        
-        # Parágrafo 15: Vazio
-        doc.add_paragraph()
-        
-        # Parágrafo 16: Quadro 1...
-        p2 = doc.add_paragraph()
-        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p2.paragraph_format.space_after = Pt(6)
-        run2 = p2.add_run("Quadro 1 – Aplicação dos Critérios de Elegibilidade Relativos ao Pavimento PE009")
-        run2.font.name = 'Aptos'
-        run2.font.size = Pt(11)
-        
-        # Parágrafo 17: Quadro 2...
-        p3 = doc.add_paragraph()
-        p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p3.paragraph_format.space_after = Pt(6)
-        run3 = p3.add_run("Quadro 2 – Aplicação dos Critérios de Elegibilidade Relativos ao Pavimento VPE034")
-        run3.font.name = 'Aptos'
-        run3.font.size = Pt(11)
-        
-        # Parágrafo 18: Visando garantir...
-        p4 = doc.add_paragraph()
-        p4.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p4.paragraph_format.space_after = Pt(6)
-        p4.paragraph_format.line_spacing = 1.15
-        run4 = p4.add_run(
-            "Visando garantir um pavimento de qualidade com a trafegabilidade e segurança viária para os usuários "
-            "sugere-se que os Pontos de Atenção registrados no Quadro 3 sejam, tratados pela concessionaria. A seguir, "
-            "estão associados aos respectivos subtrechos, possuem índices de Índice de Gravidade Global (IGG) e/ou Índice "
-            "de Irregularidade Longitudinal (IRI) que não ultrapassaram o limite máximos previstos constantes do Relatório "
-            "Anual 01 de novembro/2025 elaborado pelo Verificador Independente."
-        )
-        run4.font.name = 'Aptos'
-        run4.font.size = Pt(11)
-        
-        # Parágrafo 19: Vazio
-        doc.add_paragraph()
-        
-        # Parágrafo 20: Quadro 3...
-        p5 = doc.add_paragraph()
-        p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p5.paragraph_format.space_after = Pt(6)
-        run5 = p5.add_run("Quadro 3 – Trecho dos pontos de Atenção:")
-        run5.font.name = 'Aptos'
-        run5.font.size = Pt(11)
-        
-        # Parágrafo 21: Vazio
-        doc.add_paragraph()
-        
-        # Parágrafo 22: O Quadro 4, a seguir...
-        p6 = doc.add_paragraph()
-        p6.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p6.paragraph_format.space_after = Pt(6)
-        p6.paragraph_format.line_spacing = 1.15
-        
-        runs_data = [
-            ("O ", False),
-            ("Quadro 4", True),
-            (", a seguir, resume as Não Conformidades constatadas, relacionadas ao PDCL, com indicação dos respectivos registros fotográficos no ", False),
-            ("Apêndice A", True),
-            (" e Pontos de Atenção respectivos registros fotográficos no ", False),
-            ("Apêndice B", True),
-            (". A descrição da evidência está referenciada conforme a norma de descrição de defeitos do DNIT.", False)
-        ]
-        for text, is_bold in runs_data:
-            r = p6.add_run(text)
-            r.font.name = 'Aptos'
-            r.font.size = Pt(11)
-            if is_bold:
-                r.bold = True
-                
-        # Parágrafo 23: Vazio
-        doc.add_paragraph()
-    elif tipo_relatorio == "CRC":
-        # Modo CRC
-        from utils import formatar_data_extenso
-        data_extenso = formatar_data_extenso(row["Data"])
-        
-        adicionar_titulo_secao(doc, "5. FISCALIZAÇÃO")
-        doc.add_paragraph() # Pula linha abaixo do título
-        
-        p1 = doc.add_paragraph()
-        p1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p1.paragraph_format.space_after = Pt(6)
-        p1.paragraph_format.line_spacing = 1.15
-        run1 = p1.add_run(f"As NC identificadas, em {data_extenso}, pela equipe de fiscalização da ARPE estão detalhadas no Quadro 1 a seguir.")
-        run1.font.name = 'Aptos'
-        run1.font.size = Pt(11)
-        
-        doc.add_paragraph() # Parágrafo vazio
-    else: # SOCICAM
-        from utils import formatar_data_extenso
-        data_extenso = formatar_data_extenso(row["Data"])
-        
-        adicionar_titulo_secao(doc, "4. FISCALIZAÇÃO")
-        doc.add_paragraph() # Pula linha abaixo do título
-        
-        # Formatar equipe de fiscalização
-        responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
-        from database.manager import carregar_responsaveis
-        db_resp = carregar_responsaveis()
-        team_parts = []
-        for nome in responsaveis_list:
-            match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
-            if match:
-                team_parts.append(f"{match['nome']} (matrícula nº {match['matricula']})")
-            else:
-                team_parts.append(f"{nome} (matrícula nº xxxxxxx/xx)")
-                
-        if len(team_parts) == 1:
-            team_str = team_parts[0]
-        elif len(team_parts) == 2:
-            team_str = f"{team_parts[0]} e {team_parts[1]}"
-        else:
-            team_str = ", ".join(team_parts[:-1]) + " e " + team_parts[-1]
-            
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        
-        p1 = doc.add_paragraph()
-        p1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p1.paragraph_format.space_after = Pt(6)
-        p1.paragraph_format.line_spacing = 1.15
-        run1 = p1.add_run(f"As ações de fiscalização foram realizadas, em {data_extenso}, pela equipe formada pelos Especialista em Regulação {team_str}, no {local_val}.")
-        run1.bold = True
-        run1.font.name = 'Aptos'
-        run1.font.size = Pt(11)
-        
-        p2 = doc.add_paragraph()
-        p2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p2.paragraph_format.space_after = Pt(6)
-        p2.paragraph_format.line_spacing = 1.15
-        run2 = p2.add_run("As Não Conformidades constatadas estão relacionadas ao Programa de Manutenção dos Terminais Rodoviários, Anexo V do Contrato de Concessão, conforme descritas no Quadro 1, a seguir, com indicação dos respectivos registros fotográficos no Apêndice A.")
-        run2.bold = True
-        run2.font.name = 'Aptos'
-        run2.font.size = Pt(11)
-        
-        doc.add_paragraph() # Parágrafo vazio
-
-    # Obter dados de NC e PA
-    id_fisc = row["ID da Fiscalização"]
-    current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None else pd.DataFrame()
-    
-    ncs_reais = pd.DataFrame()
-    pas_reais = pd.DataFrame()
-    if not current_ncs.empty:
-        if "Não Conformidade" in current_ncs.columns:
-            ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
-        if tipo_relatorio == "CRA" and "Ponto de Atenção" in current_ncs.columns:
-            pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
-            
-    try:
-        mes_ano = formatar_mes_ano(row["Data"]).replace(", ", "/").lower()
-    except Exception:
-        mes_ano = "junho/2026"
-
-    # Data formatada abreviada (dd/mm/aaaa) para o Quadro 1 do CRC
-    try:
-        dt_obj = pd.to_datetime(row["Data"])
-        data_abreviada = dt_obj.strftime("%d/%m/%Y")
-    except Exception:
-        data_abreviada = "27/05/2026"
-
-    if tipo_relatorio == "CRA":
-        # Parágrafo 24: Quadro 4 title...
-        p7 = doc.add_paragraph()
-        p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p7.paragraph_format.space_after = Pt(6)
-        
-        r7_1 = p7.add_run("Quadro 4")
-        r7_1.bold = True
-        r7_1.font.name = 'Aptos'
-        r7_1.font.size = Pt(11)
-        
-        r7_2 = p7.add_run(f" – Determinações para Não Conformidades Identificadas – {mes_ano}")
-        r7_2.font.name = 'Aptos'
-        r7_2.font.size = Pt(11)
-        
-        # Tabela de Não Conformidades (Quadro 4)
-        criar_tabela_quadros(doc, ncs_reais, is_pa=False, tipo_relatorio=tipo_relatorio)
-        
-        # Parágrafo 25: Vazio
-        doc.add_paragraph()
-        
-        # Parágrafo 26: Quadro 5 title...
-        p8 = doc.add_paragraph()
-        p8.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p8.paragraph_format.space_after = Pt(6)
-        
-        r8_1 = p8.add_run("Quadro 5")
-        r8_1.bold = True
-        r8_1.font.name = 'Aptos'
-        r8_1.font.size = Pt(11)
-        
-        r8_2 = p8.add_run(" – Pontos de Atenção por Rodovia/Sentido")
-        r8_2.font.name = 'Aptos'
-        r8_2.font.size = Pt(11)
-        
-        # Tabela de Pontos de Atenção (Quadro 5)
-        criar_tabela_quadros(doc, pas_reais, is_pa=True, tipo_relatorio=tipo_relatorio)
-        
-        # Parágrafos 27, 28, 29: Vazios
-        doc.add_paragraph()
-        doc.add_paragraph()
-        doc.add_paragraph()
-    elif tipo_relatorio == "CRC":
-        # Quadro 1 do CRC
-        p7 = doc.add_paragraph()
-        p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p7.paragraph_format.space_after = Pt(6)
-        
-        r7_1 = p7.add_run("QUADRO 1")
-        r7_1.bold = True
-        r7_1.font.name = 'Aptos'
-        r7_1.font.size = Pt(11)
-        
-        r7_2 = p7.add_run(f" – NÃO CONFORMIDADES IDENTIFICADAS CRC - {data_abreviada}")
-        r7_2.bold = True
-        r7_2.font.name = 'Aptos'
-        r7_2.font.size = Pt(11)
-        
-        # Tabela de Não Conformidades (Quadro 1)
-        criar_tabela_quadros(doc, ncs_reais, is_pa=False, tipo_relatorio=tipo_relatorio)
-        
-        doc.add_paragraph() # Parágrafo vazio
-        
-        # Observação abaixo da tabela no CRC (P67):
-        p8 = doc.add_paragraph()
-        p8.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p8.paragraph_format.space_before = Pt(6)
-        p8.paragraph_format.space_after = Pt(6)
-        p8.paragraph_format.line_spacing = 1.15
-        run8 = p8.add_run("É importante destacar que as Não Conformidades apontadas se referem à segurança dos pedestres na rodovia, visando evitar a ocorrência de acidentes.")
-        run8.font.name = 'Aptos'
-        run8.font.size = Pt(11)
-    else: # SOCICAM
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        p7 = doc.add_paragraph()
-        p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p7.paragraph_format.space_after = Pt(6)
-        
-        r7_1 = p7.add_run("Quadro 1")
-        r7_1.bold = True
-        r7_1.font.name = 'Aptos'
-        r7_1.font.size = Pt(11)
-        
-        r7_2 = p7.add_run(f" – Não Conformidades do {local_val}")
-        r7_2.font.name = 'Aptos'
-        r7_2.font.size = Pt(11)
-        
-        # Tabela de Não Conformidades (Quadro 1)
-        criar_tabela_quadros(doc, ncs_reais, is_pa=False, tipo_relatorio=tipo_relatorio)
-        
-        doc.add_paragraph() # Parágrafo vazio
+    report_config.render_quadros(doc, row, nc_df, criar_tabela_quadros)

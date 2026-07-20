@@ -1,6 +1,7 @@
 __pycache__/
 reports
 assets
+venv/
 .cursor/
 .agents/
 ref/
