@@ -11,7 +11,19 @@ from database.manager import (
     carregar_contratos, salvar_contratos,
     carregar_custom_ncs, salvar_custom_ncs
 )
-st.set_page_config(page_title="Gerador de Relatórios CRA", layout="wide")
+st.set_page_config(page_title="Gerador de Relatórios", layout="wide")
+
+if "categoria_relatorio" not in st.session_state:
+    st.session_state.categoria_relatorio = "Fiscalização"
+
+is_monitoring = st.session_state.categoria_relatorio == "Monitoramento"
+term_fisc = "Monitoramento" if is_monitoring else "Fiscalização"
+term_fisc_lower = "monitoramento" if is_monitoring else "fiscalização"
+term_fisc_plural = "Monitoramentos" if is_monitoring else "Fiscalizações"
+term_fisc_plural_lower = "monitoramentos" if is_monitoring else "fiscalizações"
+term_fisc_prep = "do Monitoramento" if is_monitoring else "da Fiscalização"
+term_fisc_prep_f = "de Monitoramento" if is_monitoring else "de Fiscalização"
+term_fisc_pessoal = "pelo monitoramento" if is_monitoring else "pela fiscalização"
 
 @st.dialog("Visualização Completa da Imagem", width="large")
 def mostrar_foto_modal(uploaded_file):
@@ -19,7 +31,7 @@ def mostrar_foto_modal(uploaded_file):
 
 @st.dialog("Confirmar Exclusão em Lote")
 def confirmar_exclusao_lote_modal(ids):
-    st.write("Você tem certeza que deseja excluir as seguintes fiscalizações?")
+    st.write(f"Você tem certeza que deseja excluir as seguintes {term_fisc_plural_lower}?")
     for id_fisc in ids:
         st.write(f"- **{id_fisc}**")
     st.write("Isso também removerá todas as Não Conformidades vinculadas a estes IDs.")
@@ -31,7 +43,7 @@ def confirmar_exclusao_lote_modal(ids):
             st.session_state.temp_fiscalizacoes = [f for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] not in ids]
             st.session_state.temp_nc = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] not in ids]
             st.session_state.relatorios_preenchimento_data = []
-            st.success("Fiscalizações selecionadas excluídas com sucesso!")
+            st.success(f"{term_fisc_plural} selecionadas excluídas com sucesso!")
             st.rerun()
     with col_nao:
         if st.button("Cancelar", use_container_width=True, key="btn_cancel_bulk_del"):
@@ -77,7 +89,7 @@ def confirmar_exclusao_nc_modal(nc_keys):
 
 @st.dialog("Gerenciar Pessoal Responsável")
 def gerenciar_responsaveis_modal():
-    st.write("Adicione, veja ou remova os responsáveis técnicos pela fiscalização.")
+    st.write(f"Adicione, veja ou remova os responsáveis técnicos {term_fisc_pessoal}.")
     
     # 1. Inputs para adicionar novo
     novo_resp = st.text_input("Nome do Novo Responsável")
@@ -124,7 +136,7 @@ def gerenciar_responsaveis_modal():
 
 @st.dialog("Gerenciar Coordenadores")
 def gerenciar_coordenadores_modal():
-    st.write("Adicione, veja ou remova os coordenadores da fiscalização.")
+    st.write(f"Adicione, veja ou remova os coordenadores {term_fisc_prep_f.lower()}.")
     
     # 1. Inputs para adicionar novo
     novo_coord = st.text_input("Nome do Novo Coordenador")
@@ -307,10 +319,12 @@ def adicionar_nc_personalizada_modal(pills_key):
 
 if "tipo_relatorio" not in st.session_state:
     st.session_state.tipo_relatorio = "CRA"
+if "categoria_relatorio" not in st.session_state:
+    st.session_state.categoria_relatorio = "Fiscalização"
 
-col_title, col_switch, _ = st.columns([0.37, 0.05, 0.58], gap="small")
+col_title, col_switch, col_cat, _ = st.columns([0.46, 0.03, 0.03, 0.48], gap="small")
 with col_title:
-    st.title(f"📄 Gerador de Relatórios {st.session_state.tipo_relatorio}")
+    st.title(f"📄 Gerador {st.session_state.tipo_relatorio} ({st.session_state.categoria_relatorio})")
 with col_switch:
     st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
     if st.button("🔄", key="btn_swap_tipo", help="Clique para alternar entre CRA, CRC e SOCICAM"):
@@ -320,6 +334,14 @@ with col_switch:
             st.session_state.tipo_relatorio = "SOCICAM"
         else:
             st.session_state.tipo_relatorio = "CRA"
+        st.rerun()
+with col_cat:
+    st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+    if st.button("📋", key="btn_swap_categoria", help="Clique para alternar entre Fiscalização e Monitoramento"):
+        if st.session_state.categoria_relatorio == "Fiscalização":
+            st.session_state.categoria_relatorio = "Monitoramento"
+        else:
+            st.session_state.categoria_relatorio = "Fiscalização"
         st.rerun()
 
 # Layout principal da aplicação
@@ -334,7 +356,7 @@ with st.container():
     col_uploader, col_sort, col_clear = st.columns([3, 1, 1])
     with col_uploader:
         uploaded_nc_photos = st.file_uploader(
-            "Faça o upload de todas as fotos da fiscalização para usá-las no carrossel de Registros", 
+            f"Faça o upload de todas as fotos {term_fisc_prep_f.lower()} para usá-las no carrossel de Registros", 
             type=["jpg", "jpeg", "png"], 
             accept_multiple_files=True,
             key=f"fill_photos_uploader_{st.session_state.uploader_version}"
@@ -424,7 +446,7 @@ with st.container():
     with st.container(border=True):
         col1, col2 = st.columns(2)
         with col1:
-            id_fisc = st.text_input("ID da Fiscalização (ex: 2026-001)", help="Identificador único para vincular as abas")
+            id_fisc = st.text_input(f"ID {term_fisc_prep} (ex: 2026-001)", help="Identificador único para vincular as abas")
             data_fisc = st.text_input("Data (ex: 15/06/2026)", placeholder="dd/mm/aaaa")
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                 hora = st.text_input("Hora (ex: 10:00)", placeholder="Opcional")
@@ -436,7 +458,7 @@ with st.container():
             if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
                 local = "Sistema Viário do Paiva"
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
-                submit_fisc = st.button("➕ Adicionar Fiscalização")
+                submit_fisc = st.button(f"➕ Adicionar {term_fisc}")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
         with col2:
@@ -445,7 +467,7 @@ with st.container():
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
-
+ 
             col_resp, col_gear = st.columns([5, 1])
             with col_resp:
                 responsaveis_sel = st.multiselect(
@@ -453,7 +475,7 @@ with st.container():
                     options=st.session_state.pessoal_responsaveis,
                     default=st.session_state.pessoal_responsaveis,
                     format_func=lambda x: x["nome"],
-                    help="Selecione os responsáveis pela fiscalização. Use a engrenagem ao lado para gerenciar a lista."
+                    help=f"Selecione os responsáveis {term_fisc_pessoal}. Use a engrenagem ao lado para gerenciar a lista."
                 )
                 responsaveis = ", ".join([r["nome"] for r in responsaveis_sel])
             with col_gear:
@@ -468,7 +490,7 @@ with st.container():
                     "Coordenador",
                     options=st.session_state.coordenadores,
                     format_func=lambda x: x["nome"],
-                    help="Selecione o coordenador da fiscalização. Use a engrenagem ao lado para gerenciar a lista."
+                    help=f"Selecione o coordenador {term_fisc_prep_f.lower()}. Use a engrenagem ao lado para gerenciar a lista."
                 )
                 coordenador = coordenador_sel["nome"] if coordenador_sel else ""
             with col_gear_coord:
@@ -483,17 +505,17 @@ with st.container():
                 contrato = "CGPE-001/2006"
             else:
                 contrato = "CT. nº 1.041.080/08"
-
+ 
         if st.session_state.get("tipo_relatorio", "CRA") in ["CRA", "SOCICAM"]:
-            submit_fisc = st.button("➕ Adicionar Fiscalização")
+            submit_fisc = st.button(f"➕ Adicionar {term_fisc}")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
             if not id_fisc:
-                st.error("O ID da Fiscalização é obrigatório.")
+                st.error(f"O ID {term_fisc_prep} é obrigatório.")
             elif not local.strip():
                 st.error("O campo 'Local' é obrigatório.")
             elif id_fisc.strip() in ids_existentes:
-                st.error(f"O ID da Fiscalização '{id_fisc}' já está cadastrado. Por favor, utilize um ID único.")
+                st.error(f"O ID {term_fisc_prep} '{id_fisc}' já está cadastrado. Por favor, utilize um ID único.")
             else:
                 st.session_state.temp_fiscalizacoes.append({
                     "ID da Fiscalização": id_fisc,
@@ -522,7 +544,7 @@ with st.container():
                 if campos_em_branco:
                     st.warning(f"⚠️ Atenção: Os seguintes campos opcionais de preenchimento ficaram em branco: {', '.join(campos_em_branco)}.")
                 
-                st.success(f"Fiscalização {id_fisc} adicionada!")
+                st.success(f"{term_fisc} {id_fisc} adicionada!")
                 st.rerun()
 
     st.divider()
@@ -571,7 +593,7 @@ with st.container():
 
     with col_inputs:
         if st.session_state.nc_form_step == 1:
-            id_vinculo = st.selectbox("Vincular ao ID da Fiscalização", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
+            id_vinculo = st.selectbox(f"Vincular ao ID {term_fisc_prep}", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
             
             # Novas variáveis de Pista e Trecho inseridas de forma compacta (lado a lado)
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
@@ -649,7 +671,7 @@ with st.container():
             with col_nxt:
                 if st.button("➡️ Próximo", type="primary", use_container_width=True):
                     if id_vinculo == "Nenhum ID cadastrado":
-                        st.error("Adicione uma fiscalização primeiro.")
+                        st.error(f"Adicione um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
                     elif not nc_descricao and not ponto_atencao:
                         msg_erro = "O campo 'Não Conformidade' é obrigatório." if st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"] else "O campo 'Não Conformidade' ou 'Ponto de Atenção' é obrigatório."
                         st.error(msg_erro)
@@ -771,14 +793,18 @@ with st.container():
                     lambda x: ", ".join([name.strip().split()[0] for name in str(x).split(",") if name.strip()])
                 )
             
-            st.write("**Fiscalizações:**")
+            st.write(f"**{term_fisc_plural}:**")
             edited_df = st.data_editor(
                 df_fisc,
                 column_config={
                     "Excluir": st.column_config.CheckboxColumn(
                         "Excluir",
-                        help="Selecione as fiscalizações que deseja excluir",
+                        help=f"Selecione as {term_fisc_plural_lower} que deseja excluir",
                         default=False,
+                    ),
+                    "ID da Fiscalização": st.column_config.TextColumn(
+                        f"ID {term_fisc_prep}",
+                        width="medium"
                     ),
                     "Pessoal Responsável": st.column_config.TextColumn(
                         "Pessoal Responsável",
@@ -831,6 +857,9 @@ with st.container():
                                 "Excluir",
                                 help="Selecione as não conformidades que deseja excluir",
                                 default=False,
+                            ),
+                            "ID da Fiscalização": st.column_config.TextColumn(
+                                f"ID {term_fisc_prep}"
                             )
                         },
                         disabled=[col for col in df_nc_only.columns if col != "Excluir"],
@@ -874,6 +903,9 @@ with st.container():
                                     "Excluir",
                                     help="Selecione os pontos de atenção que deseja excluir",
                                     default=False,
+                                ),
+                                "ID da Fiscalização": st.column_config.TextColumn(
+                                    f"ID {term_fisc_prep}"
                                 )
                             },
                             disabled=[col for col in df_pa_only.columns if col != "Excluir"],
@@ -911,7 +943,7 @@ with st.container():
         with col_relatorio:
             if st.button("🚀 Gerar Relatório Automático", type="primary", use_container_width=True, key="btn_run_report_main"):
                 if not st.session_state.temp_fiscalizacoes:
-                    st.error("Adicione pelo menos uma fiscalização primeiro.")
+                    st.error(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
                 else:
                     with st.spinner("Gerando relatórios automaticamente..."):
                         st.session_state.relatorios_preenchimento_data = []
@@ -988,12 +1020,16 @@ with st.container():
                                         f.write(photo.getbuffer())
 
                             try:
+                                tipo_key = st.session_state.get("tipo_relatorio", "CRA")
+                                if st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento":
+                                    tipo_key = f"{tipo_key}_MONITORAMENTO"
+
                                 arquivos_gerados, _ = gerar_relatorio(
                                     caminho_planilha=excel_buffer,
                                     fotos_dir=fotos_dir,
                                     relatorios_dir=reports_dir,
                                     gerar_todos=True,
-                                    tipo_relatorio=st.session_state.get("tipo_relatorio", "CRA")
+                                    tipo_relatorio=tipo_key
                                 )
 
                                 if not arquivos_gerados:

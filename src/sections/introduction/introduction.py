@@ -249,7 +249,8 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config):
         run_mon_bold.font.name = 'Aptos'
         run_mon_bold.font.size = Pt(11)
         
-        run_mon_text = p_mon.add_run(" - Esta etapa é fundamental para garantir a eficácia das ações corretivas a serem executadas pela Concessionária para a melhoria contínua dos serviços prestados. Os principais instrumentos do Monitoramento e Avaliação são: Termo de Notificação e respectivo Relatório de Fiscalização, Plano de Ação da Concessionária e Relatórios de Monitoramento e Avaliação Final.")
+        mon_term = "Relatório de Monitoramento" if "MONITORAMENTO" in report_config.key else "Relatório de Fiscalização"
+        run_mon_text = p_mon.add_run(f" - Esta etapa é fundamental para garantir a eficácia das ações corretivas a serem executadas pela Concessionária para a melhoria contínua dos serviços prestados. Os principais instrumentos do Monitoramento e Avaliação são: Termo de Notificação e respectivo {mon_term}, Plano de Ação da Concessionária e Relatórios de Monitoramento e Avaliação Final.")
         run_mon_text.font.name = 'Aptos'
         run_mon_text.font.size = Pt(11)
 
