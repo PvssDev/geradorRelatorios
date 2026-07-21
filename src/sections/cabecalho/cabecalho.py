@@ -27,7 +27,8 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config):
 
     # 1. Texto Superior em Caixa Cinza (tabela 1x1 sem bordas)
     ano = extrair_ano(row["Data"])
-    ctr_text = report_config.capa_ctr_number_template.format(ano=ano)
+    id_fisc = str(row.get("ID da Fiscalização", "")).strip()
+    ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc)
     adicionar_texto_caixa_cinza(doc, ctr_text)
     
     # 1. Imagem da Capa
@@ -110,7 +111,12 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config):
         p_rodape.paragraph_format.space_after = Pt(0)
     
     # 6. Geração de Sumário e Lista de Abreviaturas com ordem condicional
-    if report_config.sumario_before_abreviaturas:
+    has_abbr = bool(report_config.get_abbreviations())
+    if not has_abbr:
+        # Apenas Sumário na Página 2, sem Lista de Abreviaturas
+        doc.add_page_break()
+        gerar_sumario(doc, row, report_config)
+    elif report_config.sumario_before_abreviaturas:
         # CRC/SOCICAM: Sumário na Página 2, Lista de Abreviaturas na Página 3
         doc.add_page_break()
         gerar_sumario(doc, row, report_config)
