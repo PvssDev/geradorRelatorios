@@ -170,7 +170,7 @@ def gerar_relatorio(
         gerar_capa_primeira_pagina(doc, logo_capa_path, row, report_config)
 
         # Geração das Seções
-        gerar_secao_introducao(doc, row, total_achados, report_config)
+        gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df)
         gerar_secao_quadros(doc, row, nc_df, report_config)
         gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR, report_config=report_config)
 

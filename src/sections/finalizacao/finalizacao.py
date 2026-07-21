@@ -336,6 +336,19 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
                     resolved_runs.append((resolved_text, bold, italic, color_rgb))
                 add_formatted_paragraph(resolved_runs)
 
+        elif sec_type in ("conclusões_monitoramento", "conclusoes_monitoramento"):
+            from utils import formatar_data_extenso
+            data_extenso = formatar_data_extenso(row["Data"])
+            doc.add_paragraph()  # Espaço
+            adicionar_titulo_secao(doc, f"{num_str}. CONCLUSÕES E RECOMENDAÇÕES")
+            doc.add_paragraph()  # Pula linha abaixo do título
+            for runs in report_config.get_conclusions_monitoramento_paragraphs(total_ncs, data_extenso):
+                resolved_runs = []
+                for text, bold, italic, color_rgb in runs:
+                    resolved_text = text.replace("{ano}", ano).replace("{ano_anterior}", str(int(ano) - 1))
+                    resolved_runs.append((resolved_text, bold, italic, color_rgb))
+                add_formatted_paragraph(resolved_runs)
+
     # Local e Data após conclusões
     p_loc1 = doc.add_paragraph()
     p_loc1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
