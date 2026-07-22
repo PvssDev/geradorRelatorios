@@ -84,6 +84,7 @@ def gerar_relatorio(
     relatorios_dir=None,
     gerar_todos=False,
     tipo_relatorio="CRA",
+    documento_anterior=None,
 ):
     """Gera o relatório completo com base nos dados da fiscalização."""
 
@@ -167,10 +168,10 @@ def gerar_relatorio(
 
         # Primeira Página (Capa)
         logo_capa_path = os.path.join(BASE_DIR, "assets/logo_capa.jpeg")
-        gerar_capa_primeira_pagina(doc, logo_capa_path, row, report_config)
+        gerar_capa_primeira_pagina(doc, logo_capa_path, row, report_config, documento_anterior=documento_anterior)
 
         # Geração das Seções
-        gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df)
+        gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df, documento_anterior=documento_anterior)
         gerar_secao_quadros(doc, row, nc_df, report_config)
         gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR, report_config=report_config)
 

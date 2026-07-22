@@ -5,12 +5,12 @@ from utils import adicionar_titulo_secao, formatar_data_extenso, extrair_ano
 import os
 import pandas as pd
 
-def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_df=None):
+def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_df=None, documento_anterior=None):
     """Gera as seções de Introdução, Objetivo, Informações Gerais, Metodologia e Fiscalização."""
 
     # Delega para implementação própria quando o relatório tem estrutura diferente
     if hasattr(report_config, "gerar_secoes_monitoramento"):
-        report_config.gerar_secoes_monitoramento(doc, row, nc_df, total_achados)
+        report_config.gerar_secoes_monitoramento(doc, row, nc_df, total_achados, documento_anterior=documento_anterior)
         return
 
 
