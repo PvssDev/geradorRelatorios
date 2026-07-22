@@ -1,8 +1,8 @@
 # ADR 1: Escolha do Streamlit como Interface do Usuário e Aplicação Web
 
 * **Status:** Aceito
-* **Data:** 2026-07-22
-* **Autor:** Equipe de Desenvolvimento
+* **Data:** 2026-06-15
+* **Autor:** Pedro Vinicius - CTR
 
 ---
 
@@ -14,9 +14,9 @@ Para democratizar o uso do sistema por analistas e técnicos de regulação, sur
 
 ## 2. Decisão
 
-Decidimos utilizar o **Streamlit** (biblioteca de código aberto em Python) como a plataforma exclusiva para o desenvolvimento da interface e do fluxo de aplicação web, em detrimento de abordagens tradicionais baseadas em arquiteturas desacopladas (como React/Vue no frontend e FastAPI/Flask no backend).
+Decidimos utilizar o **Streamlit** (biblioteca de código aberto em Python) como a plataforma exclusiva para o desenvolvimento da interface e do fluxo de aplicação web, em detrimento de abordagens tradicionais baseadas em arquiteturas desacopladas.
 
-## 3. Análise Crítica (Prós e Contras)
+## 3. Prós e Contras
 
 ### Prós (Benefícios)
 
@@ -41,7 +41,7 @@ Decidimos utilizar o **Streamlit** (biblioteca de código aberto em Python) como
    A estilização padrão do Streamlit é rígida. Customizações avançadas exigem injeção manual de CSS através do parâmetro `unsafe_allow_html=True` no widget `st.markdown`, o que reduz a elegância e a manutenibilidade do design do frontend.
 
 3. **Restrição de Concorrência e Escalabilidade:**
-   Sendo baseado em um servidor Tornado single-threaded executado no ecossistema Python, o Streamlit não é projetado para alto tráfego concorrente (milhares de requisições simultâneas). No entanto, como o gerador é uma aplicação departamental para uso concorrente baixo, essa limitação é irrelevante para o escopo do projeto.
+   Sendo baseado em um servidor Tornado single-threaded executado no ecossistema Python, o Streamlit não é projetado para alto tráfego. No entanto, como o gerador é uma aplicação departamental para uso concorrente baixo, essa limitação é irrelevante para o escopo do projeto.
 
 ## 4. Consequências
 
