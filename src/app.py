@@ -17,6 +17,7 @@ if "categoria_relatorio" not in st.session_state:
     st.session_state.categoria_relatorio = "Fiscalização"
 
 is_monitoring = st.session_state.categoria_relatorio == "Monitoramento"
+is_crc_monitoring = (st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring)
 term_fisc = "Monitoramento" if is_monitoring else "Fiscalização"
 term_fisc_lower = "monitoramento" if is_monitoring else "fiscalização"
 term_fisc_plural = "Monitoramentos" if is_monitoring else "Fiscalizações"
@@ -394,6 +395,16 @@ with st.container():
         st.session_state.fill_photos = photos_to_sort
     else:
         st.session_state.fill_photos = []
+
+    # 1.1 Upload de Documentos Auxiliares
+    uploaded_mon_anterior = None
+    if is_monitoring:
+        uploaded_mon_anterior = st.file_uploader(
+            "Monitoramento Anterior",
+            type=["doc", "docx"],
+            help="Selecione o arquivo do monitoramento anterior (.doc, .docx)"
+        )
+        st.write("---")
 
     if "carousel_index" not in st.session_state:
         st.session_state.carousel_index = 0
@@ -1024,12 +1035,17 @@ with st.container():
                                 if st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento":
                                     tipo_key = f"{tipo_key}_MONITORAMENTO"
 
+                                if tipo_key == "CRC_MONITORAMENTO" and not uploaded_mon_anterior:
+                                    st.error("❌ Por favor, faça o upload do arquivo do monitoramento anterior (.docx) para gerar o relatório CRC Monitoramento.")
+                                    st.stop()
+
                                 arquivos_gerados, _ = gerar_relatorio(
                                     caminho_planilha=excel_buffer,
                                     fotos_dir=fotos_dir,
                                     relatorios_dir=reports_dir,
                                     gerar_todos=True,
-                                    tipo_relatorio=tipo_key
+                                    tipo_relatorio=tipo_key,
+                                    documento_anterior=uploaded_mon_anterior
                                 )
 
                                 if not arquivos_gerados:

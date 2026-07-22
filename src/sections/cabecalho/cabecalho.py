@@ -4,111 +4,114 @@ from docx.enum.section import WD_SECTION
 import os
 from utils import adicionar_texto_caixa_cinza
 
-def gerar_capa_primeira_pagina(doc, logo_path, row, report_config):
+def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_anterior=None):
     """
     Gera a primeira página do relatório (Capa) baseada no modelo de referência com dados dinâmicos.
     """
-    from docx.shared import Cm
-    from docx.shared import Inches
-    from database.manager import carregar_responsaveis
-    from utils import formatar_mes_ano, extrair_ano
-    
-    # 0. Ajuste de Estilo e Margens (Explicitas de 0.5 polegadas conforme a referência)
-    style = doc.styles['Normal']
-    style.font.name = 'Aptos'
-    
-    section = doc.sections[0]
-    section.page_width = Inches(8.27)
-    section.page_height = Inches(11.69)
-    section.top_margin = Inches(0.5)
-    section.bottom_margin = Inches(0.5)
-    section.left_margin = Inches(0.5)
-    section.right_margin = Inches(0.5)
+    if hasattr(report_config, "gerar_capa_monitoramento"):
+        report_config.gerar_capa_monitoramento(doc, logo_path, row, documento_anterior)
+    else:
+        from docx.shared import Cm
+        from docx.shared import Inches
+        from database.manager import carregar_responsaveis
+        from utils import formatar_mes_ano, extrair_ano
+        
+        # 0. Ajuste de Estilo e Margens (Explicitas de 0.5 polegadas conforme a referência)
+        style = doc.styles['Normal']
+        style.font.name = 'Aptos'
+        
+        section = doc.sections[0]
+        section.page_width = Inches(8.27)
+        section.page_height = Inches(11.69)
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
+        section.left_margin = Inches(0.5)
+        section.right_margin = Inches(0.5)
 
-    # 1. Texto Superior em Caixa Cinza (tabela 1x1 sem bordas)
-    ano = extrair_ano(row["Data"])
-    id_fisc = str(row.get("ID da Fiscalização", "")).strip()
-    ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc)
-    adicionar_texto_caixa_cinza(doc, ctr_text)
-    
-    # 1. Imagem da Capa
-    if os.path.exists(logo_path):
-        doc.add_picture(logo_path, width=Inches(4.0))
-        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # 1. Texto Superior em Caixa Cinza (tabela 1x1 sem bordas)
+        ano = extrair_ano(row["Data"])
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip()
+        ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc)
+        adicionar_texto_caixa_cinza(doc, ctr_text)
         
-    doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
-    
-    # 2. Títulos Principais
-    titulos = report_config.get_capa_titulos(row, ano)
+        # 1. Imagem da Capa
+        if os.path.exists(logo_path):
+            doc.add_picture(logo_path, width=Inches(4.0))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+        doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
         
-    for idx, titulo in enumerate(titulos):
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = p.add_run(titulo)
-        run.bold = True
-        # Espaçamento pós parágrafo nas duas primeiras linhas, e um espaçamento maior (24pt) na última
-        if idx < len(titulos) - 1:
-            p.paragraph_format.space_after = Pt(6)
-        else:
-            p.paragraph_format.space_after = Pt(12)
+        # 2. Títulos Principais
+        titulos = report_config.get_capa_titulos(row, ano)
+            
+        for idx, titulo in enumerate(titulos):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(titulo)
+            run.bold = True
+            # Espaçamento pós parágrafo nas duas primeiras linhas, e um espaçamento maior (24pt) na última
+            if idx < len(titulos) - 1:
+                p.paragraph_format.space_after = Pt(6)
+            else:
+                p.paragraph_format.space_after = Pt(12)
 
-    
-    # 3. Lista de Analistas Dinâmica
-    responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
-    db_resp = carregar_responsaveis()
-    
-    analistas = []
-    for nome in responsaveis_list:
-        match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
-        if match:
-            funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
-            analistas.append((match["nome"], f"{funcao}, matrícula nº {match['matricula']}"))
-        else:
-            funcao = report_config.analyst_title if report_config.key == "SOCICAM" else "Analista de Regulação"
-            analistas.append((nome, f"{funcao}, matrícula nº xxxxxxx/xx"))
-    
-    for i, (nome, cargo) in enumerate(analistas):
-        # Nome em negrito
-        p_nome = doc.add_paragraph()
-        p_nome.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_nome = p_nome.add_run(nome)
-        run_nome.bold = True
-        run_nome.font.size = Pt(12)
         
-        p_nome.paragraph_format.space_after = Pt(0)
+        # 3. Lista de Analistas Dinâmica
+        responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+        db_resp = carregar_responsaveis()
         
-        # Cargo normal
-        p_cargo = doc.add_paragraph()
-        p_cargo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_cargo = p_cargo.add_run(cargo)
-        run_cargo.font.size = Pt(12)
+        analistas = []
+        for nome in responsaveis_list:
+            match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
+            if match:
+                funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
+                analistas.append((match["nome"], f"{funcao}, matrícula nº {match['matricula']}"))
+            else:
+                funcao = report_config.analyst_title if report_config.key == "SOCICAM" else "Analista de Regulação"
+                analistas.append((nome, f"{funcao}, matrícula nº xxxxxxx/xx"))
         
-        if i == len(analistas) - 1:
-            p_cargo.paragraph_format.space_after = Pt(12)  # Espaço após o parágrafo do último
-        else:
-            p_cargo.paragraph_format.space_after = Pt(12)  # Espaço abaixo de cada analista
-    
-    # 4. Data Dinâmica
-    p_data = doc.add_paragraph()
-    p_data.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    data_extenso = formatar_mes_ano(row["Data"])
-    run_data = p_data.add_run(data_extenso)
-    run_data.bold = True
-    run_data.font.size = Pt(12)
-    # Espaçamento superior e inferior para isolar a data nativamente
-    p_data.paragraph_format.space_before = Pt(12)
-    p_data.paragraph_format.space_after = Pt(12)
-    
-    # 5. Processo e SEI Dinâmicos
-    rodape_textos = report_config.get_process_sei_texts(ano)
+        for i, (nome, cargo) in enumerate(analistas):
+            # Nome em negrito
+            p_nome = doc.add_paragraph()
+            p_nome.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_nome = p_nome.add_run(nome)
+            run_nome.bold = True
+            run_nome.font.size = Pt(12)
+            
+            p_nome.paragraph_format.space_after = Pt(0)
+            
+            # Cargo normal
+            p_cargo = doc.add_paragraph()
+            p_cargo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_cargo = p_cargo.add_run(cargo)
+            run_cargo.font.size = Pt(12)
+            
+            if i == len(analistas) - 1:
+                p_cargo.paragraph_format.space_after = Pt(12)  # Espaço após o parágrafo do último
+            else:
+                p_cargo.paragraph_format.space_after = Pt(12)  # Espaço abaixo de cada analista
         
-    for idx, texto in enumerate(rodape_textos):
-        p_rodape = doc.add_paragraph()
-        p_rodape.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_rodape = p_rodape.add_run(texto)
-        run_rodape.bold = True
-        run_rodape.font.size = Pt(12)
-        p_rodape.paragraph_format.space_after = Pt(0)
+        # 4. Data Dinâmica
+        p_data = doc.add_paragraph()
+        p_data.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        data_extenso = formatar_mes_ano(row["Data"])
+        run_data = p_data.add_run(data_extenso)
+        run_data.bold = True
+        run_data.font.size = Pt(12)
+        # Espaçamento superior e inferior para isolar a data nativamente
+        p_data.paragraph_format.space_before = Pt(12)
+        p_data.paragraph_format.space_after = Pt(12)
+        
+        # 5. Processo e SEI Dinâmicos
+        rodape_textos = report_config.get_process_sei_texts(ano)
+            
+        for idx, texto in enumerate(rodape_textos):
+            p_rodape = doc.add_paragraph()
+            p_rodape.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_rodape = p_rodape.add_run(texto)
+            run_rodape.bold = True
+            run_rodape.font.size = Pt(12)
+            p_rodape.paragraph_format.space_after = Pt(0)
     
     # 6. Geração de Sumário e Lista de Abreviaturas com ordem condicional
     has_abbr = bool(report_config.get_abbreviations())
