@@ -120,6 +120,8 @@ def gerar_relatorio(
         "Não conformidade": "Não Conformidade",
         "Observações": "Legenda da Foto"
     }, inplace=True)
+    if not nc_df.empty and "Situação" not in nc_df.columns:
+        nc_df["Situação"] = "Pendente"
     obs_df = _carregar_e_normalizar_df(excel_file, abas["observacoes"])
     rec_df = _carregar_e_normalizar_df(excel_file, abas["recomendacoes"])
 
