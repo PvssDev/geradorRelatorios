@@ -41,9 +41,132 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
     if "Trecho" not in df_fotos.columns:
         df_fotos = df_fotos.copy()
         df_fotos["Trecho"] = ""
+    if "Foto Anterior" not in df_fotos.columns:
+        df_fotos = df_fotos.copy()
+        df_fotos["Foto Anterior"] = ""
+    if "Legenda Anterior" not in df_fotos.columns:
+        df_fotos = df_fotos.copy()
+        df_fotos["Legenda Anterior"] = ""
         
     records = df_fotos.to_dict('records')
     
+    if "MONITORAMENTO" in tipo_relatorio.upper():
+        import os
+        from docx.shared import Inches, Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        
+        # Agrupa por Pista mantendo a ordem de inserção
+        pistas_unicas = []
+        for p in df_fotos["Pista"].tolist():
+            p_str = str(p).strip() if not pd.isna(p) else ""
+            if not p_str:
+                p_str = "Única"
+            if p_str not in pistas_unicas:
+                pistas_unicas.append(p_str)
+                
+        for idx_pista, pista_val in enumerate(pistas_unicas):
+            # Filtra os itens desta pista
+            mask = df_fotos["Pista"].apply(lambda x: (str(x).strip() if not pd.isna(x) else "") == (pista_val if pista_val != "Única" else ""))
+            df_pista = df_fotos[mask].copy()
+            if df_pista.empty:
+                continue
+                
+            records_pista = df_pista.to_dict('records')
+            for idx, rec in enumerate(records_pista):
+                # Título da NC (ex: NC_01_SH04 - KM 2 + 300 - Afundamento...)
+                p_nc_desc = doc.add_paragraph()
+                p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_nc_desc.paragraph_format.space_before = Pt(12)
+                p_nc_desc.paragraph_format.space_after = Pt(6)
+                p_nc_desc.paragraph_format.line_spacing = 1.15
+                
+                ident = str(rec.get("Identificação", "")).strip()
+                desc_nc = str(rec.get("Não Conformidade", "")).strip()
+                
+                run_nc_desc = p_nc_desc.add_run(f"{ident} – {desc_nc}")
+                run_nc_desc.bold = True
+                run_nc_desc.font.name = 'Aptos'
+                run_nc_desc.font.size = Pt(11)
+                
+                # Criar tabela de 2 colunas e 2 linhas
+                table = doc.add_table(rows=2, cols=2)
+                table.style = 'Table Grid'
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                table.autofit = False
+                table.allow_autofit = False
+                
+                table.columns[0].width = Inches(3.635)
+                table.columns[1].width = Inches(3.635)
+                table.rows[0].cells[0].width = Inches(3.635)
+                table.rows[0].cells[1].width = Inches(3.635)
+                table.rows[1].cells[0].width = Inches(3.635)
+                table.rows[1].cells[1].width = Inches(3.635)
+                
+                # Foto Esquerda (Anterior)
+                p_img_left = table.rows[0].cells[0].paragraphs[0]
+                p_img_left.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_img_left.paragraph_format.left_indent = Inches(0)
+                p_img_left.paragraph_format.first_line_indent = Inches(0)
+                p_img_left.paragraph_format.space_before = Pt(4)
+                p_img_left.paragraph_format.space_after = Pt(4)
+                
+                foto_ant = rec.get("Foto Anterior", "")
+                if foto_ant and os.path.exists(str(foto_ant)):
+                    run_img_left = p_img_left.add_run()
+                    run_img_left.add_picture(str(foto_ant), width=Inches(2.708), height=Inches(2.708))
+                
+                # Foto Direita (Nova)
+                p_img_right = table.rows[0].cells[1].paragraphs[0]
+                p_img_right.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_img_right.paragraph_format.left_indent = Inches(0)
+                p_img_right.paragraph_format.first_line_indent = Inches(0)
+                p_img_right.paragraph_format.space_before = Pt(4)
+                p_img_right.paragraph_format.space_after = Pt(4)
+                
+                foto_new = rec.get("Foto", "")
+                foto_path_right = os.path.join(fotos_dir, foto_new) if fotos_dir and foto_new else ""
+                if foto_path_right and os.path.exists(foto_path_right):
+                    run_img_right = p_img_right.add_run()
+                    run_img_right.add_picture(foto_path_right, width=Inches(2.708), height=Inches(2.708))
+                    
+                # Legenda Esquerda
+                p_caption_left = table.rows[1].cells[0].paragraphs[0]
+                p_caption_left.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_caption_left.paragraph_format.left_indent = Inches(0)
+                p_caption_left.paragraph_format.first_line_indent = Inches(0)
+                p_caption_left.paragraph_format.space_before = Pt(4)
+                p_caption_left.paragraph_format.space_after = Pt(4)
+                
+                num_left = str(2 * idx + 1).zfill(2)
+                legenda_ant = str(rec.get("Legenda Anterior", "")).strip()
+                if legenda_ant:
+                    if not legenda_ant.lower().startswith("foto"):
+                        legenda_ant = f"Foto {num_left} – {legenda_ant}"
+                    run_caption_left = p_caption_left.add_run(legenda_ant)
+                    run_caption_left.font.name = 'Aptos'
+                    run_caption_left.font.size = Pt(10)
+                
+                # Legenda Direita
+                p_caption_right = table.rows[1].cells[1].paragraphs[0]
+                p_caption_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_caption_right.paragraph_format.left_indent = Inches(0)
+                p_caption_right.paragraph_format.first_line_indent = Inches(0)
+                p_caption_right.paragraph_format.space_before = Pt(4)
+                p_caption_right.paragraph_format.space_after = Pt(4)
+                
+                num_right = str(2 * idx + 2).zfill(2)
+                obs_text = str(rec.get("Observações", rec.get("Legenda da Foto", ""))).strip()
+                caption_right_text = f"Foto {num_right} – {obs_text}"
+                if not caption_right_text.endswith("."):
+                    caption_right_text += "."
+                run_caption_right = p_caption_right.add_run(caption_right_text)
+                run_caption_right.font.name = 'Aptos'
+                run_caption_right.font.size = Pt(10)
+                
+                doc.add_paragraph() # Espaço entre tabelas
+        return
+
     if tipo_relatorio in ["CRC", "SOCICAM"]:
         # No CRC/SOCICAM cada foto é uma tabela de 1 coluna
         for idx, rec in enumerate(records):
