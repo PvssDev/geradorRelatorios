@@ -82,9 +82,18 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_nc_desc.paragraph_format.line_spacing = 1.15
                 
                 ident = str(rec.get("Identificação", "")).strip()
+                trecho_val = str(rec.get("Trecho", "")).strip()
                 desc_nc = str(rec.get("Não Conformidade", "")).strip()
                 
-                run_nc_desc = p_nc_desc.add_run(f"{ident} – {desc_nc}")
+                parts = []
+                if ident:
+                    parts.append(ident)
+                if trecho_val:
+                    parts.append(trecho_val)
+                if desc_nc:
+                    parts.append(desc_nc)
+                
+                run_nc_desc = p_nc_desc.add_run(" – ".join(parts))
                 run_nc_desc.bold = True
                 run_nc_desc.font.name = 'Aptos'
                 run_nc_desc.font.size = Pt(11)
