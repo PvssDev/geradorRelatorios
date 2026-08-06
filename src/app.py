@@ -597,6 +597,10 @@ with st.container():
     st.divider()
     st.subheader("🚩 Registros")
     
+    id_vinculo = "Nenhum ID cadastrado"
+    nc_num = 1
+    terminal_nc = ""
+    
     # Preparar fotos antigas de monitoramento (filtrando as que já foram comparadas)
     if is_monitoring and st.session_state.old_photos_to_match:
         fotos_comparadas = {nc["Foto Anterior"] for nc in st.session_state.temp_nc if nc.get("Foto Anterior")}
@@ -681,6 +685,53 @@ with st.container():
                                 key=selected_key
                             )
                             foto_default = sel_name
+                            
+                            if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
+                                if st.button("💾 Salvar Comparação de Foto", type="primary", use_container_width=True, key=f"btn_save_foto_{idx}_{st.session_state.nc_form_counter}"):
+                                    # 1. Tentar encontrar registro com a mesma foto anterior
+                                    rec = next((r for r in st.session_state.temp_nc 
+                                                if r["Identificação"] == current_item["id_nc"] 
+                                                and r["Foto Anterior"] == current_item["old_photo_path"] 
+                                                and r["ID da Fiscalização"] == id_vinculo), None)
+                                    
+                                    # 2. Se não encontrou, tentar encontrar um registro com foto anterior vazia (criado pelo Relatório de Texto)
+                                    if not rec:
+                                        rec = next((r for r in st.session_state.temp_nc 
+                                                    if r["Identificação"] == current_item["id_nc"] 
+                                                    and not r.get("Foto Anterior") 
+                                                    and r["ID da Fiscalização"] == id_vinculo), None)
+                                    
+                                    # 3. Se ainda assim não encontrou, cria um novo registro herdando textos existentes
+                                    if not rec:
+                                        same_nc_rec = next((r for r in st.session_state.temp_nc 
+                                                            if r["Identificação"] == current_item["id_nc"] 
+                                                            and r["ID da Fiscalização"] == id_vinculo), None)
+                                        
+                                        rec = {
+                                            "ID da Fiscalização": id_vinculo,
+                                            "Nº": nc_num,
+                                            "Terminal": terminal_nc,
+                                            "Pista": current_item["pista"],
+                                            "Trecho": current_item["trecho"],
+                                            "Não Conformidade": current_item["constatacao"],
+                                            "Ponto de Atenção": "",
+                                            "Identificação": current_item["id_nc"],
+                                            "Direção (faixa)": "",
+                                            "Fundamento da infração": "",
+                                            "Situação": "Pendente",
+                                            "Determinação": same_nc_rec["Determinação"] if same_nc_rec else "",
+                                            "Observações": same_nc_rec["Observações"] if same_nc_rec else current_item["constatacao"],
+                                            "Análise ARPE": same_nc_rec["Análise ARPE"] if same_nc_rec else ""
+                                        }
+                                        st.session_state.temp_nc.append(rec)
+                                        
+                                    rec["Foto"] = foto_default
+                                    rec["Foto Anterior"] = current_item["old_photo_path"]
+                                    rec["Legenda Anterior"] = current_item["old_legend"]
+                                    
+                                    st.session_state.nc_form_counter += 1
+                                    st.success("Comparação de foto salva com sucesso!")
+                                    st.rerun()
                         else:
                             st.info("💡 Faça o upload de novas fotos para selecioná-las.")
                             foto_default = ""
@@ -854,6 +905,9 @@ with st.container():
             if is_monitoring and not current_item:
                 # Se for monitoramento e já comparou tudo, não exibe os botões de ação
                 pass
+            elif is_monitoring and st.session_state.get("tipo_relatorio", "CRA") == "CRC":
+                # Para CRC Monitoramento, o preenchimento ocorre na seção Relatório abaixo
+                pass
             else:
                 # Definir largura das colunas baseadas no tipo de relatório (sem col_rel para monitoramento)
                 if is_monitoring:
@@ -982,6 +1036,112 @@ with st.container():
                     st.success(f"Adicionado com sucesso ao ID {st.session_state.step1_id_vinculo}!")
                     st.rerun()
 
+    # Seção Relatório exclusiva para CRC Monitoramento (à parte da comparação de fotos)
+    if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
+        if st.session_state.old_photos_to_match:
+            st.divider()
+            
+            # Buscar quais IDs de NC já têm texto de relatório salvo (Determinação ou Análise ARPE preenchidas)
+            textos_preenchidos = {
+                nc["Identificação"] for nc in st.session_state.temp_nc
+                if nc.get("Identificação") and (str(nc.get("Determinação", "")).strip() or str(nc.get("Análise ARPE", "")).strip())
+            }
+            
+            # Filtrar NCs únicas não preenchidas (removendo numeração (1), (2) e duplicatas de pavimento no Relatório)
+            available_nc_items = []
+            seen_base_labels = set()
+            for item in st.session_state.old_photos_to_match:
+                base_label = f"{item['id_nc']} - {item['trecho']}"
+                if item["id_nc"] not in textos_preenchidos and base_label not in seen_base_labels:
+                    available_nc_items.append(item)
+                    seen_base_labels.add(base_label)
+            
+            if available_nc_items:
+                all_ncs = [f"{item['id_nc']} - {item['trecho']}" for item in available_nc_items]
+                selected_rep_label = st.selectbox(
+                    "Selecione o Pavimento/NC para editar o Relatório",
+                    all_ncs,
+                    key=f"sel_rep_nc_{st.session_state.nc_form_counter}"
+                )
+                
+                rep_item = next(
+                    item for item in available_nc_items
+                    if f"{item['id_nc']} - {item['trecho']}" == selected_rep_label
+                )
+                
+                st.markdown(f"#### Relatório - {rep_item['id_nc']} ({rep_item['trecho']})")
+                
+                # Buscar se já existe valor salvo na base temporária de NCs
+                saved_rec = next(
+                    (r for r in st.session_state.temp_nc
+                     if r["Identificação"] == rep_item["id_nc"] and r["ID da Fiscalização"] == id_vinculo),
+                    None
+                )
+                
+                default_pos_crc = saved_rec.get("Determinação", "") if saved_rec else ""
+                default_constatacao = saved_rec.get("Observações", rep_item["constatacao"]) if saved_rec else rep_item["constatacao"]
+                default_analise_arpe = saved_rec.get("Análise ARPE", "") if saved_rec else ""
+                
+                pos_crc = st.text_area(
+                    "POSICIONAMENTO CRC",
+                    value=default_pos_crc,
+                    key=f"pos_crc_rep_{rep_item['id_nc']}_{st.session_state.nc_form_counter}",
+                    placeholder="Digite o posicionamento da CRC..."
+                )
+                constatacao = st.text_area(
+                    "CONSTATAÇÃO",
+                    value=default_constatacao,
+                    key=f"constatacao_rep_{rep_item['id_nc']}_{st.session_state.nc_form_counter}",
+                    placeholder="Digite a constatação..."
+                )
+                analise_arpe = st.text_area(
+                    "ANÁLISE ARPE",
+                    value=default_analise_arpe,
+                    key=f"analise_arpe_rep_{rep_item['id_nc']}_{st.session_state.nc_form_counter}",
+                    placeholder="Digite a análise da ARPE..."
+                )
+                
+                col_save_text, _ = st.columns([2.5, 7.5])
+                with col_save_text:
+                    if st.button("💾 Salvar Relatório de Texto", type="primary", use_container_width=True, key=f"btn_save_text_rep_{st.session_state.nc_form_counter}"):
+                        # Buscar e atualizar todos os registros com esta Identificação
+                        recs = [r for r in st.session_state.temp_nc 
+                                if r["Identificação"] == rep_item["id_nc"] and r["ID da Fiscalização"] == id_vinculo]
+                        
+                        if recs:
+                            for rec in recs:
+                                rec["Determinação"] = pos_crc
+                                rec["Observações"] = constatacao
+                                rec["Análise ARPE"] = analise_arpe
+                        else:
+                            # Se não existe, cria um novo
+                            rec = {
+                                "ID da Fiscalização": id_vinculo,
+                                "Nº": nc_num,
+                                "Terminal": terminal_nc,
+                                "Pista": rep_item["pista"],
+                                "Trecho": rep_item["trecho"],
+                                "Não Conformidade": rep_item["constatacao"],
+                                "Ponto de Atenção": "",
+                                "Identificação": rep_item["id_nc"],
+                                "Direção (faixa)": "",
+                                "Fundamento da infração": "",
+                                "Situação": "Pendente",
+                                "Foto": "",
+                                "Foto Anterior": "",
+                                "Legenda Anterior": "",
+                                "Determinação": pos_crc,
+                                "Observações": constatacao,
+                                "Análise ARPE": analise_arpe
+                            }
+                            st.session_state.temp_nc.append(rec)
+                            
+                        st.session_state.nc_form_counter += 1
+                        st.success("Relatório de texto salvo com sucesso!")
+                        st.rerun()
+            else:
+                st.success("🎉 Todos os relatórios de texto das Não Conformidades foram preenchidos!")
+
     st.divider()
     if st.session_state.temp_fiscalizacoes:
         with st.expander("📋 Resumo do Preenchimento", expanded=False):
@@ -1057,7 +1217,7 @@ with st.container():
                     
                     # Garante ordenação exata das colunas
                     cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Não Conformidade', 'Identificação', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
-                    for c in ['Situação', 'Foto', 'Fotos', 'Observações', 'Legenda da Foto']:
+                    for c in ['Situação', 'Foto', 'Fotos', 'Observações', 'Legenda da Foto', 'Análise ARPE']:
                         if c in df_nc_only.columns:
                             cols_order.append(c)
                     cols_order = [c for c in cols_order if c in df_nc_only.columns]
@@ -1143,28 +1303,53 @@ with st.container():
                 confirmar_exclusao_nc_modal(ncs_totais_para_excluir)
                 
             st.write("") # Espaçamento
-        st.divider()
-        st.subheader("🛠️ Painel de Ações do Relatório")
+    st.divider()
+    st.subheader("🛠️ Painel de Ações do Relatório")
+    
+    # Organização dos botões finais em 3 colunas
+    col_relatorio, col_planilha, col_limpar = st.columns(3)
+    
+    # Inicializar estado para persistir os relatórios gerados via aba preenchimento
+    if "relatorios_preenchimento_data" not in st.session_state:
+        st.session_state.relatorios_preenchimento_data = []
         
-        # Organização dos botões finais em 3 colunas
-        col_relatorio, col_planilha, col_limpar = st.columns(3)
-        
-        # Inicializar estado para persistir os relatórios gerados via aba preenchimento
-        if "relatorios_preenchimento_data" not in st.session_state:
-            st.session_state.relatorios_preenchimento_data = []
-            
-        with col_relatorio:
-            if st.button("🚀 Gerar Relatório Automático", type="primary", use_container_width=True, key="btn_run_report_main"):
-                if not st.session_state.temp_fiscalizacoes:
-                    st.error(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
-                else:
-                    with st.spinner("Gerando relatórios automaticamente..."):
-                        st.session_state.relatorios_preenchimento_data = []
-                        flat_fiscalizacoes = []
-                        for fisc in st.session_state.temp_fiscalizacoes:
-                            id_fisc = fisc["ID da Fiscalização"]
-                            ncs = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_fisc]
-                            if not ncs:
+    with col_relatorio:
+        if st.button("🚀 Gerar Relatório Automático", type="primary", use_container_width=True, key="btn_run_report_main"):
+            if not st.session_state.temp_fiscalizacoes:
+                st.error(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
+            else:
+                with st.spinner("Gerando relatórios automaticamente..."):
+                    st.session_state.relatorios_preenchimento_data = []
+                    flat_fiscalizacoes = []
+                    for fisc in st.session_state.temp_fiscalizacoes:
+                        id_fisc = fisc["ID da Fiscalização"]
+                        ncs = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_fisc]
+                        if not ncs:
+                            flat_fiscalizacoes.append({
+                                "ID da Fiscalização": fisc["ID da Fiscalização"],
+                                "Data": fisc["Data"],
+                                "Hora": fisc["Hora"],
+                                "Cidade": fisc["Cidade"],
+                                "Local": fisc["Local"],
+                                "Pessoal Responsável": fisc["Pessoal Responsável"],
+                                "Coordenador": fisc["Coordenador"],
+                                "Contrato": fisc["Contrato"],
+                                "Período": fisc["Período"],
+                                "Observações": "",
+                                "Fotos": "",
+                                "Não conformidade": "",
+                                "Ponto de Atenção": "",
+                                "Pista": "",
+                                "Trecho": "",
+                                "Identificação": "",
+                                "Direção (faixa)": "",
+                                "Fundamento da infração": "",
+                                "Determinação": "",
+                                "Situação": "",
+                                "Relatório Gerado": fisc["Relatório Gerado"]
+                            })
+                        else:
+                            for nc in ncs:
                                 flat_fiscalizacoes.append({
                                     "ID da Fiscalização": fisc["ID da Fiscalização"],
                                     "Data": fisc["Data"],
@@ -1175,102 +1360,81 @@ with st.container():
                                     "Coordenador": fisc["Coordenador"],
                                     "Contrato": fisc["Contrato"],
                                     "Período": fisc["Período"],
-                                    "Observações": "",
-                                    "Fotos": "",
-                                    "Não conformidade": "",
-                                    "Ponto de Atenção": "",
-                                    "Pista": "",
-                                    "Trecho": "",
-                                    "Identificação": "",
-                                    "Direção (faixa)": "",
-                                    "Fundamento da infração": "",
-                                    "Determinação": "",
-                                    "Situação": "",
+                                    "Observações": nc.get("Observações", nc.get("Legenda da Foto", "")),
+                                    "Fotos": nc.get("Foto", nc.get("Fotos", "")),
+                                    "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
+                                    "Ponto de Atenção": nc.get("Ponto de Atenção", ""),
+                                    "Pista": nc.get("Pista", ""),
+                                    "Trecho": nc.get("Trecho", ""),
+                                    "Identificação": nc.get("Identificação", ""),
+                                    "Direção (faixa)": nc.get("Direção (faixa)", ""),
+                                    "Fundamento da infração": nc.get("Fundamento da infração", ""),
+                                    "Determinação": nc.get("Determinação", ""),
+                                    "Situação": nc.get("Situação", "Pendente"),
                                     "Relatório Gerado": fisc["Relatório Gerado"]
                                 })
+
+                    excel_buffer = io.BytesIO()
+                    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                        pd.DataFrame(flat_fiscalizacoes).to_excel(writer, sheet_name="Fiscalizações", index=False)
+                        pd.DataFrame(st.session_state.temp_nc).to_excel(writer, sheet_name="Não-conformidades ", index=False)
+                        pd.DataFrame().to_excel(writer, sheet_name="Observações Importantes", index=False)
+                        pd.DataFrame().to_excel(writer, sheet_name="Recomendações", index=False)
+                    excel_buffer.seek(0)
+
+                    # 2. Criar diretório temporário para as fotos já enviadas
+                    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+                        fotos_dir = os.path.join(temp_dir, "fotos")
+                        reports_dir = os.path.join(temp_dir, "reports")
+                        os.makedirs(fotos_dir, exist_ok=True)
+                        os.makedirs(reports_dir, exist_ok=True)
+
+                        if "fill_photos" in st.session_state and st.session_state.fill_photos:
+                            for photo in st.session_state.fill_photos:
+                                with open(os.path.join(fotos_dir, photo.name), "wb") as f:
+                                    f.write(photo.getbuffer())
+
+                        try:
+                            tipo_key = st.session_state.get("tipo_relatorio", "CRA")
+                            if st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento":
+                                tipo_key = f"{tipo_key}_MONITORAMENTO"
+
+                            if tipo_key == "CRC_MONITORAMENTO" and not uploaded_mon_anterior:
+                                st.error("❌ Por favor, faça o upload do arquivo do monitoramento anterior (.docx) para gerar o relatório CRC Monitoramento.")
+                                st.stop()
+
+                            arquivos_gerados, _ = gerar_relatorio(
+                                caminho_planilha=excel_buffer,
+                                fotos_dir=fotos_dir,
+                                relatorios_dir=reports_dir,
+                                gerar_todos=True,
+                                tipo_relatorio=tipo_key,
+                                documento_anterior=uploaded_mon_anterior
+                            )
+
+                            if not arquivos_gerados:
+                                st.warning("Nenhum relatório gerado.")
                             else:
-                                for nc in ncs:
-                                    flat_fiscalizacoes.append({
-                                        "ID da Fiscalização": fisc["ID da Fiscalização"],
-                                        "Data": fisc["Data"],
-                                        "Hora": fisc["Hora"],
-                                        "Cidade": fisc["Cidade"],
-                                        "Local": fisc["Local"],
-                                        "Pessoal Responsável": fisc["Pessoal Responsável"],
-                                        "Coordenador": fisc["Coordenador"],
-                                        "Contrato": fisc["Contrato"],
-                                        "Período": fisc["Período"],
-                                        "Observações": nc.get("Observações", nc.get("Legenda da Foto", "")),
-                                        "Fotos": nc.get("Foto", nc.get("Fotos", "")),
-                                        "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
-                                        "Ponto de Atenção": nc.get("Ponto de Atenção", ""),
-                                        "Pista": nc.get("Pista", ""),
-                                        "Trecho": nc.get("Trecho", ""),
-                                        "Identificação": nc.get("Identificação", ""),
-                                        "Direção (faixa)": nc.get("Direção (faixa)", ""),
-                                        "Fundamento da infração": nc.get("Fundamento da infração", ""),
-                                        "Determinação": nc.get("Determinação", ""),
-                                        "Situação": nc.get("Situação", "Pendente"),
-                                        "Relatório Gerado": fisc["Relatório Gerado"]
-                                    })
-
-                        excel_buffer = io.BytesIO()
-                        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-                            pd.DataFrame(flat_fiscalizacoes).to_excel(writer, sheet_name="Fiscalizações", index=False)
-                            pd.DataFrame(st.session_state.temp_nc).to_excel(writer, sheet_name="Não-conformidades ", index=False)
-                            pd.DataFrame().to_excel(writer, sheet_name="Observações Importantes", index=False)
-                            pd.DataFrame().to_excel(writer, sheet_name="Recomendações", index=False)
-                        excel_buffer.seek(0)
-
-                        # 2. Criar diretório temporário para as fotos já enviadas
-                        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
-                            fotos_dir = os.path.join(temp_dir, "fotos")
-                            reports_dir = os.path.join(temp_dir, "reports")
-                            os.makedirs(fotos_dir, exist_ok=True)
-                            os.makedirs(reports_dir, exist_ok=True)
-
-                            if "fill_photos" in st.session_state and st.session_state.fill_photos:
-                                for photo in st.session_state.fill_photos:
-                                    with open(os.path.join(fotos_dir, photo.name), "wb") as f:
-                                        f.write(photo.getbuffer())
-
-                            try:
-                                tipo_key = st.session_state.get("tipo_relatorio", "CRA")
-                                if st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento":
-                                    tipo_key = f"{tipo_key}_MONITORAMENTO"
-
-                                if tipo_key == "CRC_MONITORAMENTO" and not uploaded_mon_anterior:
-                                    st.error("❌ Por favor, faça o upload do arquivo do monitoramento anterior (.docx) para gerar o relatório CRC Monitoramento.")
-                                    st.stop()
-
-                                arquivos_gerados, _ = gerar_relatorio(
-                                    caminho_planilha=excel_buffer,
-                                    fotos_dir=fotos_dir,
-                                    relatorios_dir=reports_dir,
-                                    gerar_todos=True,
-                                    tipo_relatorio=tipo_key,
-                                    documento_anterior=uploaded_mon_anterior
-                                )
-
-                                if not arquivos_gerados:
-                                    st.warning("Nenhum relatório gerado.")
-                                else:
-                                    for arquivo in arquivos_gerados:
-                                        nome_base = os.path.basename(arquivo)
-                                        with open(arquivo, "rb") as f:
-                                            st.session_state.relatorios_preenchimento_data.append({
-                                                "nome": nome_base,
-                                                "bytes": f.read()
-                                            })
-                                    st.success(f"✅ {len(arquivos_gerados)} relatório(s) gerado(s) com sucesso!")
-                            except Exception as e:
-                                st.error(f"❌ Erro ao gerar relatórios: {e}")
-                                st.exception(e)
-                            finally:
-                                import gc
-                                gc.collect()
-        with col_planilha:
-            if st.button("💾 Gerar Planilha Completa", use_container_width=True, key="btn_generate_spreadsheet"):
+                                for arquivo in arquivos_gerados:
+                                    nome_base = os.path.basename(arquivo)
+                                    with open(arquivo, "rb") as f:
+                                        st.session_state.relatorios_preenchimento_data.append({
+                                            "nome": nome_base,
+                                            "bytes": f.read()
+                                        })
+                                st.success(f"✅ {len(arquivos_gerados)} relatório(s) gerado(s) com sucesso!")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao gerar relatórios: {e}")
+                            st.exception(e)
+                        finally:
+                            import gc
+                            gc.collect()
+                            
+    with col_planilha:
+        if st.button("💾 Gerar Planilha Completa", use_container_width=True, key="btn_generate_spreadsheet"):
+            if not st.session_state.temp_fiscalizacoes:
+                st.error(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
+            else:
                 flat_fiscalizacoes = []
                 for fisc in st.session_state.temp_fiscalizacoes:
                     id_fisc = fisc["ID da Fiscalização"]
@@ -1335,42 +1499,42 @@ with st.container():
                 st.session_state.planilha_download_bytes = output.getvalue()
                 st.success("Planilha gerada!")
                 
-            if "planilha_download_bytes" in st.session_state and st.session_state.planilha_download_bytes:
-                st.write("") # Pequeno espaçamento
-                st.download_button(
-                    label="📥 Baixar Planilha",
-                    data=st.session_state.planilha_download_bytes,
-                    file_name=f"planilha_gerada_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                    key="dl_btn_planilha"
-                )
-                
-        with col_limpar:
-            if st.button("🗑️ Limpar Todos os Dados", type="secondary", use_container_width=True, key="btn_clear_all_data"):
-                st.session_state.temp_fiscalizacoes = []
-                st.session_state.temp_nc = []
-                st.session_state.relatorios_preenchimento_data = []
-                if "planilha_download_bytes" in st.session_state:
-                    del st.session_state.planilha_download_bytes
-                st.rerun()
-
-        # Exibir botões de download dos relatórios se gerados
-        if st.session_state.relatorios_preenchimento_data:
-            st.write("") # Espaçamento
-            st.markdown("---")
-            st.write("### 📥 Baixar Relatórios Gerados")
-            docx_files = [x for x in st.session_state.relatorios_preenchimento_data if x["nome"].endswith(".docx")]
+        if "planilha_download_bytes" in st.session_state and st.session_state.planilha_download_bytes:
+            st.write("") # Pequeno espaçamento
+            st.download_button(
+                label="📥 Baixar Planilha",
+                data=st.session_state.planilha_download_bytes,
+                file_name=f"planilha_gerada_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="dl_btn_planilha"
+            )
             
-            st.write("**Documentos Word (.docx):**")
-            for i, item in enumerate(docx_files):
-                st.download_button(
-                    label=f"Baixar {item['nome']}",
-                    data=item["bytes"],
-                    file_name=item["nome"],
-                    key=f"dl_fill_docx_{i}_{item['nome']}",
-                    use_container_width=True
-                )
+    with col_limpar:
+        if st.button("🗑️ Limpar Todos os Dados", type="secondary", use_container_width=True, key="btn_clear_all_data"):
+            st.session_state.temp_fiscalizacoes = []
+            st.session_state.temp_nc = []
+            st.session_state.relatorios_preenchimento_data = []
+            if "planilha_download_bytes" in st.session_state:
+                del st.session_state.planilha_download_bytes
+            st.rerun()
+
+    # Exibir botões de download dos relatórios se gerados
+    if st.session_state.relatorios_preenchimento_data:
+        st.write("") # Espaçamento
+        st.markdown("---")
+        st.write("### 📥 Baixar Relatórios Gerados")
+        docx_files = [x for x in st.session_state.relatorios_preenchimento_data if x["nome"].endswith(".docx")]
+        
+        st.write("**Documentos Word (.docx):**")
+        for i, item in enumerate(docx_files):
+            st.download_button(
+                label=f"Baixar {item['nome']}",
+                data=item["bytes"],
+                file_name=item["nome"],
+                key=f"dl_fill_docx_{i}_{item['nome']}",
+                use_container_width=True
+            )
 
 st.divider()
 st.info("Nota: Use a aba 'Preencher Planilha' para montar seus dados e depois a aba 'Gerador' para processar os documentos.")

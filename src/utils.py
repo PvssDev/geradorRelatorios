@@ -1,5 +1,5 @@
 from docx.shared import Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from openpyxl import load_workbook
 import os
 from docx.oxml import OxmlElement

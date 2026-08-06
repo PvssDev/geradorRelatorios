@@ -1,6 +1,8 @@
 __pycache__/
-reports
-assets
+/reports/
+/assets/
+dist/reports/
+dist/assets/
 venv/
 .cursor/
 .agents/

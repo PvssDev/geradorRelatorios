@@ -11,7 +11,6 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
     if hasattr(report_config, "gerar_capa_monitoramento"):
         report_config.gerar_capa_monitoramento(doc, logo_path, row, documento_anterior)
     else:
-        from docx.shared import Cm
         from docx.shared import Inches
         from database.manager import carregar_responsaveis
         from utils import formatar_mes_ano, extrair_ano

@@ -5,7 +5,6 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import pandas as pd
-from utils import formatar_mes_ano, adicionar_titulo_secao
 
 MAP_SIGLAS = {
     "FI": "Fissuras",
