@@ -595,7 +595,7 @@ with st.container():
                 st.rerun()
 
     st.divider()
-    st.subheader("🚩 Registros")
+    st.write("")
     
     id_vinculo = "Nenhum ID cadastrado"
     nc_num = 1
@@ -781,6 +781,7 @@ with st.container():
             foto_default = ""
 
     with col_inputs:
+        st.markdown("### 📝 Cadastro de Registros")
         if st.session_state.nc_form_step == 1:
             if is_monitoring:
                 id_vinculo = st.selectbox(f"Vincular ao ID {term_fisc_prep}", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
@@ -1104,41 +1105,52 @@ with st.container():
                 col_save_text, _ = st.columns([2.5, 7.5])
                 with col_save_text:
                     if st.button("💾 Salvar Relatório de Texto", type="primary", use_container_width=True, key=f"btn_save_text_rep_{st.session_state.nc_form_counter}"):
-                        # Buscar e atualizar todos os registros com esta Identificação
-                        recs = [r for r in st.session_state.temp_nc 
-                                if r["Identificação"] == rep_item["id_nc"] and r["ID da Fiscalização"] == id_vinculo]
-                        
-                        if recs:
-                            for rec in recs:
-                                rec["Determinação"] = pos_crc
-                                rec["Observações"] = constatacao
-                                rec["Análise ARPE"] = analise_arpe
-                        else:
-                            # Se não existe, cria um novo
-                            rec = {
-                                "ID da Fiscalização": id_vinculo,
-                                "Nº": nc_num,
-                                "Terminal": terminal_nc,
-                                "Pista": rep_item["pista"],
-                                "Trecho": rep_item["trecho"],
-                                "Não Conformidade": rep_item["constatacao"],
-                                "Ponto de Atenção": "",
-                                "Identificação": rep_item["id_nc"],
-                                "Direção (faixa)": "",
-                                "Fundamento da infração": "",
-                                "Situação": "Pendente",
-                                "Foto": "",
-                                "Foto Anterior": "",
-                                "Legenda Anterior": "",
-                                "Determinação": pos_crc,
-                                "Observações": constatacao,
-                                "Análise ARPE": analise_arpe
-                            }
-                            st.session_state.temp_nc.append(rec)
+                        campos_vazios = []
+                        if not pos_crc.strip():
+                            campos_vazios.append("POSICIONAMENTO CRC")
+                        if not constatacao.strip():
+                            campos_vazios.append("CONSTATAÇÃO")
+                        if not analise_arpe.strip():
+                            campos_vazios.append("ANÁLISE ARPE")
                             
-                        st.session_state.nc_form_counter += 1
-                        st.success("Relatório de texto salvo com sucesso!")
-                        st.rerun()
+                        if campos_vazios:
+                            st.error(f"❌ Não foi possível salvar. Os seguintes campos estão em branco: {', '.join(campos_vazios)}")
+                        else:
+                            # Buscar e atualizar todos os registros com esta Identificação
+                            recs = [r for r in st.session_state.temp_nc 
+                                    if r["Identificação"] == rep_item["id_nc"] and r["ID da Fiscalização"] == id_vinculo]
+                            
+                            if recs:
+                                for rec in recs:
+                                    rec["Determinação"] = pos_crc
+                                    rec["Observações"] = constatacao
+                                    rec["Análise ARPE"] = analise_arpe
+                            else:
+                                # Se não existe, cria um novo
+                                rec = {
+                                    "ID da Fiscalização": id_vinculo,
+                                    "Nº": nc_num,
+                                    "Terminal": terminal_nc,
+                                    "Pista": rep_item["pista"],
+                                    "Trecho": rep_item["trecho"],
+                                    "Não Conformidade": rep_item["constatacao"],
+                                    "Ponto de Atenção": "",
+                                    "Identificação": rep_item["id_nc"],
+                                    "Direção (faixa)": "",
+                                    "Fundamento da infração": "",
+                                    "Situação": "Pendente",
+                                    "Foto": "",
+                                    "Foto Anterior": "",
+                                    "Legenda Anterior": "",
+                                    "Determinação": pos_crc,
+                                    "Observações": constatacao,
+                                    "Análise ARPE": analise_arpe
+                                }
+                                st.session_state.temp_nc.append(rec)
+                                
+                            st.session_state.nc_form_counter += 1
+                            st.success("Relatório de texto salvo com sucesso!")
+                            st.rerun()
             else:
                 st.success("🎉 Todos os relatórios de texto das Não Conformidades foram preenchidos!")
 
