@@ -121,9 +121,14 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_img_left.paragraph_format.space_after = Pt(4)
                 
                 foto_ant = rec.get("Foto Anterior", "")
-                if foto_ant and os.path.exists(str(foto_ant)):
+                if pd.isna(foto_ant) or not isinstance(foto_ant, str):
+                    foto_ant = ""
+                else:
+                    foto_ant = foto_ant.strip()
+                    
+                if foto_ant and os.path.exists(foto_ant):
                     run_img_left = p_img_left.add_run()
-                    run_img_left.add_picture(str(foto_ant), width=Inches(2.708), height=Inches(2.708))
+                    run_img_left.add_picture(foto_ant, width=Inches(2.708), height=Inches(2.708))
                 
                 # Foto Direita (Nova)
                 p_img_right = table.rows[0].cells[1].paragraphs[0]
@@ -134,6 +139,11 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_img_right.paragraph_format.space_after = Pt(4)
                 
                 foto_new = rec.get("Foto", "")
+                if pd.isna(foto_new) or not isinstance(foto_new, str):
+                    foto_new = ""
+                else:
+                    foto_new = foto_new.strip()
+                    
                 foto_path_right = os.path.join(fotos_dir, foto_new) if fotos_dir and foto_new else ""
                 if foto_path_right and os.path.exists(foto_path_right):
                     run_img_right = p_img_right.add_run()
