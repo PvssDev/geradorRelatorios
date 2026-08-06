@@ -2,7 +2,6 @@ from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from utils import adicionar_titulo_secao, formatar_data_extenso, extrair_ano
-import os
 import pandas as pd
 
 def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_df=None, documento_anterior=None):

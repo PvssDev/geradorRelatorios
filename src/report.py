@@ -1,9 +1,6 @@
 from docx import Document
-from docx.shared import Inches
 import pandas as pd
 from tqdm import tqdm
-from docx.enum.section import WD_SECTION
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 import sys
 import os
 import io
