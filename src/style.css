@@ -1,0 +1,89 @@
+/* style.css - Folha de estilos personalizada do aplicativo */
+
+/* Permite que o sombreamento seja visível e não seja cortado pelo overflow do Streamlit */
+div[data-testid="stVerticalBlock"] {
+    overflow: visible !important;
+}
+
+/* Aplica o sombreamento suave e margens para os containers específicos st.container */
+.st-key-top_fisc_container,
+.st-key-registros_main_container,
+.st-key-acoes_panel_container,
+.st-key-downloads_section_container {
+    border-radius: 12px !important;
+    margin: 16px 4px !important;
+    transition: box-shadow 0.3s ease, transform 0.3s ease !important;
+    overflow: visible !important;
+}
+
+/* ==========================================
+   PALETA DE CORES: MODO LIGHT (WHITE SUAVE & SOMBRAS)
+   ========================================== */
+@media (prefers-color-scheme: light) {
+    /* Fundo da aplicação: Branco suave (off-white descansável) */
+    [data-testid="stAppViewContainer"], .stApp {
+        background-color: #f7f7f7 !important;
+    }
+
+    /* Tornar o cabeçalho superior transparente para não quebrar o tom de fundo */
+    div[data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+
+    /* Cards e Containers: Fundo branco puro destacado do fundo */
+    .st-key-top_fisc_container,
+    .st-key-registros_main_container,
+    .st-key-acoes_panel_container,
+    .st-key-downloads_section_container {
+        background-color: #ffffff !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important; /* Sombra sutil padrão */
+    }
+
+    /* Sombreamento no Hover (Fica mais escuro e definido ao passar o mouse) */
+    .st-key-top_fisc_container:hover,
+    .st-key-registros_main_container:hover,
+    .st-key-acoes_panel_container:hover,
+    .st-key-downloads_section_container:hover {
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.16) !important; /* Sombra significativamente mais escura */
+        transform: translateY(-2px);
+    }
+}
+
+/* ==========================================
+   PALETA DE CORES: MODO DARK (GLOW SUAVE)
+   ========================================== */
+@media (prefers-color-scheme: dark) {
+    .st-key-top_fisc_container,
+    .st-key-registros_main_container,
+    .st-key-acoes_panel_container,
+    .st-key-downloads_section_container {
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .st-key-top_fisc_container:hover,
+    .st-key-registros_main_container:hover,
+    .st-key-acoes_panel_container:hover,
+    .st-key-downloads_section_container:hover {
+        box-shadow: 0 12px 24px rgba(255, 255, 255, 0.05) !important;
+        transform: translateY(-2px);
+    }
+}
+
+/* Estilização específica do botão + ao lado das pills */
+.green-btn-marker + div div.stButton button {
+    background-color: #28a745 !important;
+    color: white !important;
+    border-color: #28a745 !important;
+    font-weight: bold !important;
+    font-size: 16px !important;
+    border-radius: 4px !important;
+    height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.green-btn-marker + div div.stButton button:hover {
+    background-color: #218838 !important;
+    border-color: #1e7e34 !important;
+}
