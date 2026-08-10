@@ -312,34 +312,39 @@ if "tipo_relatorio" not in st.session_state:
 if "categoria_relatorio" not in st.session_state:
     st.session_state.categoria_relatorio = "Fiscalização"
 
-col_title, col_switch, col_cat, _ = st.columns([0.46, 0.03, 0.03, 0.48], gap="small")
-with col_title:
-    st.title(f"📄 Gerador {st.session_state.tipo_relatorio} ({st.session_state.categoria_relatorio})")
-with col_switch:
-    st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-    if st.button("🔄", key="btn_swap_tipo", help="Clique para alternar entre CRA, CRC e SOCICAM"):
-        if st.session_state.tipo_relatorio == "CRA":
-            st.session_state.tipo_relatorio = "CRC"
-        elif st.session_state.tipo_relatorio == "CRC":
-            st.session_state.tipo_relatorio = "SOCICAM"
-        else:
-            st.session_state.tipo_relatorio = "CRA"
-        st.rerun()
-with col_cat:
-    st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-    if st.button("📋", key="btn_swap_categoria", help="Clique para alternar entre Fiscalização e Monitoramento"):
-        if st.session_state.categoria_relatorio == "Fiscalização":
-            st.session_state.categoria_relatorio = "Monitoramento"
-        else:
-            st.session_state.categoria_relatorio = "Fiscalização"
-        st.rerun()
+_, col_center_group, _ = st.columns([1, 12, 1])
+with col_center_group:
+    c_space_l, c_title, c_b1, c_b2, c_space_r = st.columns([2, 16, 1, 1, 3], gap="small")
+    with c_title:
+        st.markdown(
+            f"<h1 style='text-align: right; margin: 0; padding-right: 6px; font-size: 3.15rem; font-weight: 900; color: #ffffff; -webkit-text-stroke: 6px #6f4b3e; paint-order: stroke fill; white-space: nowrap;'>📄 Gerador {st.session_state.tipo_relatorio} ({st.session_state.categoria_relatorio})</h1>",
+            unsafe_allow_html=True
+        )
+    with c_b1:
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        if st.button("🔄", key="btn_swap_tipo", help="Clique para alternar entre CRA, CRC e SOCICAM"):
+            if st.session_state.tipo_relatorio == "CRA":
+                st.session_state.tipo_relatorio = "CRC"
+            elif st.session_state.tipo_relatorio == "CRC":
+                st.session_state.tipo_relatorio = "SOCICAM"
+            else:
+                st.session_state.tipo_relatorio = "CRA"
+            st.rerun()
+    with c_b2:
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        if st.button("📋", key="btn_swap_categoria", help="Clique para alternar entre Fiscalização e Monitoramento"):
+            if st.session_state.categoria_relatorio == "Fiscalização":
+                st.session_state.categoria_relatorio = "Monitoramento"
+            else:
+                st.session_state.categoria_relatorio = "Fiscalização"
+            st.rerun()
 
 # Layout principal da aplicação
 with st.container():
 
     # 1. Upload de Fotos do Levantamento no início
-    st.markdown("### 📷 Upload de Arquivos")
-    with st.container(border=True):
+    with st.container(border=True, key="upload_arquivos_container"):
+        st.markdown("### 📷 Upload de Arquivos")
         if "fill_photos_sort_option" not in st.session_state:
             st.session_state.fill_photos_sort_option = "Nome (A-Z / 0-9)"
         if "uploader_version" not in st.session_state:
@@ -499,6 +504,11 @@ with st.container():
         st.session_state.nc_options = base_options
 
     with st.container(border=True, key="top_fisc_container"):
+        st.markdown(f"### 📍 {term_fisc}")
+        if st.session_state.get("last_added_fisc_msg"):
+            st.success(st.session_state.last_added_fisc_msg)
+            del st.session_state.last_added_fisc_msg
+            
         col1, col2 = st.columns(2)
         with col1:
             id_fisc = st.text_input(f"ID {term_fisc_prep} (ex: 2026-001)", help="Identificador único para vincular as abas")
@@ -513,7 +523,7 @@ with st.container():
             if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
                 local = "Sistema Viário do Paiva"
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
-                submit_fisc = st.button(f"➕ Adicionar {term_fisc}")
+                submit_fisc = st.button(f"➕ Adicionar {term_fisc}", type="primary")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 local = st.text_input("Local (ex: TIP (RECIFE))", placeholder="Nome do Terminal")
         with col2:
@@ -523,7 +533,7 @@ with st.container():
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", placeholder="Opcional")
  
-            col_resp, col_gear = st.columns([5, 1])
+            col_resp, col_gear = st.columns([10, 1])
             with col_resp:
                 responsaveis_sel = st.multiselect(
                     "Pessoal Responsável",
@@ -539,7 +549,7 @@ with st.container():
                     gerenciar_responsaveis_modal()
             
             # Coordenador
-            col_coord, col_gear_coord = st.columns([5, 1])
+            col_coord, col_gear_coord = st.columns([10, 1])
             with col_coord:
                 coordenador_sel = st.selectbox(
                     "Coordenador",
@@ -562,7 +572,7 @@ with st.container():
                 contrato = "CT. nº 1.041.080/08"
  
         if st.session_state.get("tipo_relatorio", "CRA") in ["CRA", "SOCICAM"]:
-            submit_fisc = st.button(f"➕ Adicionar {term_fisc}")
+            submit_fisc = st.button(f"➕ Adicionar {term_fisc}", type="primary")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
             if not id_fisc:
@@ -599,7 +609,7 @@ with st.container():
                 if campos_em_branco:
                     st.warning(f"⚠️ Atenção: Os seguintes campos opcionais de preenchimento ficaram em branco: {', '.join(campos_em_branco)}.")
                 
-                st.success(f"{term_fisc} {id_fisc} adicionada!")
+                st.session_state.last_added_fisc_msg = f"✅ {term_fisc} {id_fisc} adicionado(a) com sucesso!"
                 st.rerun()
 
     st.write("")
@@ -643,7 +653,6 @@ with st.container():
         idx = 0
         options_old = []
         
-    st.markdown("### 📝 Cadastro de Registros e Fotos")
     registros_container = st.container(border=True, key="registros_main_container")
     col_inputs, col_preview = registros_container.columns([1.2, 1.0])
     
@@ -1174,170 +1183,173 @@ with st.container():
 
 
     
-    if st.session_state.temp_fiscalizacoes:
-        with st.expander("📋 Resumo do Preenchimento", expanded=False):
-            df_fisc = pd.DataFrame(st.session_state.temp_fiscalizacoes)
-            if "Relatório Gerado" in df_fisc.columns:
-                df_fisc = df_fisc.drop(columns=["Relatório Gerado"])
-            if "Contrato" in df_fisc.columns:
-                df_fisc = df_fisc.drop(columns=["Contrato"])
-            if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
-                for col in ["Hora", "Cidade", "Local"]:
-                    if col in df_fisc.columns:
-                        df_fisc = df_fisc.drop(columns=[col])
-            elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
-                for col in ["Hora", "Cidade"]:
-                    if col in df_fisc.columns:
-                        df_fisc = df_fisc.drop(columns=[col])
-            df_fisc.insert(0, "Excluir", False)
-            
-            # Apenas para a visualização, encurta o nome dos responsáveis para exibir apenas o primeiro nome
-            if "Pessoal Responsável" in df_fisc.columns:
-                df_fisc["Pessoal Responsável"] = df_fisc["Pessoal Responsável"].apply(
-                    lambda x: ", ".join([name.strip().split()[0] for name in str(x).split(",") if name.strip()])
+    st.write("")
+    acoes_container = st.container(border=True, key="acoes_panel_container")
+    with acoes_container:
+        st.subheader("🛠️ Painel de Ações do Relatório")
+        
+        if st.session_state.temp_fiscalizacoes:
+            with st.expander("📋 Resumo do Preenchimento", expanded=False):
+                df_fisc = pd.DataFrame(st.session_state.temp_fiscalizacoes)
+                if "Relatório Gerado" in df_fisc.columns:
+                    df_fisc = df_fisc.drop(columns=["Relatório Gerado"])
+                if "Contrato" in df_fisc.columns:
+                    df_fisc = df_fisc.drop(columns=["Contrato"])
+                if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
+                    for col in ["Hora", "Cidade", "Local"]:
+                        if col in df_fisc.columns:
+                            df_fisc = df_fisc.drop(columns=[col])
+                elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
+                    for col in ["Hora", "Cidade"]:
+                        if col in df_fisc.columns:
+                            df_fisc = df_fisc.drop(columns=[col])
+                df_fisc.insert(0, "Excluir", False)
+                
+                # Apenas para a visualização, encurta o nome dos responsáveis para exibir apenas o primeiro nome
+                if "Pessoal Responsável" in df_fisc.columns:
+                    df_fisc["Pessoal Responsável"] = df_fisc["Pessoal Responsável"].apply(
+                        lambda x: ", ".join([name.strip().split()[0] for name in str(x).split(",") if name.strip()])
+                    )
+                
+                st.write(f"**{term_fisc_plural}:**")
+                edited_df = st.data_editor(
+                    df_fisc,
+                    column_config={
+                        "Excluir": st.column_config.CheckboxColumn(
+                            "Excluir",
+                            help=f"Selecione as {term_fisc_plural_lower} que deseja excluir",
+                            default=False,
+                        ),
+                        "ID da Fiscalização": st.column_config.TextColumn(
+                            f"ID {term_fisc_prep}",
+                            width="medium"
+                        ),
+                        "Pessoal Responsável": st.column_config.TextColumn(
+                            "Pessoal Responsável",
+                            width="small"
+                        )
+                    },
+                    disabled=[col for col in df_fisc.columns if col != "Excluir"],
+                    use_container_width=True,
+                    hide_index=True,
+                    key="fisc_data_editor"
                 )
-            
-            st.write(f"**{term_fisc_plural}:**")
-            edited_df = st.data_editor(
-                df_fisc,
-                column_config={
-                    "Excluir": st.column_config.CheckboxColumn(
-                        "Excluir",
-                        help=f"Selecione as {term_fisc_plural_lower} que deseja excluir",
-                        default=False,
-                    ),
-                    "ID da Fiscalização": st.column_config.TextColumn(
-                        f"ID {term_fisc_prep}",
-                        width="medium"
-                    ),
-                    "Pessoal Responsável": st.column_config.TextColumn(
-                        "Pessoal Responsável",
-                        width="small"
-                    )
-                },
-                disabled=[col for col in df_fisc.columns if col != "Excluir"],
-                use_container_width=True,
-                hide_index=True,
-                key="fisc_data_editor"
-            )
-            
-            # Identifica as linhas marcadas para exclusão
-            selected_rows = edited_df[edited_df["Excluir"] == True] if "Excluir" in edited_df.columns else pd.DataFrame()
-            ids_para_excluir = selected_rows["ID da Fiscalização"].tolist() if not selected_rows.empty else []
-            
-            # Botão que fica habilitado se houver itens selecionados
-            disable_btn = len(ids_para_excluir) == 0
-            if st.button("🗑️ Excluir Selecionadas", type="secondary", disabled=disable_btn, key="btn_bulk_delete"):
-                confirmar_exclusao_lote_modal(ids_para_excluir)
                 
-            ncs_para_excluir = []
-            df_nc = pd.DataFrame(st.session_state.temp_nc)
-            
-            # 1. Tabela de Não Conformidades (apenas com coluna Não Conformidade)
-            st.write("**Não Conformidades:**")
-            if not df_nc.empty and "Não Conformidade" in df_nc.columns:
-                df_nc_only = df_nc[df_nc["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
-                if not df_nc_only.empty:
-                    if "Ponto de Atenção" in df_nc_only.columns:
-                        df_nc_only = df_nc_only.drop(columns=["Ponto de Atenção"])
-                    if st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"]:
-                        for col in ["Terminal", "Trecho", "Pista", "Direção (faixa)"]:
-                            if col in df_nc_only.columns:
-                                df_nc_only = df_nc_only.drop(columns=[col])
-                    df_nc_only.insert(0, "Excluir", False)
-                    
-                    # Garante ordenação exata das colunas
-                    cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Não Conformidade', 'Identificação', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
-                    for c in ['Situação', 'Foto', 'Fotos', 'Observações', 'Legenda da Foto', 'Análise ARPE']:
-                        if c in df_nc_only.columns:
-                            cols_order.append(c)
-                    cols_order = [c for c in cols_order if c in df_nc_only.columns]
-                    df_nc_only = df_nc_only[cols_order]
-                    
-                    edited_nc_df = st.data_editor(
-                        df_nc_only,
-                        column_config={
-                            "Excluir": st.column_config.CheckboxColumn(
-                                "Excluir",
-                                help="Selecione as não conformidades que deseja excluir",
-                                default=False,
-                            ),
-                            "ID da Fiscalização": st.column_config.TextColumn(
-                                f"ID {term_fisc_prep}"
-                            )
-                        },
-                        disabled=[col for col in df_nc_only.columns if col != "Excluir"],
-                        use_container_width=True,
-                        hide_index=True,
-                        key="nc_data_editor"
-                    )
-                    
-                    # Identifica as linhas marcadas para exclusão
-                    selected_ncs = edited_nc_df[edited_nc_df["Excluir"] == True] if "Excluir" in edited_nc_df.columns else pd.DataFrame()
-                    ncs_para_excluir = list(zip(selected_ncs["ID da Fiscalização"], selected_ncs["Nº"])) if not selected_ncs.empty else []
-                else:
-                    st.info("Nenhuma não conformidade registrada.")
-            else:
-                st.info("Nenhuma não conformidade registrada.")
+                # Identifica as linhas marcadas para exclusão
+                selected_rows = edited_df[edited_df["Excluir"] == True] if "Excluir" in edited_df.columns else pd.DataFrame()
+                ids_para_excluir = selected_rows["ID da Fiscalização"].tolist() if not selected_rows.empty else []
                 
-            # 2. Tabela de Pontos de Atenção (apenas com coluna Ponto de Atenção)
-            pas_para_excluir = []
-            if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
-                st.write("") # Espaçamento
-                st.write("**Pontos de Atenção:**")
-                if not df_nc.empty and "Ponto de Atenção" in df_nc.columns:
-                    df_pa_only = df_nc[df_nc["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
-                    if not df_pa_only.empty:
-                        if "Não Conformidade" in df_pa_only.columns:
-                            df_pa_only = df_pa_only.drop(columns=["Não Conformidade"])
-                        df_pa_only.insert(0, "Excluir", False)
+                # Botão que fica habilitado se houver itens selecionados
+                disable_btn = len(ids_para_excluir) == 0
+                if st.button("🗑️ Excluir Selecionadas", type="secondary", disabled=disable_btn, key="btn_bulk_delete"):
+                    confirmar_exclusao_lote_modal(ids_para_excluir)
+                    
+                ncs_para_excluir = []
+                df_nc = pd.DataFrame(st.session_state.temp_nc)
+                
+                # 1. Tabela de Não Conformidades (apenas com coluna Não Conformidade)
+                st.write("**Não Conformidades:**")
+                if not df_nc.empty and "Não Conformidade" in df_nc.columns:
+                    df_nc_only = df_nc[df_nc["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
+                    if not df_nc_only.empty:
+                        if "Ponto de Atenção" in df_nc_only.columns:
+                            df_nc_only = df_nc_only.drop(columns=["Ponto de Atenção"])
+                        if st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"]:
+                            for col in ["Terminal", "Trecho", "Pista", "Direção (faixa)"]:
+                                if col in df_nc_only.columns:
+                                    df_nc_only = df_nc_only.drop(columns=[col])
+                        df_nc_only.insert(0, "Excluir", False)
                         
-                        # Garante ordenação exata das colunas (Ponto de Atenção após Terminal e antes de Foto)
-                        cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Ponto de Atenção', 'Identificação', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
-                        for c in ['Foto', 'Fotos', 'Observações', 'Legenda da Foto']:
-                            if c in df_pa_only.columns:
+                        # Garante ordenação exata das colunas
+                        cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Não Conformidade', 'Identificação', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
+                        for c in ['Situação', 'Foto', 'Fotos', 'Observações', 'Legenda da Foto', 'Análise ARPE']:
+                            if c in df_nc_only.columns:
                                 cols_order.append(c)
-                        cols_order = [c for c in cols_order if c in df_pa_only.columns]
-                        df_pa_only = df_pa_only[cols_order]
+                        cols_order = [c for c in cols_order if c in df_nc_only.columns]
+                        df_nc_only = df_nc_only[cols_order]
                         
-                        edited_pa_df = st.data_editor(
-                            df_pa_only,
+                        edited_nc_df = st.data_editor(
+                            df_nc_only,
                             column_config={
                                 "Excluir": st.column_config.CheckboxColumn(
                                     "Excluir",
-                                    help="Selecione os pontos de atenção que deseja excluir",
+                                    help="Selecione as não conformidades que deseja excluir",
                                     default=False,
                                 ),
                                 "ID da Fiscalização": st.column_config.TextColumn(
                                     f"ID {term_fisc_prep}"
                                 )
                             },
-                            disabled=[col for col in df_pa_only.columns if col != "Excluir"],
+                            disabled=[col for col in df_nc_only.columns if col != "Excluir"],
                             use_container_width=True,
                             hide_index=True,
-                            key="pa_data_editor"
+                            key="nc_data_editor"
                         )
                         
                         # Identifica as linhas marcadas para exclusão
-                        selected_pas = edited_pa_df[edited_pa_df["Excluir"] == True] if "Excluir" in edited_pa_df.columns else pd.DataFrame()
-                        pas_para_excluir = list(zip(selected_pas["ID da Fiscalização"], selected_pas["Nº"])) if not selected_pas.empty else []
+                        selected_ncs = edited_nc_df[edited_nc_df["Excluir"] == True] if "Excluir" in edited_nc_df.columns else pd.DataFrame()
+                        ncs_para_excluir = list(zip(selected_ncs["ID da Fiscalização"], selected_ncs["Nº"])) if not selected_ncs.empty else []
+                    else:
+                        st.info("Nenhuma não conformidade registrada.")
+                else:
+                    st.info("Nenhuma não conformidade registrada.")
+                    
+                # 2. Tabela de Pontos de Atenção (apenas com coluna Ponto de Atenção)
+                pas_para_excluir = []
+                if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                    st.write("") # Espaçamento
+                    st.write("**Pontos de Atenção:**")
+                    if not df_nc.empty and "Ponto de Atenção" in df_nc.columns:
+                        df_pa_only = df_nc[df_nc["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
+                        if not df_pa_only.empty:
+                            if "Não Conformidade" in df_pa_only.columns:
+                                df_pa_only = df_pa_only.drop(columns=["Não Conformidade"])
+                            df_pa_only.insert(0, "Excluir", False)
+                            
+                            # Garante ordenação exata das colunas (Ponto de Atenção após Terminal e antes de Foto)
+                            cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Ponto de Atenção', 'Identificação', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
+                            for c in ['Foto', 'Fotos', 'Observações', 'Legenda da Foto']:
+                                if c in df_pa_only.columns:
+                                    cols_order.append(c)
+                            cols_order = [c for c in cols_order if c in df_pa_only.columns]
+                            df_pa_only = df_pa_only[cols_order]
+                            
+                            edited_pa_df = st.data_editor(
+                                df_pa_only,
+                                column_config={
+                                    "Excluir": st.column_config.CheckboxColumn(
+                                        "Excluir",
+                                        help="Selecione os pontos de atenção que deseja excluir",
+                                        default=False,
+                                    ),
+                                    "ID da Fiscalização": st.column_config.TextColumn(
+                                        f"ID {term_fisc_prep}"
+                                    )
+                                },
+                                disabled=[col for col in df_pa_only.columns if col != "Excluir"],
+                                use_container_width=True,
+                                hide_index=True,
+                                key="pa_data_editor"
+                            )
+                            
+                            # Identifica as linhas marcadas para exclusão
+                            selected_pas = edited_pa_df[edited_pa_df["Excluir"] == True] if "Excluir" in edited_pa_df.columns else pd.DataFrame()
+                            pas_para_excluir = list(zip(selected_pas["ID da Fiscalização"], selected_pas["Nº"])) if not selected_pas.empty else []
+                        else:
+                            st.info("Nenhum ponto de atenção registrado.")
                     else:
                         st.info("Nenhum ponto de atenção registrado.")
-                else:
-                    st.info("Nenhum ponto de atenção registrado.")
-                
-            # Botão unificado para excluir as selecionadas
-            ncs_totais_para_excluir = ncs_para_excluir + pas_para_excluir
-            disable_nc_btn = len(ncs_totais_para_excluir) == 0
-            label_excluir = "🗑️ Excluir Selecionadas (Não Conformidades)" if st.session_state.get("tipo_relatorio", "CRA") == "CRC" else "🗑️ Excluir Selecionadas (Não Conformidades / Pontos de Atenção)"
-            if st.button(label_excluir, type="secondary", disabled=disable_nc_btn, key="btn_nc_bulk_delete"):
-                confirmar_exclusao_nc_modal(ncs_totais_para_excluir)
-                
-            st.write("") # Espaçamento
-    st.write("")
-    st.subheader("🛠️ Painel de Ações do Relatório")
-    acoes_container = st.container(border=True, key="acoes_panel_container")
-    col_relatorio, col_planilha, col_limpar = acoes_container.columns(3)
+                    
+                # Botão unificado para excluir as selecionadas
+                ncs_totais_para_excluir = ncs_para_excluir + pas_para_excluir
+                disable_nc_btn = len(ncs_totais_para_excluir) == 0
+                label_excluir = "🗑️ Excluir Selecionadas (Não Conformidades)" if st.session_state.get("tipo_relatorio", "CRA") == "CRC" else "🗑️ Excluir Selecionadas (Não Conformidades / Pontos de Atenção)"
+                if st.button(label_excluir, type="secondary", disabled=disable_nc_btn, key="btn_nc_bulk_delete"):
+                    confirmar_exclusao_nc_modal(ncs_totais_para_excluir)
+                    
+                st.write("") # Espaçamento
+        
+        col_relatorio, col_planilha, col_limpar = st.columns(3)
     
     # Inicializar estado para persistir os relatórios gerados via aba preenchimento
     if "relatorios_preenchimento_data" not in st.session_state:
