@@ -1,0 +1,9 @@
+[theme]
+# Cor de destaque para itens selecionados (pills, tags multiselect, botões primários)
+primaryColor = "#6f4b3e"
+
+# Fundo suave off-white para o modo Light (menos agressivo que branco puro)
+backgroundColor = "#eed3c7"
+
+# Fundo secundário (usado em inputs, textareas, pills não selecionadas)
+secondaryBackgroundColor = "#fcedea"

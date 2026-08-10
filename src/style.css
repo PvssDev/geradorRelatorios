@@ -1,77 +1,293 @@
 /* style.css - Folha de estilos personalizada do aplicativo */
 
-/* Permite que o sombreamento seja visível e não seja cortado pelo overflow do Streamlit */
+/* ==========================================
+   CORREÇÃO GLOBAL DE OVERFLOW
+   Permite que sombras não sejam cortadas
+   ========================================== */
 div[data-testid="stVerticalBlock"] {
     overflow: visible !important;
 }
 
-/* Aplica o sombreamento suave e margens para os containers específicos st.container */
+/* ==========================================
+   FUNDO DA APLICAÇÃO
+   Gerenciado por .streamlit/config.toml [theme].
+   A aplicação opera em tema único (Light).
+   ========================================== */
+
+/* ==========================================
+   CONTAINERS COM BORDA (st.container border=True)
+   ========================================== */
+.st-key-upload_arquivos_container,
 .st-key-top_fisc_container,
 .st-key-registros_main_container,
 .st-key-acoes_panel_container,
 .st-key-downloads_section_container {
     border-radius: 12px !important;
     margin: 16px 4px !important;
-    transition: box-shadow 0.3s ease, transform 0.3s ease !important;
     overflow: visible !important;
+    background-color: #fff3ef !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    transition: box-shadow 0.3s ease, transform 0.3s ease !important;
+}
+
+/* Hover: sombra mais escura e pronunciada */
+.st-key-upload_arquivos_container:hover,
+.st-key-top_fisc_container:hover,
+.st-key-registros_main_container:hover,
+.st-key-acoes_panel_container:hover,
+.st-key-downloads_section_container:hover {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22) !important;
+    transform: translateY(-2px);
 }
 
 /* ==========================================
-   PALETA DE CORES: MODO LIGHT (WHITE SUAVE & SOMBRAS)
+   MENSAGENS INFORMATIVAS E ALERTAS (st.info)
+   Fundo Marrom Pastel sem bordas
    ========================================== */
-@media (prefers-color-scheme: light) {
-    /* Fundo da aplicação: Branco suave (off-white descansável) */
-    [data-testid="stAppViewContainer"], .stApp {
-        background-color: #f7f7f7 !important;
-    }
+div[data-testid="stAlert"],
+div[data-testid="stAlert"] > div,
+div[data-testid="stAlert"] [data-testid*="stNotificationContent"],
+div[data-testid="stAlert"] [role="alert"],
+div[data-testid="stNotificationContentInfo"] {
+    background-color: #f8dbda !important;
+    background: #f8dbda !important;
+    border: none !important;
+    border-radius: 8px !important;
+    color: #4a3026 !important;
+    box-shadow: none !important;
+}
 
-    /* Tornar o cabeçalho superior transparente para não quebrar o tom de fundo */
-    div[data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
+div[data-testid="stAlert"] p,
+div[data-testid="stAlert"] span,
+div[data-testid="stAlert"] div {
+    color: #4a3026 !important;
+}
 
-    /* Cards e Containers: Fundo branco puro destacado do fundo */
-    .st-key-top_fisc_container,
-    .st-key-registros_main_container,
-    .st-key-acoes_panel_container,
-    .st-key-downloads_section_container {
-        background-color: #ffffff !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important; /* Sombra sutil padrão */
-    }
+div[data-testid="stAlert"] strong,
+div[data-testid="stAlert"] b {
+    color: #3e251b !important;
+    font-weight: 700 !important;
+}
 
-    /* Sombreamento no Hover (Fica mais escuro e definido ao passar o mouse) */
-    .st-key-top_fisc_container:hover,
-    .st-key-registros_main_container:hover,
-    .st-key-acoes_panel_container:hover,
-    .st-key-downloads_section_container:hover {
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.16) !important; /* Sombra significativamente mais escura */
-        transform: translateY(-2px);
-    }
+div[data-testid="stAlert"] svg {
+    fill: #6f4b3e !important;
+    color: #6f4b3e !important;
+}
+
+/* Alerta de Sucesso (Verde harmonizado) */
+div[data-testid="stAlert"]:has([data-testid*="Success"]),
+div[data-testid="stAlert"]:has([data-testid*="Success"]) > div,
+div[data-testid="stNotificationContentSuccess"] {
+    background-color: #eaf5ea !important;
+    background: #eaf5ea !important;
+    border: none !important;
+    color: #1e4620 !important;
+}
+div[data-testid="stAlert"]:has([data-testid*="Success"]) p,
+div[data-testid="stAlert"]:has([data-testid*="Success"]) span {
+    color: #1e4620 !important;
+}
+
+/* Alerta de Erro (Coral/Vermelho suave) */
+div[data-testid="stAlert"]:has([data-testid*="Error"]),
+div[data-testid="stAlert"]:has([data-testid*="Error"]) > div,
+div[data-testid="stNotificationContentError"] {
+    background-color: #fdeaea !important;
+    background: #fdeaea !important;
+    border: none !important;
+    color: #7a1f1f !important;
+}
+div[data-testid="stAlert"]:has([data-testid*="Error"]) p,
+div[data-testid="stAlert"]:has([data-testid*="Error"]) span {
+    color: #7a1f1f !important;
+}
+
+/* Alerta de Atenção (Âmbar suave) */
+div[data-testid="stAlert"]:has([data-testid*="Warning"]),
+div[data-testid="stAlert"]:has([data-testid*="Warning"]) > div,
+div[data-testid="stNotificationContentWarning"] {
+    background-color: #fef7ea !important;
+    background: #fef7ea !important;
+    border: none !important;
+    color: #7c5208 !important;
 }
 
 /* ==========================================
-   PALETA DE CORES: MODO DARK (GLOW SUAVE)
+   BOTÕES PRINCIPAIS / DESTAQUE (#6f4b3e)
+   ➕ Adicionar, 💾 Salvar e Continuar, 🚀 Gerar Relatório, 📁 Botão de Upload
    ========================================== */
-@media (prefers-color-scheme: dark) {
-    .st-key-top_fisc_container,
-    .st-key-registros_main_container,
-    .st-key-acoes_panel_container,
-    .st-key-downloads_section_container {
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-    .st-key-top_fisc_container:hover,
-    .st-key-registros_main_container:hover,
-    .st-key-acoes_panel_container:hover,
-    .st-key-downloads_section_container:hover {
-        box-shadow: 0 12px 24px rgba(255, 255, 255, 0.05) !important;
-        transform: translateY(-2px);
-    }
+button[kind="primary"],
+div.stButton > button[kind="primary"],
+section[data-testid="stFileUploader"] button[data-testid*="baseButton"],
+section[data-testid="stFileUploader"] button[data-testid*="stBaseButton"],
+section[data-testid="stFileUploadDropzone"] button {
+    background-color: #6f4b3e !important;
+    color: #ffffff !important;
+    border: 1px solid #5a3c31 !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 6px rgba(111, 75, 62, 0.25) !important;
+    transition: background-color 0.2s ease, transform 0.1s ease !important;
 }
 
-/* Estilização específica do botão + ao lado das pills */
-.green-btn-marker + div div.stButton button {
+button[kind="primary"]:hover,
+div.stButton > button[kind="primary"]:hover,
+section[data-testid="stFileUploader"] button[data-testid*="baseButton"]:hover,
+section[data-testid="stFileUploader"] button[data-testid*="stBaseButton"]:hover,
+section[data-testid="stFileUploadDropzone"] button:hover {
+    background-color: #5c3e33 !important;
+    border-color: #4a3128 !important;
+    color: #ffffff !important;
+}
+
+/* ==========================================
+   BOTÕES SECUNDÁRIOS / DE AÇÃO
+   ========================================== */
+div.stButton > button:not([kind="primary"]):not([data-testid="stPill"]),
+div.stDownloadButton > button:not([kind="primary"]),
+div[data-testid="stPopover"] button,
+div[data-testid="stPopover"] > div > button,
+div.stPopover button,
+button[data-testid="stPopoverButton"],
+button[aria-haspopup="dialog"] {
+    background-color: #fff2e8 !important;
+    color: #2d2926 !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+    transition: background-color 0.2s ease, transform 0.1s ease !important;
+}
+
+div.stButton > button:not([kind="primary"]):not([data-testid="stPill"]):hover,
+div.stDownloadButton > button:not([kind="primary"]):hover,
+div[data-testid="stPopover"] button:hover,
+div[data-testid="stPopover"] > div > button:hover,
+div.stPopover button:hover,
+button[data-testid="stPopoverButton"]:hover,
+button[aria-haspopup="dialog"]:hover {
+    background-color: #e9d4c2 !important;
+    border-color: rgba(0, 0, 0, 0.25) !important;
+}
+
+/* ==========================================
+   BOTÕES QUADRADOS DE ÍCONES / CONFIGURAÇÃO / SWITCHES
+   (⚙️, 🔄, 📋, 🗑️, 🔍, etc.)
+   ========================================== */
+div[class*="st-key-btn_swap_"] button,
+div[class*="st-key-btn_manage_"] button,
+div[class*="st-key-del_"] button,
+div[class*="st-key-btn_del_"] button,
+div[class*="st-key-btn_view_"] button,
+div[data-testid="stDialog"] button:not([kind="primary"]),
+div[data-testid="stModal"] button:not([kind="primary"]) {
+    background-color: #fcedea !important;
+    color: #2d2926 !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    border-radius: 8px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 16px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease !important;
+}
+
+div[class*="st-key-btn_swap_"] button:hover,
+div[class*="st-key-btn_manage_"] button:hover,
+div[class*="st-key-del_"] button:hover,
+div[class*="st-key-btn_del_"] button:hover,
+div[class*="st-key-btn_view_"] button:hover,
+div[data-testid="stDialog"] button:not([kind="primary"]):hover,
+div[data-testid="stModal"] button:not([kind="primary"]):hover {
+    background-color: #ebd0cb !important;
+    border-color: rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12) !important;
+    transform: translateY(-1px);
+}
+
+/* ==========================================
+   ÍCONES DE AJUDA / TOOLTIP (?)
+   Garante fundo transparente e sem bordas
+   ========================================== */
+div[data-testid="stTooltipIcon"] button,
+button[data-testid="stTooltipHoverTarget"],
+div[data-testid="stWidgetLabel"] button,
+[data-testid="stTooltipIcon"] button,
+[data-testid="stTooltipHoverTarget"] {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: inherit !important;
+    padding: 0 !important;
+    min-width: auto !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+div[data-testid="stTooltipIcon"] button:hover,
+button[data-testid="stTooltipHoverTarget"]:hover,
+div[data-testid="stWidgetLabel"] button:hover,
+[data-testid="stTooltipIcon"] button:hover,
+[data-testid="stTooltipHoverTarget"]:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* ==========================================
+   TAGS / NOMES DOS RESPONSÁVEIS NO MULTISELECT
+   ========================================== */
+div[data-baseweb="tag"],
+span[data-baseweb="tag"] {
+    background-color: #6f4b3e !important;
+    color: #ffffff !important;
+    border-radius: 4px !important;
+}
+
+div[data-baseweb="tag"] span,
+span[data-baseweb="tag"] span {
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+div[data-baseweb="tag"] svg,
+span[data-baseweb="tag"] svg {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+}
+
+/* ==========================================
+   BOTÕES DE SELEÇÃO / PILLS (SELECIONADOS)
+   ========================================== */
+div[data-testid="stPills"] button[aria-pressed="true"],
+div[data-testid="stPills"] button[aria-checked="true"],
+div[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+    background-color: #6f4b3e !important;
+    color: #ffffff !important;
+    border-color: #5a3c31 !important;
+    font-weight: 600 !important;
+}
+
+div[data-testid="stPills"] button[aria-pressed="true"]:hover,
+div[data-testid="stPills"] button[aria-checked="true"]:hover,
+div[data-testid="stSegmentedControl"] button[aria-pressed="true"]:hover {
+    background-color: #5c3e33 !important;
+    border-color: #4a3128 !important;
+}
+
+/* ==========================================
+   ESTILIZAÇÃO ESPECÍFICA DO BOTÃO + (SIGLAS PERSONALIZADAS)
+   ========================================== */
+.green-btn-marker + div div.stButton button,
+.green-btn-marker + div button {
     background-color: #28a745 !important;
     color: white !important;
     border-color: #28a745 !important;
@@ -83,7 +299,60 @@ div[data-testid="stVerticalBlock"] {
     align-items: center !important;
     justify-content: center !important;
 }
-.green-btn-marker + div div.stButton button:hover {
+.green-btn-marker + div div.stButton button:hover,
+.green-btn-marker + div button:hover {
     background-color: #218838 !important;
     border-color: #1e7e34 !important;
+}
+
+/* ==========================================
+   CAMPOS DE DIGITAÇÃO (text_input, text_area, number_input, selectbox)
+   ========================================== */
+
+/* Wrapper do campo de texto (text_input / number_input) */
+div[data-baseweb="input"] {
+    background-color: #fcedea !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 6px !important;
+}
+
+/* Elemento input em si */
+div[data-baseweb="input"] input {
+    background-color: #fcedea !important;
+    color: #2d2926 !important;
+    caret-color: #2d2926 !important;
+}
+
+/* Placeholder do input */
+div[data-baseweb="input"] input::placeholder {
+    color: #9e847c !important;
+    opacity: 1 !important;
+}
+
+/* Wrapper do campo de texto longo (text_area) */
+div[data-baseweb="textarea"] {
+    background-color: #fcedea !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 6px !important;
+}
+
+/* Elemento textarea em si */
+div[data-baseweb="textarea"] textarea {
+    background-color: #fcedea !important;
+    color: #2d2926 !important;
+    caret-color: #2d2926 !important;
+}
+
+/* Placeholder do textarea */
+div[data-baseweb="textarea"] textarea::placeholder {
+    color: #9e847c !important;
+    opacity: 1 !important;
+}
+
+/* Selectbox */
+div[data-baseweb="select"] > div {
+    background-color: #fcedea !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 6px !important;
+    color: #2d2926 !important;
 }
