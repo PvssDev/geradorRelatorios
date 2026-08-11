@@ -3,7 +3,7 @@
 primaryColor = "#6f4b3e"
 
 # Fundo suave off-white para o modo Light (menos agressivo que branco puro)
-backgroundColor = "#eed3c7"
+backgroundColor = "#dfb7a7"
 
 # Fundo secundário (usado em inputs, textareas, pills não selecionadas)
-secondaryBackgroundColor = "#fcedea"
+secondaryBackgroundColor = "#f7e4da"
