@@ -25,7 +25,7 @@ div[data-testid="stVerticalBlock"] {
     border-radius: 12px !important;
     margin: 16px 4px !important;
     overflow: visible !important;
-    background-color: #fff3ef !important;
+    background-color: #eed2c5 !important;
     border: 1px solid rgba(0, 0, 0, 0.08) !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
     transition: box-shadow 0.3s ease, transform 0.3s ease !important;
@@ -142,7 +142,7 @@ section[data-testid="stFileUploadDropzone"] button:hover {
 }
 
 /* ==========================================
-   BOTÕES SECUNDÁRIOS / DE AÇÃO
+   BOTÕES SECUNDÁRIOS / DE AÇÃO (#f7e4da)
    ========================================== */
 div.stButton > button:not([kind="primary"]):not([data-testid="stPill"]),
 div.stDownloadButton > button:not([kind="primary"]),
@@ -151,7 +151,7 @@ div[data-testid="stPopover"] > div > button,
 div.stPopover button,
 button[data-testid="stPopoverButton"],
 button[aria-haspopup="dialog"] {
-    background-color: #fff2e8 !important;
+    background-color: #f7e4da !important;
     color: #2d2926 !important;
     border: 1px solid rgba(0, 0, 0, 0.15) !important;
     border-radius: 6px !important;
@@ -166,12 +166,12 @@ div[data-testid="stPopover"] > div > button:hover,
 div.stPopover button:hover,
 button[data-testid="stPopoverButton"]:hover,
 button[aria-haspopup="dialog"]:hover {
-    background-color: #e9d4c2 !important;
+    background-color: #ecd2c4 !important;
     border-color: rgba(0, 0, 0, 0.25) !important;
 }
 
 /* ==========================================
-   BOTÕES QUADRADOS DE ÍCONES / CONFIGURAÇÃO / SWITCHES
+   BOTÕES QUADRADOS DE ÍCONES / CONFIGURAÇÃO / SWITCHES (#f7e4da)
    (⚙️, 🔄, 📋, 🗑️, 🔍, etc.)
    ========================================== */
 div[class*="st-key-btn_swap_"] button,
@@ -181,7 +181,7 @@ div[class*="st-key-btn_del_"] button,
 div[class*="st-key-btn_view_"] button,
 div[data-testid="stDialog"] button:not([kind="primary"]),
 div[data-testid="stModal"] button:not([kind="primary"]) {
-    background-color: #fcedea !important;
+    background-color: #f7e4da !important;
     color: #2d2926 !important;
     border: 1px solid rgba(0, 0, 0, 0.15) !important;
     border-radius: 8px !important;
@@ -205,7 +205,7 @@ div[class*="st-key-btn_del_"] button:hover,
 div[class*="st-key-btn_view_"] button:hover,
 div[data-testid="stDialog"] button:not([kind="primary"]):hover,
 div[data-testid="stModal"] button:not([kind="primary"]):hover {
-    background-color: #ebd0cb !important;
+    background-color: #ecd2c4 !important;
     border-color: rgba(0, 0, 0, 0.25) !important;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12) !important;
     transform: translateY(-1px);
@@ -307,18 +307,19 @@ div[data-testid="stSegmentedControl"] button[aria-pressed="true"]:hover {
 
 /* ==========================================
    CAMPOS DE DIGITAÇÃO (text_input, text_area, number_input, selectbox)
+   Unificados em #f7e4da (tom suave mais claro que os containers)
    ========================================== */
 
 /* Wrapper do campo de texto (text_input / number_input) */
 div[data-baseweb="input"] {
-    background-color: #fcedea !important;
+    background-color: #f7e4da !important;
     border: 1px solid rgba(0, 0, 0, 0.12) !important;
     border-radius: 6px !important;
 }
 
 /* Elemento input em si */
 div[data-baseweb="input"] input {
-    background-color: #fcedea !important;
+    background-color: #f7e4da !important;
     color: #2d2926 !important;
     caret-color: #2d2926 !important;
 }
@@ -331,14 +332,14 @@ div[data-baseweb="input"] input::placeholder {
 
 /* Wrapper do campo de texto longo (text_area) */
 div[data-baseweb="textarea"] {
-    background-color: #fcedea !important;
+    background-color: #f7e4da !important;
     border: 1px solid rgba(0, 0, 0, 0.12) !important;
     border-radius: 6px !important;
 }
 
 /* Elemento textarea em si */
 div[data-baseweb="textarea"] textarea {
-    background-color: #fcedea !important;
+    background-color: #f7e4da !important;
     color: #2d2926 !important;
     caret-color: #2d2926 !important;
 }
@@ -351,7 +352,7 @@ div[data-baseweb="textarea"] textarea::placeholder {
 
 /* Selectbox */
 div[data-baseweb="select"] > div {
-    background-color: #fcedea !important;
+    background-color: #f7e4da !important;
     border: 1px solid rgba(0, 0, 0, 0.12) !important;
     border-radius: 6px !important;
     color: #2d2926 !important;
