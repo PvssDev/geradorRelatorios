@@ -1,8 +1,10 @@
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_SECTION
+from docx.enum.table import WD_TABLE_ALIGNMENT
 import os
-from utils import adicionar_texto_caixa_cinza
+from utils import adicionar_texto_caixa_cinza, formatar_mes_ano, extrair_ano
+from database.manager import carregar_responsaveis
 
 def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_anterior=None):
     """
@@ -11,10 +13,6 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
     if hasattr(report_config, "gerar_capa_monitoramento"):
         report_config.gerar_capa_monitoramento(doc, logo_path, row, documento_anterior)
     else:
-        from docx.shared import Inches
-        from database.manager import carregar_responsaveis
-        from utils import formatar_mes_ano, extrair_ano
-        
         # 0. Ajuste de Estilo e Margens (Explicitas de 0.5 polegadas conforme a referência)
         style = doc.styles['Normal']
         style.font.name = 'Aptos'
@@ -35,7 +33,8 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
         
         # 1. Imagem da Capa
         if os.path.exists(logo_path):
-            doc.add_picture(logo_path, width=Inches(4.0))
+            img_w = Inches(6.0) if report_config.key == "SOCICAM" else Inches(4.0)
+            doc.add_picture(logo_path, width=img_w)
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
             
         doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
@@ -90,16 +89,17 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
             else:
                 p_cargo.paragraph_format.space_after = Pt(12)  # Espaço abaixo de cada analista
         
-        # 4. Data Dinâmica
-        p_data = doc.add_paragraph()
-        p_data.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        data_extenso = formatar_mes_ano(row["Data"])
-        run_data = p_data.add_run(data_extenso)
-        run_data.bold = True
-        run_data.font.size = Pt(12)
-        # Espaçamento superior e inferior para isolar a data nativamente
-        p_data.paragraph_format.space_before = Pt(12)
-        p_data.paragraph_format.space_after = Pt(12)
+        # 4. Data Dinâmica (Apenas para relatórios que contêm data central na capa, como CRA/CRC)
+        if report_config.key != "SOCICAM":
+            p_data = doc.add_paragraph()
+            p_data.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            data_extenso = formatar_mes_ano(row["Data"])
+            run_data = p_data.add_run(data_extenso)
+            run_data.bold = True
+            run_data.font.size = Pt(12)
+            # Espaçamento superior e inferior para isolar a data nativamente
+            p_data.paragraph_format.space_before = Pt(12)
+            p_data.paragraph_format.space_after = Pt(12)
         
         # 5. Processo e SEI Dinâmicos
         rodape_textos = report_config.get_process_sei_texts(ano)
@@ -139,8 +139,6 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
 
 def gerar_lista_abreviaturas(doc, report_config):
     """Gera a segunda página do cabeçalho (Lista de Abreviaturas e Siglas)."""
-    from docx.enum.table import WD_TABLE_ALIGNMENT
-    
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run("LISTA DE ABREVIATURAS E SIGLAS")
@@ -185,7 +183,7 @@ def gerar_lista_abreviaturas(doc, report_config):
                 run.font.size = Pt(11)
                 
     # Definir larguras das colunas
-    col_widths = [Inches(1.0), Inches(5.0)]
+    col_widths = [Inches(0.65), Inches(4.38)] if report_config.key == "SOCICAM" else [Inches(1.0), Inches(5.0)]
     for row in table.rows:
         for idx, width in enumerate(col_widths):
             row.cells[idx].width = width
@@ -211,10 +209,10 @@ def gerar_sumario(doc, row, report_config):
         
         # Adiciona os tab stops necessários:
         # 1. Alinhamento esquerdo a 0.5 polegadas para afastar o título do número
-        # 2. Alinhamento direito a 7.5 polegadas para colar o número da página no canto direito com pontilhado
+        # 2. Alinhamento direito a 7.27 polegadas para colar o número da página no canto direito com pontilhado
         tab_stops = p_line.paragraph_format.tab_stops
         tab_stops.add_tab_stop(Inches(0.5), alignment=WD_TAB_ALIGNMENT.LEFT)
-        tab_stops.add_tab_stop(Inches(7.5), alignment=WD_TAB_ALIGNMENT.RIGHT, leader=WD_TAB_LEADER.DOTS)
+        tab_stops.add_tab_stop(Inches(7.27), alignment=WD_TAB_ALIGNMENT.RIGHT, leader=WD_TAB_LEADER.DOTS)
         
         parts = linha.split('\t')
         

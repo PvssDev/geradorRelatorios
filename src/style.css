@@ -178,9 +178,7 @@ div[class*="st-key-btn_swap_"] button,
 div[class*="st-key-btn_manage_"] button,
 div[class*="st-key-del_"] button,
 div[class*="st-key-btn_del_"] button,
-div[class*="st-key-btn_view_"] button,
-div[data-testid="stDialog"] button:not([kind="primary"]),
-div[data-testid="stModal"] button:not([kind="primary"]) {
+div[class*="st-key-btn_view_"] button {
     background-color: #f7e4da !important;
     color: #2d2926 !important;
     border: 1px solid rgba(0, 0, 0, 0.15) !important;
@@ -202,9 +200,7 @@ div[class*="st-key-btn_swap_"] button:hover,
 div[class*="st-key-btn_manage_"] button:hover,
 div[class*="st-key-del_"] button:hover,
 div[class*="st-key-btn_del_"] button:hover,
-div[class*="st-key-btn_view_"] button:hover,
-div[data-testid="stDialog"] button:not([kind="primary"]):hover,
-div[data-testid="stModal"] button:not([kind="primary"]):hover {
+div[class*="st-key-btn_view_"] button:hover {
     background-color: #ecd2c4 !important;
     border-color: rgba(0, 0, 0, 0.25) !important;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12) !important;
