@@ -1,6 +1,9 @@
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from utils import adicionar_titulo_secao, formatar_data_extenso, extrair_ano
 import pandas as pd
 
@@ -35,7 +38,6 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
             if italic:
                 run.italic = True
             if color_rgb:
-                from docx.shared import RGBColor
                 run.font.color.rgb = RGBColor(*color_rgb)
 
     # ----------------------------------------------------
@@ -73,8 +75,6 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
     run_info.font.size = Pt(12)
     
     # Construção da tabela de Informações Gerais
-    from docx.enum.table import WD_TABLE_ALIGNMENT
-    
     responsaveis_formatted = str(row["Pessoal Responsável"]).replace(",", " e" if "," not in str(row["Pessoal Responsável"]) else ";")
     periodo_val = str(row["Período"]).strip() if pd.notna(row["Período"]) and str(row["Período"]).strip() else f"{data_extenso}."
     
@@ -101,8 +101,6 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
             
         # Shading XML
         tcPr = cell._tc.get_or_add_tcPr()
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
         shd = OxmlElement('w:shd')
         shd.set(qn('w:val'), 'clear')
         shd.set(qn('w:color'), 'auto')
@@ -151,10 +149,10 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
             row_obj.cells[1].width = col_widths[1]
 
     # ----------------------------------------------------
-    # 4. SEÇÃO: METODOLOGIA
+    # 3/4. SEÇÃO: METODOLOGIA
     # ----------------------------------------------------
     doc.add_paragraph()  # Pula uma linha antes do título
-    metodo_title = "3. METODOLOGIA" if report_config.key == "CRA" else "4. METODOLOGIA"
+    metodo_title = "3. METODOLOGIA" if report_config.key in ["CRA", "SOCICAM"] else "4. METODOLOGIA"
     adicionar_titulo_secao(doc, metodo_title)
     doc.add_paragraph()  # Pula uma linha abaixo do título
     

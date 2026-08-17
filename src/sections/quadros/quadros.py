@@ -310,6 +310,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         
         # Format the cells
         for c_idx, cell in enumerate(r_total.cells):
+            set_cell_shading(cell, "D9D9D9")
             set_cell_margins(cell, top=100, bottom=100, left=150, right=150)
             cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
             

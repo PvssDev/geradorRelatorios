@@ -1,17 +1,17 @@
 from docx import Document
-from docx.shared import Pt, Inches
+from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 import os
 import pandas as pd
-from utils import adicionar_titulo_secao, extrair_ano
+from datetime import datetime
+from utils import adicionar_titulo_secao, extrair_ano, formatar_data_extenso
 from database.manager import carregar_responsaveis, carregar_coordenadores
 
 def formatar_data_dd_mm_yyyy(data_val):
     if pd.isna(data_val) or not data_val:
         return ""
     try:
-        from datetime import datetime
         if hasattr(data_val, "to_pydatetime"):
             dt = data_val.to_pydatetime()
         elif isinstance(data_val, datetime):
@@ -51,11 +51,6 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
     records = df_fotos.to_dict('records')
     
     if "MONITORAMENTO" in tipo_relatorio.upper():
-        import os
-        from docx.shared import Inches, Pt
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.enum.table import WD_TABLE_ALIGNMENT
-        
         # Agrupa por Pista mantendo a ordem de inserção
         pistas_unicas = []
         for p in df_fotos["Pista"].tolist():
@@ -212,9 +207,10 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
             table.autofit = False
             table.allow_autofit = False
             
-            # Largura de 5.0 polegadas
-            table.rows[0].cells[0].width = Inches(5.0)
-            table.rows[1].cells[0].width = Inches(5.0)
+            # Largura de 3.12 polegadas para SOCICAM e 5.0 para CRC
+            tbl_width = Inches(3.12) if tipo_relatorio == "SOCICAM" else Inches(5.0)
+            table.rows[0].cells[0].width = tbl_width
+            table.rows[1].cells[0].width = tbl_width
             
             # Row 0: Foto
             p_img = table.rows[0].cells[0].paragraphs[0]
@@ -227,7 +223,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
             foto_path = os.path.join(fotos_dir, foto) if fotos_dir and foto else ""
             if foto_path and os.path.exists(foto_path):
                 run_img = p_img.add_run()
-                run_img.add_picture(foto_path, width=Inches(4.5), height=Inches(4.5))
+                img_dim = Inches(2.96) if tipo_relatorio == "SOCICAM" else Inches(4.5)
+                run_img.add_picture(foto_path, width=img_dim, height=img_dim)
                 
             # Row 1: Legenda
             p_caption = table.rows[1].cells[0].paragraphs[0]
@@ -418,7 +415,6 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
             if italic:
                 run.italic = True
             if color_rgb:
-                from docx.shared import RGBColor
                 run.font.color.rgb = RGBColor(*color_rgb)
 
     # ----------------------------------------------------
@@ -479,7 +475,6 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
                 add_formatted_paragraph(resolved_runs)
 
         elif sec_type in ("conclusões_monitoramento", "conclusoes_monitoramento"):
-            from utils import formatar_data_extenso
             data_extenso = formatar_data_extenso(row["Data"])
             doc.add_paragraph()  # Espaço
             adicionar_titulo_secao(doc, f"{num_str}. CONCLUSÕES E RECOMENDAÇÕES")
@@ -491,16 +486,8 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
                     resolved_runs.append((resolved_text, bold, italic, color_rgb))
                 add_formatted_paragraph(resolved_runs)
 
-    # Local e Data após conclusões
-    p_loc1 = doc.add_paragraph()
-    p_loc1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p_loc1.paragraph_format.space_after = Pt(6)
-    run_loc1 = p_loc1.add_run("Recife, data da assinatura eletrônica.")
-    run_loc1.font.name = 'Aptos'
-    run_loc1.font.size = Pt(11)
-    
     # ----------------------------------------------------
-    # APÊNDICES
+    # APÊNDICES (Renderizados após as conclusões e antes das assinaturas)
     # ----------------------------------------------------
     id_fisc = row["ID da Fiscalização"]
     data_fisc = formatar_data_dd_mm_yyyy(row["Data"])
@@ -518,17 +505,18 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
     # Delegate appendix rendering to the strategy
     report_config.render_apendices(doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos)
 
-    p_loc2 = doc.add_paragraph()
-    p_loc2.paragraph_format.space_before = Pt(12)
-    p_loc2.paragraph_format.space_after = Pt(12)
-    run_loc2 = p_loc2.add_run("Recife, data da assinatura eletrônica.")
-    run_loc2.font.name = 'Aptos'
-    run_loc2.font.size = Pt(11)
-    
     # ----------------------------------------------------
-    # ASSINATURAS FINAIS DINÂMICAS
+    # DATAÇÃO E ASSINATURAS FINAIS (Ao final do documento)
     # ----------------------------------------------------
     doc.add_paragraph()
+    p_loc1 = doc.add_paragraph()
+    p_loc1.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p_loc1.paragraph_format.space_before = Pt(12)
+    p_loc1.paragraph_format.space_after = Pt(24)
+    run_loc1 = p_loc1.add_run("Recife, data da assinatura eletrônica.")
+    run_loc1.font.name = 'Aptos'
+    run_loc1.font.size = Pt(11)
+    
     doc.add_paragraph()
     
     responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
@@ -556,28 +544,29 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         p_carg = doc.add_paragraph()
         p_carg.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_carg.paragraph_format.space_after = Pt(0)
-        run_carg = p_carg.add_run(r_funcao)
+        run_carg = p_carg.add_run(f"{r_funcao}, Matrícula nº {r_matr}" if report_config.key == "SOCICAM" else r_funcao)
         run_carg.font.name = 'Aptos'
         run_carg.font.size = Pt(11)
         
-        p_mat = doc.add_paragraph()
-        p_mat.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_mat.paragraph_format.space_after = Pt(12)
-        run_mat = p_mat.add_run(f"Matrícula nº {r_matr}")
-        run_mat.font.name = 'Aptos'
-        run_mat.font.size = Pt(11)
+        if report_config.key != "SOCICAM":
+            p_mat = doc.add_paragraph()
+            p_mat.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_mat.paragraph_format.space_after = Pt(12)
+            run_mat = p_mat.add_run(f"Matrícula nº {r_matr}")
+            run_mat.font.name = 'Aptos'
+            run_mat.font.size = Pt(11)
+        else:
+            p_carg.paragraph_format.space_after = Pt(18)
         
         doc.add_paragraph()  # Espaço entre assinaturas
         
     # Ciente e de acordo (Coordenador)
     p_ciente = doc.add_paragraph()
-    p_ciente.paragraph_format.space_before = Pt(12)
-    p_ciente.paragraph_format.space_after = Pt(12)
+    p_ciente.paragraph_format.space_before = Pt(36)
+    p_ciente.paragraph_format.space_after = Pt(36)
     run_ciente = p_ciente.add_run("Ciente e de acordo.")
     run_ciente.font.name = 'Aptos'
     run_ciente.font.size = Pt(11)
-    
-    doc.add_paragraph()  # Espaço antes da assinatura do coordenador
     
     db_coord = carregar_coordenadores()
     coord_name = str(row["Coordenador"]).strip()

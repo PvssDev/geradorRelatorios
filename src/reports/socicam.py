@@ -62,7 +62,9 @@ class SocicamReport(BaseReport):
             ("ABNT", "Associação Brasileira de Normas Técnicas"),
             ("ARPE", "Agência de Regulação de Pernambuco"),
             ("EPTI", "Empresa Pernambucana de Transporte Coletivo Intermunicipal"),
-            ("NC", "Não Conformidade")
+            ("NC", "Não Conformidade"),
+            ("PCD", "Pessoa com Deficiência"),
+            ("TIP", "Terminal Rodoviário de Passageiros do Recife")
         ]
 
     def get_sumario_linhas(self, row) -> list:
@@ -118,7 +120,7 @@ class SocicamReport(BaseReport):
             f"A fiscalização direta e periódica dos Terminais Rodoviários de Passageiros concedidos à SOCICAM, tem por "
             f"objetivo verificar as condições de conservação, limpeza e higiene das áreas de embarque e desembarque, dos "
             f"sanitários, as condições do pavimento das vias de circulação interna, a infraestrutura oferecida, a segurança "
-            f"e o atendimento ao usuário, bem como toda estrutura para funcionamento desse terminal. Dessa forma a ação de "
+            f"e o atendimento ao usuário, bem como toda estrutura para funcionamento desses terminais. Dessa forma a ação de "
             f"fiscalização no {nome_negrito}, realizada pela ARPE verificou o grau de conformidade dessas instalações com o "
             f"Contrato de Concessão, bem como com a legislação e normas vigentes de modo a determinar e/ou recomendar "
             f"medidas corretivas, com foco na qualidade dos serviços prestados."
@@ -263,26 +265,41 @@ class SocicamReport(BaseReport):
         responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
         from database.manager import carregar_responsaveis
         db_resp = carregar_responsaveis()
-        team_parts = []
-        for nome in responsaveis_list:
+        
+        team_runs = []
+        for idx, nome in enumerate(responsaveis_list):
             match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
-            if match:
-                team_parts.append(f"{match['nome']} (matrícula nº {match['matricula']})")
-            else:
-                team_parts.append(f"{nome} (matrícula nº xxxxxxx/xx)")
-                
-        if len(team_parts) == 1:
-            team_str = team_parts[0]
-        elif len(team_parts) == 2:
-            team_str = f"{team_parts[0]} e {team_parts[1]}"
-        else:
-            team_str = ", ".join(team_parts[:-1]) + " e " + team_parts[-1]
+            matricula = match['matricula'] if match else "xxxxxxx/xx"
+            nome_real = match['nome'] if match else nome
+            
+            if idx > 0:
+                if idx == len(responsaveis_list) - 1:
+                    team_runs.append((" e ", False, False, None))
+                else:
+                    team_runs.append((", ", False, False, None))
+            team_runs.append((nome_real, True, False, None))
+            team_runs.append((f" (matrícula nº {matricula})", False, False, None))
             
         local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        return [
-            [(f"As ações de fiscalização foram realizadas, em {data_extenso}, pela equipe formada pelos Especialista em Regulação {team_str}, no {local_val}.", True, False, None)],
-            [("As Não Conformidades constatadas estão relacionadas ao Programa de Manutenção dos Terminais Rodoviários, Anexo V do Contrato de Concessão, conforme descritas no Quadro 1, a seguir, com indicação dos respectivos registros fotográficos no Apêndice A.", True, False, None)]
+        
+        p1 = [
+            ("As ações de fiscalização foram realizadas, em ", False, False, None),
+            (f"{data_extenso}, ", False, False, None),
+            ("pela equipe formada pelos Especialista em Regulação ", False, False, None)
+        ] + team_runs + [
+            (f", no {local_val}.", False, False, None)
         ]
+        
+        p2 = [
+            ("As Não Conformidades constatadas estão relacionadas ao ", False, False, None),
+            ("Programa de Manutenção dos Terminais Rodoviários", True, False, None),
+            (", Anexo V do Contrato de Concessão, conforme descritas no ", False, False, None),
+            ("Quadro 1", True, False, None),
+            (", a seguir, com indicação dos respectivos registros fotográficos no ", False, False, None),
+            ("Apêndice A", True, False, None),
+            (".", False, False, None)
+        ]
+        return [p1, p2]
 
     @property
     def quadro_title_template(self) -> str:
@@ -329,11 +346,12 @@ class SocicamReport(BaseReport):
         extenso_ncs = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
         return [
             [("Considerando os dispositivos contratuais pertinentes e visando garantir a qualidade dos serviços prestados, determina-se que a SOCICAM tome as seguintes medidas através de plano de ação:", False, False, None)],
-            [("Manutenção e Monitoramento:", True, False, None),
-             (" adotar medidas para assegurar a manutenção, o monitoramento contínuo e o cumprimento do Programa de Manutenção dos Terminais Rodoviários, constante da proposta da SOICICAM nos subitens 9.1.1 Manutenção Preventiva; 9.1.2 manutenção Corretiva e 9.13 tabela de Classificação de Níveis de Falha (tabela de tempos máximos para os níveis de atendimento).", True, False, None)],
-            [("Medidas imediatas para resolutividade das ", True, False, None),
-             (f"{total_ncs} ({extenso_ncs})", True, False, None),
-             (" novas Não Conformidades constatadas, nos prazos estabelecidos, conforme disposto no Quadro 1, na coluna denominada Determinações.", True, False, None)]
+            [("Manutenção e Monitoramento", True, False, None),
+             (": adotar medidas para assegurar a manutenção, o monitoramento contínuo e o cumprimento do Programa de Manutenção dos Terminais Rodoviários, constante da proposta da SOCICAM nos subitens 9.1.1 Manutenção Preventiva; 9.1.2 Manutenção Corretiva e 9.1.3 Tabela de Classificação de Níveis de Falha (tabela de tempos máximos para os níveis de atendimento).", False, False, None)],
+            [("Medidas imediatas", True, False, None),
+             (" para resolutividade das ", False, False, None),
+             (f"{total_ncs} ({extenso_ncs}) novas Não Conformidades", True, False, None),
+             (" constatadas, nos prazos estabelecidos, conforme disposto no Quadro 1, na coluna denominada Determinações.", False, False, None)]
         ]
 
     def get_recommendations_paragraphs(self) -> list:
@@ -353,7 +371,11 @@ class SocicamReport(BaseReport):
         }
         extenso_ncs = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
         return [
-            [(f"Tendo em vista as ações de fiscalização realizadas pela ARPE foram constatadas {extenso_ncs} novas Não Conformidades no {local_val}, que devem ser solucionadas pela SOCICAM de acordo com as Determinações desta Agência de Regulação (v. Quadro 1).", True, False, None)],
+            [
+                ("Tendo em vista as ações de fiscalização realizadas pela ARPE foram constatadas ", False, False, None),
+                (f"{extenso_ncs} novas Não Conformidades no {local_val}", True, False, None),
+                (", que devem ser solucionadas pela SOCICAM de acordo com as Determinações desta Agência de Regulação (v. Quadro 1).", False, False, None)
+            ],
             [("Por fim, solicita-se o encaminhamento deste Processo de Fiscalização para conhecimento e acompanhamento da EPTI, na qualidade de Poder Concedente do Contrato de Concessão e gestora do Sistema de Transporte Coletivo Intermunicipal de Passageiros (STCIP-PE).", False, False, None)]
         ]
 
