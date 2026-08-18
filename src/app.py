@@ -11,6 +11,21 @@ from database.manager import (
     carregar_contratos, salvar_contratos,
     carregar_custom_ncs, salvar_custom_ncs
 )
+from services.data_service import (
+    gerar_planilha_excel_buffer,
+    salvar_fotos_em_diretorio
+)
+from ui.state import inicializar_estado_sessao, obter_termos_ui
+from ui.modals import (
+    mostrar_foto_modal,
+    confirmar_exclusao_lote_modal,
+    confirmar_exclusao_nc_modal,
+    gerenciar_responsaveis_modal,
+    gerenciar_coordenadores_modal,
+    gerenciar_contratos_modal,
+    adicionar_nc_personalizada_modal
+)
+
 st.set_page_config(page_title="Gerador de Relatórios", layout="wide")
 
 def inject_custom_theme_css():
@@ -23,322 +38,19 @@ def inject_custom_theme_css():
 
 inject_custom_theme_css()
 
-if "categoria_relatorio" not in st.session_state:
-    st.session_state.categoria_relatorio = "Fiscalização"
-
-if "photos_uploader_version" not in st.session_state:
-    st.session_state.photos_uploader_version = 0
-if "mon_uploader_version" not in st.session_state:
-    st.session_state.mon_uploader_version = 0
+# Inicialização centralizada do estado e opções da aplicação
+inicializar_estado_sessao()
 
 is_monitoring = st.session_state.categoria_relatorio == "Monitoramento"
 is_crc_monitoring = (st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring)
-term_fisc = "Monitoramento" if is_monitoring else "Fiscalização"
-term_fisc_lower = "monitoramento" if is_monitoring else "fiscalização"
-term_fisc_plural = "Monitoramentos" if is_monitoring else "Fiscalizações"
-term_fisc_plural_lower = "monitoramentos" if is_monitoring else "fiscalizações"
-term_fisc_prep = "do Monitoramento" if is_monitoring else "da Fiscalização"
-term_fisc_prep_f = "de Monitoramento" if is_monitoring else "de Fiscalização"
-term_fisc_pessoal = "pelo monitoramento" if is_monitoring else "pela fiscalização"
-
-@st.dialog("Visualização Completa da Imagem", width="large")
-def mostrar_foto_modal(uploaded_file):
-    st.image(uploaded_file, caption=uploaded_file.name, use_container_width=True)
-
-@st.dialog("Confirmar Exclusão em Lote")
-def confirmar_exclusao_lote_modal(ids):
-    st.write(f"Você tem certeza que deseja excluir as seguintes {term_fisc_plural_lower}?")
-    for id_fisc in ids:
-        st.write(f"- **{id_fisc}**")
-    st.write("Isso também removerá todas as Não Conformidades vinculadas a estes IDs.")
-    st.warning("⚠️ Esta ação não pode ser desfeita.")
-    
-    col_sim, col_nao = st.columns(2)
-    with col_sim:
-        if st.button("Sim, Excluir", type="primary", use_container_width=True, key="btn_confirm_bulk_del"):
-            st.session_state.temp_fiscalizacoes = [f for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] not in ids]
-            st.session_state.temp_nc = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] not in ids]
-            st.session_state.relatorios_preenchimento_data = []
-            st.success(f"{term_fisc_plural} selecionadas excluídas com sucesso!")
-            st.rerun()
-    with col_nao:
-        if st.button("Cancelar", use_container_width=True, key="btn_cancel_bulk_del"):
-            st.rerun()
-
-@st.dialog("Confirmar Exclusão de Itens")
-def confirmar_exclusao_nc_modal(nc_keys):
-    st.write("Você tem certeza que deseja excluir os seguintes itens selecionados?")
-    for id_fisc, num in nc_keys:
-        st.write(f"- **ID {id_fisc} - Item nº {num}**")
-    st.warning("⚠️ Esta ação não pode ser desfeita.")
-    
-    col_sim, col_nao = st.columns(2)
-    with col_sim:
-        if st.button("Sim, Excluir", type="primary", use_container_width=True, key="btn_confirm_nc_del"):
-            # Mantém apenas as NCs que NÃO foram marcadas para exclusão
-            st.session_state.temp_nc = [
-                nc for nc in st.session_state.temp_nc 
-                if (nc["ID da Fiscalização"], nc["Nº"]) not in nc_keys
-            ]
-            
-            # Recalcula a numeração sequencial ("Nº") das NCs restantes por ID de fiscalização
-            ncs_por_id = {}
-            for nc in st.session_state.temp_nc:
-                id_f = nc["ID da Fiscalização"]
-                if id_f not in ncs_por_id:
-                    ncs_por_id[id_f] = []
-                ncs_por_id[id_f].append(nc)
-            
-            novas_ncs = []
-            for id_f, lista in ncs_por_id.items():
-                for seq, nc in enumerate(lista, 1):
-                    nc["Nº"] = seq
-                    novas_ncs.append(nc)
-            st.session_state.temp_nc = novas_ncs
-            
-            st.session_state.relatorios_preenchimento_data = []
-            st.success("Não Conformidades selecionadas excluídas com sucesso!")
-            st.rerun()
-    with col_nao:
-        if st.button("Cancelar", use_container_width=True, key="btn_cancel_nc_del"):
-            st.rerun()
-
-@st.dialog("Gerenciar Pessoal Responsável")
-def gerenciar_responsaveis_modal():
-    st.write(f"Adicione, veja ou remova os responsáveis técnicos {term_fisc_pessoal}.")
-    
-    # 1. Inputs para adicionar novo
-    novo_resp = st.text_input("Nome do Novo Responsável")
-    nova_matricula = st.text_input("Número de Matrícula (ex: 40672015/01)")
-    nova_funcao = st.text_input("Função / Cargo (ex: Analista de Regulação)")
-    
-    if st.button("➕ Adicionar Responsável", type="primary", use_container_width=True):
-        if not novo_resp.strip():
-            st.error("O nome do responsável é obrigatório.")
-        elif not nova_matricula.strip():
-            st.error("O número de matrícula é obrigatório.")
-        elif not nova_funcao.strip():
-            st.error("A função / cargo é obrigatória.")
-        else:
-            nomes_existentes = [r["nome"].strip().lower() for r in st.session_state.pessoal_responsaveis]
-            if novo_resp.strip().lower() not in nomes_existentes:
-                st.session_state.pessoal_responsaveis.append({
-                    "nome": novo_resp.strip(),
-                    "matricula": nova_matricula.strip(),
-                    "funcao": nova_funcao.strip()
-                })
-                salvar_responsaveis(st.session_state.pessoal_responsaveis)
-                st.success(f"'{novo_resp.strip()}' adicionado!")
-                st.rerun()
-            else:
-                st.warning("Este nome já está cadastrado.")
-            
-    st.divider()
-    
-    # 2. Lista atual com opção de remover
-    st.write("**Responsáveis Cadastrados:**")
-    if not st.session_state.pessoal_responsaveis:
-        st.info("Nenhum responsável cadastrado.")
-    else:
-        for idx, resp in enumerate(st.session_state.pessoal_responsaveis):
-            col_name, col_del = st.columns([8.5, 1.5])
-            with col_name:
-                st.markdown(f"- **{resp['nome']}**  \n  *{resp['funcao']} - Matrícula: {resp['matricula']}*")
-            with col_del:
-                if st.button("🗑️", key=f"del_resp_{idx}", help="Remover responsável"):
-                    st.session_state.pessoal_responsaveis.pop(idx)
-                    salvar_responsaveis(st.session_state.pessoal_responsaveis)
-                    st.rerun()
-
-@st.dialog("Gerenciar Coordenadores")
-def gerenciar_coordenadores_modal():
-    st.write(f"Adicione, veja ou remova os coordenadores {term_fisc_prep_f.lower()}.")
-    
-    # 1. Inputs para adicionar novo
-    novo_coord = st.text_input("Nome do Novo Coordenador")
-    nova_matricula = st.text_input("Número de Matrícula (ex: 209640/01)")
-    nova_funcao = st.text_input("Função / Cargo (ex: Coordenador(a) de Transportes e Rodovias)")
-    
-    if st.button("➕ Adicionar Coordenador", type="primary", use_container_width=True):
-        if not novo_coord.strip():
-            st.error("O nome do coordenador é obrigatório.")
-        elif not nova_matricula.strip():
-            st.error("O número de matrícula é obrigatório.")
-        elif not nova_funcao.strip():
-            st.error("A função / cargo é obrigatória.")
-        else:
-            nomes_existentes = [c["nome"].strip().lower() for c in st.session_state.coordenadores]
-            if novo_coord.strip().lower() not in nomes_existentes:
-                st.session_state.coordenadores.append({
-                    "nome": novo_coord.strip(),
-                    "matricula": nova_matricula.strip(),
-                    "funcao": nova_funcao.strip()
-                })
-                salvar_coordenadores(st.session_state.coordenadores)
-                st.success(f"'{novo_coord.strip()}' adicionado!")
-                st.rerun()
-            else:
-                st.warning("Este nome já está cadastrado.")
-            
-    st.divider()
-    
-    # 2. Lista atual com opção de remover
-    st.write("**Coordenadores Cadastrados:**")
-    if not st.session_state.coordenadores:
-        st.info("Nenhum coordenador cadastrado.")
-    else:
-        for idx, coord in enumerate(st.session_state.coordenadores):
-            col_name, col_del = st.columns([8.5, 1.5])
-            with col_name:
-                st.markdown(f"- **{coord['nome']}**  \n  *{coord['funcao']} - Matrícula: {coord['matricula']}*")
-            with col_del:
-                if st.button("🗑️", key=f"del_coord_{idx}", help="Remover coordenador"):
-                    st.session_state.coordenadores.pop(idx)
-                    salvar_coordenadores(st.session_state.coordenadores)
-                    st.rerun()
-
-@st.dialog("Gerenciar Contratos")
-def gerenciar_contratos_modal():
-    st.write("Adicione, veja ou remova os números de contrato cadastrados.")
-    
-    # 1. Input para adicionar novo
-    novo_contrato = st.text_input("Número do Novo Contrato")
-    if st.button("➕ Adicionar Contrato", type="primary", use_container_width=True):
-        if novo_contrato.strip():
-            if novo_contrato.strip() not in st.session_state.contratos:
-                st.session_state.contratos.append(novo_contrato.strip())
-                salvar_contratos(st.session_state.contratos)
-                st.success(f"'{novo_contrato.strip()}' adicionado!")
-                st.rerun()
-            else:
-                st.warning("Este contrato já está na lista.")
-        else:
-            st.error("O número do contrato não pode ser vazio.")
-            
-    st.divider()
-    
-    # 2. Lista atual com opção de remover
-    st.write("**Contratos Cadastrados:**")
-    if not st.session_state.contratos:
-        st.info("Nenhum contrato cadastrado.")
-    else:
-        for idx, cont in enumerate(st.session_state.contratos):
-            col_name, col_del = st.columns([8.5, 1.5])
-            with col_name:
-                st.write(f"- {cont}")
-            with col_del:
-                if st.button("🗑️", key=f"del_cont_{idx}", help="Remover contrato"):
-                    st.session_state.contratos.pop(idx)
-                    salvar_contratos(st.session_state.contratos)
-                    st.rerun()
-
-
-
-@st.dialog("Adicionar Não Conformidade Personalizada")
-def adicionar_nc_personalizada_modal(pills_key):
-    st.write("Selecione uma Não Conformidade criada anteriormente ou cadastre uma nova:")
-    
-    # 1. Escolher existente e permitir apagar
-    custom_ncs = st.session_state.custom_ncs
-    
-    st.markdown("**Não Conformidades Adicionadas Anteriormente:**")
-    if not custom_ncs:
-        st.info("Nenhuma não conformidade personalizada cadastrada ainda.")
-    else:
-        for idx, item in enumerate(custom_ncs):
-            sigla = item.get("sigla", "")
-            desc = item.get("descricao", "")
-            label = f"{sigla} - {desc}" if sigla else desc
-            val_to_select = sigla if sigla else desc
-            
-            col_sel, col_del = st.columns([8.5, 1.5])
-            with col_sel:
-                # Ao clicar, seleciona diretamente a NC e adiciona ao pills_key
-                if st.button(label, key=f"sel_custom_nc_{idx}", use_container_width=True):
-                    if val_to_select not in st.session_state.nc_options:
-                        st.session_state.nc_options.append(val_to_select)
-                    
-                    current_sel = list(st.session_state.get(pills_key, []))
-                    if val_to_select not in current_sel:
-                        st.session_state[pills_key] = current_sel + [val_to_select]
-                    st.rerun()
-            with col_del:
-                if st.button("🗑️", key=f"del_custom_nc_{idx}", help="Apagar esta não conformidade permanentemente"):
-                    del_item = st.session_state.custom_ncs.pop(idx)
-                    salvar_custom_ncs(st.session_state.custom_ncs)
-                    
-                    del_sigla = del_item.get("sigla", "")
-                    del_desc = del_item.get("descricao", "")
-                    del_val = del_sigla if del_sigla else del_desc
-                    
-                    # Remover do MAP_SIGLAS
-                    from sections.quadros.quadros import MAP_SIGLAS
-                    if del_sigla and del_sigla in MAP_SIGLAS:
-                        del MAP_SIGLAS[del_sigla]
-                    
-                    # Reconstruir st.session_state.nc_options
-                    base_options = ["FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB", "JE", "TBE", "ALP", "ATP", "O", "P", "EX", "D", "R", "ALC", "ATC", "E"]
-                    new_nc_options = base_options.copy()
-                    for c_item in st.session_state.custom_ncs:
-                        s = c_item.get("sigla", "")
-                        d = c_item.get("descricao", "")
-                        v = s if s else d
-                        if v not in new_nc_options:
-                            new_nc_options.append(v)
-                    st.session_state.nc_options = new_nc_options
-                    
-                    # Remover da seleção ativa se estiver selecionado
-                    current_sel = list(st.session_state.get(pills_key, []))
-                    if del_val in current_sel:
-                        st.session_state[pills_key] = [x for x in current_sel if x != del_val]
-                        
-                    st.rerun()
-                    
-    st.markdown("---")
-    st.write("**Cadastrar uma nova Não Conformidade:**")
-    
-    nova_sigla = st.text_input("Sigla (opcional)", placeholder="Ex: ABC")
-    nova_desc = st.text_input("Descrição (obrigatório)", placeholder="Ex: Minha descrição personalizada...")
-    
-    col_salvar, col_cancelar = st.columns(2)
-    with col_salvar:
-        if st.button("Cadastrar e Selecionar", type="primary", use_container_width=True, key="btn_confirm_add_custom_nc"):
-            desc_strip = nova_desc.strip()
-            sigla_strip = nova_sigla.strip().upper()
-            
-            if not desc_strip:
-                st.error("O campo 'Descrição' é obrigatório para cadastrar uma nova não conformidade.")
-            else:
-                # Save new custom NC
-                new_item = {"sigla": sigla_strip, "descricao": desc_strip}
-                st.session_state.custom_ncs.append(new_item)
-                salvar_custom_ncs(st.session_state.custom_ncs)
-                
-                # Update MAP_SIGLAS and options
-                from sections.quadros.quadros import MAP_SIGLAS
-                val_to_select = sigla_strip if sigla_strip else desc_strip
-                if sigla_strip:
-                    MAP_SIGLAS[sigla_strip] = desc_strip
-                
-                if val_to_select not in st.session_state.nc_options:
-                    st.session_state.nc_options.append(val_to_select)
-                    
-                # Add to selection
-                current_sel = list(st.session_state.get(pills_key, []))
-                if val_to_select not in current_sel:
-                    st.session_state[pills_key] = current_sel + [val_to_select]
-                    
-                st.success("Nova não conformidade cadastrada e selecionada!")
-                st.rerun()
-                    
-    with col_cancelar:
-        if st.button("Cancelar", use_container_width=True, key="btn_cancel_add_custom_nc"):
-            st.rerun()
-
-if "tipo_relatorio" not in st.session_state:
-    st.session_state.tipo_relatorio = "CRA"
-if "categoria_relatorio" not in st.session_state:
-    st.session_state.categoria_relatorio = "Fiscalização"
+terms = obter_termos_ui(is_monitoring)
+term_fisc = terms["term_fisc"]
+term_fisc_lower = terms["term_fisc_lower"]
+term_fisc_plural = terms["term_fisc_plural"]
+term_fisc_plural_lower = terms["term_fisc_plural_lower"]
+term_fisc_prep = terms["term_fisc_prep"]
+term_fisc_prep_f = terms["term_fisc_prep_f"]
+term_fisc_pessoal = terms["term_fisc_pessoal"]
 
 _, col_center_group, _ = st.columns([1, 12, 1])
 with col_center_group:
@@ -476,66 +188,6 @@ with st.container():
     elif st.session_state.fill_photos:
         st.session_state.carousel_index = min(st.session_state.carousel_index, len(st.session_state.fill_photos) - 1)
         st.session_state.carousel_index = max(0, st.session_state.carousel_index)
-    if "temp_fiscalizacoes" not in st.session_state:
-        st.session_state.temp_fiscalizacoes = []
-    if "temp_nc" not in st.session_state:
-        st.session_state.temp_nc = []
-    if "nc_form_counter" not in st.session_state:
-        st.session_state.nc_form_counter = 0
-    if "nc_form_step" not in st.session_state:
-        st.session_state.nc_form_step = 1
-    # Inicializa todas as variáveis da Etapa 1 do formulário para evitar AttributeError em recarregamentos
-    for key, default_val in {
-        "step1_id_vinculo": "Nenhum ID cadastrado",
-        "step1_pista": "",
-        "step1_trecho": "",
-        "step1_terminal_nc": "",
-        "step1_nc_num": 1,
-        "step1_nc_desc_str": "",
-        "step1_pa_desc_str": "",
-        "step1_foto_default": "",
-        "step1_nc_legenda": "",
-        "step1_situacao": "Pendente",
-        "step1_foto_anterior": "",
-        "step1_legenda_anterior": "",
-        "step1_identificacao": ""
-    }.items():
-        if key not in st.session_state:
-            st.session_state[key] = default_val
-    if "pista_persistida" not in st.session_state:
-        st.session_state.pista_persistida = ""
-    if "trecho_persistido" not in st.session_state:
-        st.session_state.trecho_persistido = ""
-    if "pessoal_responsaveis" not in st.session_state or (
-        st.session_state.pessoal_responsaveis and isinstance(st.session_state.pessoal_responsaveis[0], str)
-    ):
-        st.session_state.pessoal_responsaveis = carregar_responsaveis()
-    if "coordenadores" not in st.session_state or (
-        st.session_state.coordenadores and isinstance(st.session_state.coordenadores[0], str)
-    ):
-        st.session_state.coordenadores = carregar_coordenadores()
-    if "contratos" not in st.session_state:
-        st.session_state.contratos = carregar_contratos()
-
-    if "custom_ncs" not in st.session_state:
-        st.session_state.custom_ncs = carregar_custom_ncs()
-        
-    from sections.quadros.quadros import MAP_SIGLAS
-    for item in st.session_state.custom_ncs:
-        sigla = item.get("sigla", "")
-        desc = item.get("descricao", "")
-        if sigla:
-            MAP_SIGLAS[sigla] = desc
-            
-    base_options = ["FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB", "JE", "TBE", "ALP", "ATP", "O", "P", "EX", "D", "R", "ALC", "ATC", "E"]
-    current_nc_options = base_options.copy()
-    for item in st.session_state.custom_ncs:
-        sigla = item.get("sigla", "")
-        desc = item.get("descricao", "")
-        val_to_add = sigla if sigla else desc
-        if val_to_add and val_to_add not in current_nc_options:
-            current_nc_options.append(val_to_add)
-    st.session_state.nc_options = current_nc_options
 
     with st.container(border=True, key="top_fisc_container"):
         st.markdown(f"### 📍 {term_fisc}")
@@ -581,7 +233,7 @@ with st.container():
             with col_gear:
                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                 if st.button("⚙️", help="Gerenciar Responsáveis", key="btn_manage_responsaveis"):
-                    gerenciar_responsaveis_modal()
+                    gerenciar_responsaveis_modal(term_fisc_pessoal)
             
             # Coordenador
             col_coord, col_gear_coord = st.columns([10, 1])
@@ -597,7 +249,7 @@ with st.container():
             with col_gear_coord:
                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
                 if st.button("⚙️", help="Gerenciar Coordenadores", key="btn_manage_coordenadores"):
-                    gerenciar_coordenadores_modal()
+                    gerenciar_coordenadores_modal(term_fisc_prep_f)
             
             # Número do Contrato definido automaticamente por tipo de relatório
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
@@ -1281,7 +933,7 @@ with st.container():
                 # Botão que fica habilitado se houver itens selecionados
                 disable_btn = len(ids_para_excluir) == 0
                 if st.button("🗑️ Excluir Selecionadas", type="secondary", disabled=disable_btn, key="btn_bulk_delete"):
-                    confirmar_exclusao_lote_modal(ids_para_excluir)
+                    confirmar_exclusao_lote_modal(ids_para_excluir, term_fisc_plural_lower, term_fisc_plural)
                     
                 ncs_para_excluir = []
                 df_nc = pd.DataFrame(st.session_state.temp_nc)
@@ -1401,67 +1053,10 @@ with st.container():
             else:
                 with st.spinner("Gerando relatórios automaticamente..."):
                     st.session_state.relatorios_preenchimento_data = []
-                    flat_fiscalizacoes = []
-                    for fisc in st.session_state.temp_fiscalizacoes:
-                        id_fisc = fisc["ID da Fiscalização"]
-                        ncs = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_fisc]
-                        if not ncs:
-                            flat_fiscalizacoes.append({
-                                "ID da Fiscalização": fisc["ID da Fiscalização"],
-                                "Data": fisc["Data"],
-                                "Hora": fisc["Hora"],
-                                "Cidade": fisc["Cidade"],
-                                "Local": fisc["Local"],
-                                "Pessoal Responsável": fisc["Pessoal Responsável"],
-                                "Coordenador": fisc["Coordenador"],
-                                "Contrato": fisc["Contrato"],
-                                "Período": fisc["Período"],
-                                "Observações": "",
-                                "Fotos": "",
-                                "Não conformidade": "",
-                                "Ponto de Atenção": "",
-                                "Pista": "",
-                                "Trecho": "",
-                                "Identificação": "",
-                                "Direção (faixa)": "",
-                                "Fundamento da infração": "",
-                                "Determinação": "",
-                                "Situação": "",
-                                "Relatório Gerado": fisc["Relatório Gerado"]
-                            })
-                        else:
-                            for nc in ncs:
-                                flat_fiscalizacoes.append({
-                                    "ID da Fiscalização": fisc["ID da Fiscalização"],
-                                    "Data": fisc["Data"],
-                                    "Hora": fisc["Hora"],
-                                    "Cidade": fisc["Cidade"],
-                                    "Local": fisc["Local"],
-                                    "Pessoal Responsável": fisc["Pessoal Responsável"],
-                                    "Coordenador": fisc["Coordenador"],
-                                    "Contrato": fisc["Contrato"],
-                                    "Período": fisc["Período"],
-                                    "Observações": nc.get("Observações", nc.get("Legenda da Foto", "")),
-                                    "Fotos": nc.get("Foto", nc.get("Fotos", "")),
-                                    "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
-                                    "Ponto de Atenção": nc.get("Ponto de Atenção", ""),
-                                    "Pista": nc.get("Pista", ""),
-                                    "Trecho": nc.get("Trecho", ""),
-                                    "Identificação": nc.get("Identificação", ""),
-                                    "Direção (faixa)": nc.get("Direção (faixa)", ""),
-                                    "Fundamento da infração": nc.get("Fundamento da infração", ""),
-                                    "Determinação": nc.get("Determinação", ""),
-                                    "Situação": nc.get("Situação", "Pendente"),
-                                    "Relatório Gerado": fisc["Relatório Gerado"]
-                                })
-
-                    excel_buffer = io.BytesIO()
-                    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-                        pd.DataFrame(flat_fiscalizacoes).to_excel(writer, sheet_name="Fiscalizações", index=False)
-                        pd.DataFrame(st.session_state.temp_nc).to_excel(writer, sheet_name="Não-conformidades ", index=False)
-                        pd.DataFrame().to_excel(writer, sheet_name="Observações Importantes", index=False)
-                        pd.DataFrame().to_excel(writer, sheet_name="Recomendações", index=False)
-                    excel_buffer.seek(0)
+                    excel_buffer = gerar_planilha_excel_buffer(
+                        st.session_state.temp_fiscalizacoes,
+                        st.session_state.temp_nc
+                    )
 
                     # 2. Criar diretório temporário para as fotos já enviadas
                     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
@@ -1471,9 +1066,7 @@ with st.container():
                         os.makedirs(reports_dir, exist_ok=True)
 
                         if "fill_photos" in st.session_state and st.session_state.fill_photos:
-                            for photo in st.session_state.fill_photos:
-                                with open(os.path.join(fotos_dir, photo.name), "wb") as f:
-                                    f.write(photo.getbuffer())
+                            salvar_fotos_em_diretorio(st.session_state.fill_photos, fotos_dir)
 
                         try:
                             tipo_key = st.session_state.get("tipo_relatorio", "CRA")
@@ -1516,68 +1109,11 @@ with st.container():
             if not st.session_state.temp_fiscalizacoes:
                 st.error(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
             else:
-                flat_fiscalizacoes = []
-                for fisc in st.session_state.temp_fiscalizacoes:
-                    id_fisc = fisc["ID da Fiscalização"]
-                    ncs = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_fisc]
-                    if not ncs:
-                        flat_fiscalizacoes.append({
-                            "ID da Fiscalização": fisc["ID da Fiscalização"],
-                            "Data": fisc["Data"],
-                            "Hora": fisc["Hora"],
-                            "Cidade": fisc["Cidade"],
-                            "Local": fisc["Local"],
-                            "Pessoal Responsável": fisc["Pessoal Responsável"],
-                            "Coordenador": fisc["Coordenador"],
-                            "Contrato": fisc["Contrato"],
-                            "Período": fisc["Período"],
-                            "Observações": "",
-                            "Fotos": "",
-                            "Não conformidade": "",
-                            "Ponto de Atenção": "",
-                            "Pista": "",
-                            "Trecho": "",
-                            "Identificação": "",
-                            "Direção (faixa)": "",
-                            "Fundamento da infração": "",
-                            "Determinação": "",
-                            "Situação": "",
-                            "Relatório Gerado": fisc["Relatório Gerado"]
-                        })
-                    else:
-                        for nc in ncs:
-                            flat_fiscalizacoes.append({
-                                "ID da Fiscalização": fisc["ID da Fiscalização"],
-                                "Data": fisc["Data"],
-                                "Hora": fisc["Hora"],
-                                "Cidade": fisc["Cidade"],
-                                "Local": fisc["Local"],
-                                "Pessoal Responsável": fisc["Pessoal Responsável"],
-                                "Coordenador": fisc["Coordenador"],
-                                "Contrato": fisc["Contrato"],
-                                "Período": fisc["Período"],
-                                "Observações": nc.get("Observações", nc.get("Legenda da Foto", "")),
-                                "Fotos": nc.get("Foto", nc.get("Fotos", "")),
-                                "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
-                                "Ponto de Atenção": nc.get("Ponto de Atenção", ""),
-                                "Pista": nc.get("Pista", ""),
-                                "Trecho": nc.get("Trecho", ""),
-                                "Identificação": nc.get("Identificação", ""),
-                                "Direção (faixa)": nc.get("Direção (faixa)", ""),
-                                "Fundamento da infração": nc.get("Fundamento da infração", ""),
-                                "Determinação": nc.get("Determinação", ""),
-                                "Situação": nc.get("Situação", "Pendente"),
-                                "Relatório Gerado": fisc["Relatório Gerado"]
-                            })
-
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    pd.DataFrame(flat_fiscalizacoes).to_excel(writer, sheet_name="Fiscalizações", index=False)
-                    pd.DataFrame(st.session_state.temp_nc).to_excel(writer, sheet_name="Não-conformidades ", index=False)
-                    pd.DataFrame().to_excel(writer, sheet_name="Observações Importantes", index=False)
-                    pd.DataFrame().to_excel(writer, sheet_name="Recomendações", index=False)
-
-                st.session_state.planilha_download_bytes = output.getvalue()
+                output_buffer = gerar_planilha_excel_buffer(
+                    st.session_state.temp_fiscalizacoes,
+                    st.session_state.temp_nc
+                )
+                st.session_state.planilha_download_bytes = output_buffer.getvalue()
                 st.success("Planilha gerada!")
                 
         if "planilha_download_bytes" in st.session_state and st.session_state.planilha_download_bytes:
