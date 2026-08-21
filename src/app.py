@@ -148,7 +148,7 @@ with st.container():
 
         if is_monitoring and uploaded_mon_anterior:
             last_parsed_key = f"last_parsed_{uploaded_mon_anterior.name}_{uploaded_mon_anterior.size}"
-            if st.session_state.get("last_parsed_file") != last_parsed_key:
+            if st.session_state.get("last_parsed_file") != last_parsed_key or not st.session_state.get("old_photos_to_match"):
                 from monitoramento_utils import extrair_ncs_e_fotos_anterior
                 st.session_state.old_photos_to_match = extrair_ncs_e_fotos_anterior(uploaded_mon_anterior)
                 
@@ -175,7 +175,11 @@ with st.container():
                         
                 st.session_state.last_parsed_file = last_parsed_key
                 st.session_state.carousel_index = 0
-        else:
+        elif is_monitoring and "last_parsed_file" in st.session_state and uploaded_mon_anterior is None:
+            # Se o usuário removeu explicitamente o arquivo do uploader, limpa as fotos
+            st.session_state.old_photos_to_match = []
+            del st.session_state.last_parsed_file
+        elif not is_monitoring:
             st.session_state.old_photos_to_match = []
             if "last_parsed_file" in st.session_state:
                 del st.session_state.last_parsed_file
@@ -316,9 +320,11 @@ with st.container():
         uploads_pendentes = True
         mensagem_pendencias.append("as fotos do levantamento")
         
-    if is_monitoring and not st.session_state.get("old_photos_to_match"):
-        uploads_pendentes = True
-        mensagem_pendencias.append("o arquivo do monitoramento anterior")
+    if is_monitoring:
+        # Só bloqueia se não tiver parseado o arquivo ainda
+        if not st.session_state.get("old_photos_to_match") and not st.session_state.get("last_parsed_file"):
+            uploads_pendentes = True
+            mensagem_pendencias.append("o arquivo do monitoramento anterior")
         
     if uploads_pendentes:
         registros_container = st.container(border=True, key="registros_main_container")
@@ -363,64 +369,95 @@ with st.container():
     
         with col_preview:
             st.markdown("### 🖼️ Carrossel de Fotos")
-            if is_monitoring:
-                if st.session_state.old_photos_to_match:
-                    if current_item:
-                        st.markdown(f"**Trecho de Comparação {idx + 1} de {len(st.session_state.old_photos_to_match)}**")
-                        col_old, col_new = st.columns(2)
-                        with col_old:
-                            st.markdown(f"**Foto Anterior ({current_item['id_nc']} - {current_item['trecho']})**")
+            foto_default = ""
+            if is_monitoring and st.session_state.old_photos_to_match:
+                if current_item:
+                    st.markdown(f"**Trecho de Comparação {idx + 1} de {len(st.session_state.old_photos_to_match)}**")
+                    col_old, col_new = st.columns(2)
+                    with col_old:
+                        st.markdown(f"**Foto Anterior ({current_item['id_nc']} - {current_item['trecho']})**")
+                        try:
+                            from PIL import Image, ImageOps
+                            img_old = Image.open(current_item["old_photo_path"])
+                            preview_old = ImageOps.fit(img_old, (320, 240))
+                            st.image(preview_old, use_container_width=True)
+                            st.button("🔍 Ampliar Foto Anterior", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{idx}_{st.session_state.nc_form_counter}")
+                        except Exception:
+                            st.image(current_item["old_photo_path"], use_container_width=True)
+                    
+                        st.selectbox(
+                            "Selecione a foto antiga para comparar",
+                            options_old,
+                            key=selected_old_key
+                        )
+                    with col_new:
+                        st.markdown("**Nova Foto (Atual)**")
+                        if st.session_state.fill_photos:
+                            new_photo_names = [f.name for f in st.session_state.fill_photos]
+                            selected_key = f"sel_box_photo_{idx}_{st.session_state.nc_form_counter}"
+                            if selected_key not in st.session_state:
+                                st.session_state[selected_key] = st.session_state.fill_photos[min(idx, len(st.session_state.fill_photos)-1)].name
+                        
+                            current_sel_name = st.session_state[selected_key]
+                            if current_sel_name not in new_photo_names:
+                                current_sel_name = new_photo_names[0]
+                                st.session_state[selected_key] = current_sel_name
+                        
+                            img_path = next(f for f in st.session_state.fill_photos if f.name == current_sel_name)
                             try:
                                 from PIL import Image, ImageOps
-                                img_old = Image.open(current_item["old_photo_path"])
-                                preview_old = ImageOps.fit(img_old, (320, 240))
-                                st.image(preview_old, use_container_width=True)
+                                img_new = Image.open(img_path)
+                                preview_new = ImageOps.fit(img_new, (320, 240))
+                                st.image(preview_new, use_container_width=True)
+                                st.button("🔍 Ampliar Nova Foto", on_click=mostrar_foto_modal, args=(img_path,), key=f"btn_zoom_new_{idx}_{st.session_state.nc_form_counter}")
                             except Exception:
-                                st.image(current_item["old_photo_path"], use_container_width=True)
+                                st.image(img_path, use_container_width=True)
                         
-                            st.selectbox(
-                                "Selecione a foto antiga para comparar",
-                                options_old,
-                                key=selected_old_key
+                            sel_name = st.selectbox(
+                                "Selecione a foto correspondente",
+                                new_photo_names,
+                                key=selected_key
                             )
-                        with col_new:
-                            st.markdown("**Nova Foto (Atual)**")
-                            if st.session_state.fill_photos:
-                                new_photo_names = [f.name for f in st.session_state.fill_photos]
-                                selected_key = f"sel_box_photo_{idx}_{st.session_state.nc_form_counter}"
-                                if selected_key not in st.session_state:
-                                    st.session_state[selected_key] = st.session_state.fill_photos[min(idx, len(st.session_state.fill_photos)-1)].name
-                            
-                                current_sel_name = st.session_state[selected_key]
-                                if current_sel_name not in new_photo_names:
-                                    current_sel_name = new_photo_names[0]
-                                    st.session_state[selected_key] = current_sel_name
-                            
-                                img_path = next(f for f in st.session_state.fill_photos if f.name == current_sel_name)
-                                try:
-                                    from PIL import Image, ImageOps
-                                    img_new = Image.open(img_path)
-                                    preview_new = ImageOps.fit(img_new, (320, 240))
-                                    st.image(preview_new, use_container_width=True)
-                                except Exception:
-                                    st.image(img_path, use_container_width=True)
-                            
-                                sel_name = st.selectbox(
-                                    "Selecione a foto correspondente",
-                                    new_photo_names,
-                                    key=selected_key
-                                )
-                                foto_default = sel_name
-                            
-                                pass
-                            else:
-                                st.info("💡 Faça o upload de novas fotos para selecioná-las.")
-                                foto_default = ""
+                            foto_default = sel_name
+                        else:
+                            st.info("💡 Faça o upload de novas fotos para selecioná-las.")
+                            foto_default = ""
+
+                    nav_col1, nav_col2 = st.columns(2)
+                    with nav_col1:
+                        if st.button("⬅️ Anterior", disabled=(idx == 0), key="btn_prev_photo_mon"):
+                            st.session_state.carousel_index = idx - 1
+                            st.rerun()
+                    with nav_col2:
+                        if st.button("Próxima ➡️", disabled=(idx == len(st.session_state.old_photos_to_match) - 1), key="btn_next_photo_mon"):
+                            st.session_state.carousel_index = idx + 1
+                            st.rerun()
+
+                    st.checkbox(
+                        "Avançar foto automaticamente",
+                        value=True,
+                        key="auto_advance_active",
+                        help="Avança para a próxima foto do carrossel ao adicionar o Registro"
+                    )
+                else:
+                    st.success("🎉 Todas as Não Conformidades do monitoramento anterior foram comparadas!")
+                    if st.session_state.fill_photos:
+                        idx_single = min(st.session_state.carousel_index, len(st.session_state.fill_photos) - 1)
+                        current_photo = st.session_state.fill_photos[idx_single]
+                        try:
+                            from PIL import Image, ImageOps
+                            image = Image.open(current_photo)
+                            preview_image = ImageOps.fit(image, (400, 300))
+                            st.image(preview_image, caption=f"Foto {idx_single + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}")
+                        except Exception:
+                            st.image(current_photo, caption=f"Foto {idx_single + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}", use_container_width=True)
+                        foto_default = current_photo.name
                     else:
-                        st.success("🎉 Todas as Não Conformidades do monitoramento anterior foram comparadas!")
                         foto_default = ""
             elif st.session_state.fill_photos:
                 idx = st.session_state.carousel_index
+                idx = min(idx, len(st.session_state.fill_photos) - 1)
+                idx = max(0, idx)
                 current_photo = st.session_state.fill_photos[idx]
             
                 try:
@@ -451,6 +488,9 @@ with st.container():
                 )
             
                 foto_default = current_photo.name
+            else:
+                st.info("💡 Faça o upload das fotos do levantamento no topo da página para exibi-las aqui.")
+                foto_default = ""
 
         with col_inputs:
             st.markdown("### 📝 Cadastro de Registros")
@@ -788,16 +828,19 @@ with st.container():
                     if st.button(btn_label, type="primary", use_container_width=True):
                         if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
                             campos_vazios = []
-                            if not pos_crc.strip():
+                            _pos_crc = locals().get("pos_crc", "")
+                            _constatacao = locals().get("constatacao", "")
+                            _analise_arpe = locals().get("analise_arpe", "")
+
+                            if not _pos_crc.strip():
                                 campos_vazios.append("POSICIONAMENTO CRC")
-                            if not constatacao.strip():
+                            if not _constatacao.strip():
                                 campos_vazios.append("CONSTATAÇÃO")
-                            if not analise_arpe.strip():
+                            if not _analise_arpe.strip():
                                 campos_vazios.append("ANÁLISE ARPE")
                             
                             if campos_vazios:
-                                st.error(f"❌ Não foi possível salvar. Os seguintes campos estão em branco: {', '.join(campos_vazios)}")
-                                st.stop()
+                                st.warning(f"⚠️ Atenção: Os seguintes campos de texto da CRC estão vazios: {', '.join(campos_vazios)}.")
                     
                         # 1. Tentar encontrar registro com a mesma foto anterior
                         rec = next((r for r in st.session_state.temp_nc 

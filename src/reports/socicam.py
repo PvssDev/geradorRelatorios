@@ -234,7 +234,7 @@ class SocicamReport(BaseReport):
         
         # Obter dados de NC
         id_fisc = row["ID da Fiscalização"]
-        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None else pd.DataFrame()
+        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
         ncs_reais = pd.DataFrame()
         if not current_ncs.empty and "Não Conformidade" in current_ncs.columns:
             ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()

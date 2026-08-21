@@ -65,16 +65,24 @@ class CrcMonitoramentoReport(CrcReport):
         
         if documento_anterior:
             try:
+                # Verificar pelo nome do arquivo se é fiscalização ou monitoramento
+                filename = getattr(documento_anterior, "name", str(documento_anterior)).lower()
+                is_fiscalizacao = "fiscaliza" in filename
+
+                if is_fiscalizacao:
+                    self.N_prev = 0
+                
                 # Se for um arquivo temporário/BytesIO do Streamlit, docx consegue ler
                 prev_doc = Document(documento_anterior)
                 
-                # Buscar número do monitoramento anterior
-                pattern = re.compile(r'(\d+)(?:\u00ba|\u00b0)?\s*monitoramento', re.IGNORECASE)
-                for p in prev_doc.paragraphs:
-                    m = pattern.search(p.text)
-                    if m:
-                        self.N_prev = int(m.group(1))
-                        break
+                if not is_fiscalizacao:
+                    # Buscar número do monitoramento anterior
+                    pattern = re.compile(r'(\d+)(?:\u00ba|\u00b0)?\s*monitoramento', re.IGNORECASE)
+                    for p in prev_doc.paragraphs:
+                        m = pattern.search(p.text)
+                        if m:
+                            self.N_prev = int(m.group(1))
+                            break
                 
                 # Buscar CTR
                 pattern_ctr = re.compile(r'CTR\s*(?:N\u00ba|n\u00ba|N\u00ba)?\s*(\d+/\d+)', re.IGNORECASE)
@@ -90,6 +98,7 @@ class CrcMonitoramentoReport(CrcReport):
                     m = pattern_sei.search(p.text)
                     if m:
                         self.processo_sei_prev = m.group(1)
+                        break
                         break
                 
                 # Extrair data da vistoria anterior a partir dos parágrafos (mais robusto)
@@ -182,15 +191,15 @@ class CrcMonitoramentoReport(CrcReport):
         add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO", bold=True, size_pt=12, space_after=4)
         add_cover_p(f"DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {self.ctr_num}", bold=True, size_pt=12, space_after=12)
 
-        # Imagem da Capa (logo_capa_crc.png)
-        # Procuramos logo_capa_crc.png na pasta assets
+        # Imagem da Capa (capa_1.png)
+        # Procuramos capa_1.png na pasta assets
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        logo_capa_crc = os.path.join(base_dir, "assets", "logo_capa_crc.png")
-        if not os.path.exists(logo_capa_crc):
-            logo_capa_crc = logo_path  # fallback
+        capa_1 = os.path.join(base_dir, "assets", "capa_1.png")
+        if not os.path.exists(capa_1):
+            capa_1 = logo_path  # fallback
             
-        if os.path.exists(logo_capa_crc):
-            doc.add_picture(logo_capa_crc, width=Inches(5.90))
+        if os.path.exists(capa_1):
+            doc.add_picture(capa_1, width=Inches(5.90))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
             doc.paragraphs[-1].paragraph_format.space_after = Pt(12)
             doc.paragraphs[-1].paragraph_format.space_before = Pt(12)
@@ -240,14 +249,23 @@ class CrcMonitoramentoReport(CrcReport):
         # Se N_prev ou ctr_num não foram calculados pela capa, calculamos aqui também
         if documento_anterior and (getattr(self, "N_prev", "X") == "X" or getattr(self, "ctr_num", "XX/XXXX") == "XX/XXXX"):
             try:
+                filename = getattr(documento_anterior, "name", str(documento_anterior)).lower()
+                is_fiscalizacao = "fiscaliza" in filename
+
+                if is_fiscalizacao:
+                    self.N_prev = 0
+                    self.N_curr = 1
+
                 prev_doc = Document(documento_anterior)
-                pattern = re.compile(r'(\d+)(?:\u00ba|\u00b0)?\s*monitoramento', re.IGNORECASE)
-                for p in prev_doc.paragraphs:
-                    m = pattern.search(p.text)
-                    if m:
-                        self.N_prev = int(m.group(1))
-                        self.N_curr = self.N_prev + 1
-                        break
+                
+                if not is_fiscalizacao:
+                    pattern = re.compile(r'(\d+)(?:\u00ba|\u00b0)?\s*monitoramento', re.IGNORECASE)
+                    for p in prev_doc.paragraphs:
+                        m = pattern.search(p.text)
+                        if m:
+                            self.N_prev = int(m.group(1))
+                            self.N_curr = self.N_prev + 1
+                            break
                 
                 pattern_ctr = re.compile(r'CTR\s*(?:N\u00ba|n\u00ba|N\u00ba)?\s*(\d+/\d+)', re.IGNORECASE)
                 for p in prev_doc.paragraphs:
@@ -324,10 +342,12 @@ class CrcMonitoramentoReport(CrcReport):
         except Exception:
             val_ncs = 999
             
+        is_fiscalizacao = getattr(self, "N_prev", "X") == 0
+            
         if val_ncs == 1:
-            nc_phrase = "1 Não Conformidade restava pendente"
+            nc_phrase = "1 Não Conformidade foi apontada" if is_fiscalizacao else "1 Não Conformidade restava pendente"
         else:
-            nc_phrase = f"{ncs_pend_prev} Não Conformidades restavam pendentes"
+            nc_phrase = f"{ncs_pend_prev} Não Conformidades foram apontadas" if is_fiscalizacao else f"{ncs_pend_prev} Não Conformidades restavam pendentes"
             
         oficio_num_prev = getattr(self, "oficio_num_prev", "xxx/xxxx")
         oficio_data_prev = getattr(self, "oficio_data_prev", "xx/xx/xxxx")
@@ -335,14 +355,24 @@ class CrcMonitoramentoReport(CrcReport):
         carta_data_prev = getattr(self, "carta_data_prev", "xx/xx/xxxx")
         carta_sei_prev = getattr(self, "carta_sei_prev", "xxxxxxxx")
         
-        add_p(
-            f"Registra-se, preliminarmente, que na última vistoria técnica de monitoramento das Não Conformidades "
-            f"apontadas no Relatório de Fiscalização Técnico-Operacional CTR {ctr_num}, realizada na Rodovia Rota dos "
-            f"Coqueiros em {data_vist_prev}, verificou-se que {nc_phrase}. "
-            f"Assim, o Relatório do {n_prev_str} Monitoramento (Doc. SEI nº {processo_sei_prev}) foi encaminhado à Concessionária "
-            f"Rota dos Coqueiros (CRC) pelo Ofício Arpe DTO nº {oficio_num_prev}, de {oficio_data_prev}, reforçando a recomendação "
-            f"para que a Concessionária mantenha a ARPE informada sobre as tratativas referentes às não conformidades pendentes."
-        )
+        if is_fiscalizacao:
+            add_p(
+                f"Registra-se, preliminarmente, que na vistoria técnica que originou o Relatório de Fiscalização "
+                f"Técnico-Operacional CTR {ctr_num}, realizada na Rodovia Rota dos "
+                f"Coqueiros em {data_vist_prev}, verificou-se que {nc_phrase}. "
+                f"Assim, o referido Relatório de Fiscalização (Doc. SEI nº {processo_sei_prev}) foi encaminhado à Concessionária "
+                f"Rota dos Coqueiros (CRC) pelo Ofício Arpe DTO nº {oficio_num_prev}, de {oficio_data_prev}, com a recomendação "
+                f"para que a Concessionária mantenha a ARPE informada sobre as tratativas referentes às não conformidades apontadas."
+            )
+        else:
+            add_p(
+                f"Registra-se, preliminarmente, que na última vistoria técnica de monitoramento das Não Conformidades "
+                f"apontadas no Relatório de Fiscalização Técnico-Operacional CTR {ctr_num}, realizada na Rodovia Rota dos "
+                f"Coqueiros em {data_vist_prev}, verificou-se que {nc_phrase}. "
+                f"Assim, o Relatório do {n_prev_str} Monitoramento (Doc. SEI nº {processo_sei_prev}) foi encaminhado à Concessionária "
+                f"Rota dos Coqueiros (CRC) pelo Ofício Arpe DTO nº {oficio_num_prev}, de {oficio_data_prev}, reforçando a recomendação "
+                f"para que a Concessionária mantenha a ARPE informada sobre as tratativas referentes às não conformidades pendentes."
+            )
         add_p(
             f"Em sequência, a Concessionária, por meio da Carta CRC/REG nº {carta_num_prev}, de {carta_data_prev} "
             f"(Doc. SEI nº {carta_sei_prev}), enviou sua manifestação informando as ações tomadas referentes às Não Conformidades pendentes."
@@ -446,7 +476,7 @@ class CrcMonitoramentoReport(CrcReport):
             data_vistoria_atual = "XX/XX/XXXX"
 
         # Buscar Não Conformidades do preenchimento atual
-        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None else pd.DataFrame()
+        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
         ncs_reais = pd.DataFrame()
         if not current_ncs.empty and "Não Conformidade" in current_ncs.columns:
             ncs_reais = current_ncs[
