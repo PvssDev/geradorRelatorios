@@ -492,7 +492,7 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
     id_fisc = row["ID da Fiscalização"]
     data_fisc = formatar_data_dd_mm_yyyy(row["Data"])
     
-    current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None else pd.DataFrame()
+    current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
     
     ncs_reais = pd.DataFrame()
     pas_reais = pd.DataFrame()

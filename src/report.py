@@ -154,7 +154,7 @@ def gerar_relatorio(
         report_config = get_report(tipo_relatorio)
 
         # Calcula o total de achados (soma de não conformidades com pontos de atenção no caso de CRA)
-        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if not nc_df.empty else pd.DataFrame()
+        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
         total_achados = 0
         if not current_ncs.empty:
             has_nc = 0
@@ -166,7 +166,7 @@ def gerar_relatorio(
             total_achados = has_nc + has_pa
 
         # Primeira Página (Capa)
-        logo_capa_path = os.path.join(BASE_DIR, "assets/logo_capa.jpeg")
+        logo_capa_path = os.path.join(BASE_DIR, "assets/capa_2.jpeg")
         gerar_capa_primeira_pagina(doc, logo_capa_path, row, report_config, documento_anterior=documento_anterior)
 
         # Geração das Seções
