@@ -41,12 +41,35 @@ div[data-testid="stVerticalBlock"] {
     transform: translateY(-2px);
 }
 
+/* Expander harmonizado com a paleta */
+div[data-testid="stExpander"],
+details {
+    background-color: #eedac9 !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 8px !important;
+}
+
+div[data-testid="stExpander"] summary,
+details summary {
+    background-color: #eecfc9 !important;
+    color: #2d2926 !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+}
+
+div[data-testid="stExpander"] summary:hover,
+details summary:hover {
+    background-color: #ecd2c4 !important;
+}
+
+
+
 /* ==========================================
    MENSAGENS INFORMATIVAS E ALERTAS (st.info)
    Fundo Marrom Pastel sem bordas
    ========================================== */
 div[data-testid="stAlert"],
-div[data-testid="stAlert"] > div,
+div[data-testid="stAlert"]>div,
 div[data-testid="stAlert"] [data-testid*="stNotificationContent"],
 div[data-testid="stAlert"] [role="alert"],
 div[data-testid="stNotificationContentInfo"] {
@@ -77,13 +100,14 @@ div[data-testid="stAlert"] svg {
 
 /* Alerta de Sucesso (Verde harmonizado) */
 div[data-testid="stAlert"]:has([data-testid*="Success"]),
-div[data-testid="stAlert"]:has([data-testid*="Success"]) > div,
+div[data-testid="stAlert"]:has([data-testid*="Success"])>div,
 div[data-testid="stNotificationContentSuccess"] {
     background-color: #eaf5ea !important;
     background: #eaf5ea !important;
     border: none !important;
     color: #1e4620 !important;
 }
+
 div[data-testid="stAlert"]:has([data-testid*="Success"]) p,
 div[data-testid="stAlert"]:has([data-testid*="Success"]) span {
     color: #1e4620 !important;
@@ -91,13 +115,14 @@ div[data-testid="stAlert"]:has([data-testid*="Success"]) span {
 
 /* Alerta de Erro (Coral/Vermelho suave) */
 div[data-testid="stAlert"]:has([data-testid*="Error"]),
-div[data-testid="stAlert"]:has([data-testid*="Error"]) > div,
+div[data-testid="stAlert"]:has([data-testid*="Error"])>div,
 div[data-testid="stNotificationContentError"] {
     background-color: #fdeaea !important;
     background: #fdeaea !important;
     border: none !important;
     color: #7a1f1f !important;
 }
+
 div[data-testid="stAlert"]:has([data-testid*="Error"]) p,
 div[data-testid="stAlert"]:has([data-testid*="Error"]) span {
     color: #7a1f1f !important;
@@ -105,7 +130,7 @@ div[data-testid="stAlert"]:has([data-testid*="Error"]) span {
 
 /* Alerta de Atenção (Âmbar suave) */
 div[data-testid="stAlert"]:has([data-testid*="Warning"]),
-div[data-testid="stAlert"]:has([data-testid*="Warning"]) > div,
+div[data-testid="stAlert"]:has([data-testid*="Warning"])>div,
 div[data-testid="stNotificationContentWarning"] {
     background-color: #fef7ea !important;
     background: #fef7ea !important;
@@ -118,7 +143,7 @@ div[data-testid="stNotificationContentWarning"] {
    ➕ Adicionar, 💾 Salvar e Continuar, 🚀 Gerar Relatório, 📁 Botão de Upload
    ========================================== */
 button[kind="primary"],
-div.stButton > button[kind="primary"],
+div.stButton>button[kind="primary"],
 section[data-testid="stFileUploader"] button[data-testid*="baseButton"],
 section[data-testid="stFileUploader"] button[data-testid*="stBaseButton"],
 section[data-testid="stFileUploadDropzone"] button {
@@ -132,7 +157,7 @@ section[data-testid="stFileUploadDropzone"] button {
 }
 
 button[kind="primary"]:hover,
-div.stButton > button[kind="primary"]:hover,
+div.stButton>button[kind="primary"]:hover,
 section[data-testid="stFileUploader"] button[data-testid*="baseButton"]:hover,
 section[data-testid="stFileUploader"] button[data-testid*="stBaseButton"]:hover,
 section[data-testid="stFileUploadDropzone"] button:hover {
@@ -144,10 +169,10 @@ section[data-testid="stFileUploadDropzone"] button:hover {
 /* ==========================================
    BOTÕES SECUNDÁRIOS / DE AÇÃO (#f7e4da)
    ========================================== */
-div.stButton > button:not([kind="primary"]):not([data-testid="stPill"]),
-div.stDownloadButton > button:not([kind="primary"]),
+div.stButton>button:not([kind="primary"]):not([data-testid="stPill"]),
+div.stDownloadButton>button:not([kind="primary"]),
 div[data-testid="stPopover"] button,
-div[data-testid="stPopover"] > div > button,
+div[data-testid="stPopover"]>div>button,
 div.stPopover button,
 button[data-testid="stPopoverButton"],
 button[aria-haspopup="dialog"] {
@@ -159,10 +184,10 @@ button[aria-haspopup="dialog"] {
     transition: background-color 0.2s ease, transform 0.1s ease !important;
 }
 
-div.stButton > button:not([kind="primary"]):not([data-testid="stPill"]):hover,
-div.stDownloadButton > button:not([kind="primary"]):hover,
+div.stButton>button:not([kind="primary"]):not([data-testid="stPill"]):hover,
+div.stDownloadButton>button:not([kind="primary"]):hover,
 div[data-testid="stPopover"] button:hover,
-div[data-testid="stPopover"] > div > button:hover,
+div[data-testid="stPopover"]>div>button:hover,
 div.stPopover button:hover,
 button[data-testid="stPopoverButton"]:hover,
 button[aria-haspopup="dialog"]:hover {
@@ -282,8 +307,8 @@ div[data-testid="stSegmentedControl"] button[aria-pressed="true"]:hover {
 /* ==========================================
    ESTILIZAÇÃO ESPECÍFICA DO BOTÃO + (SIGLAS PERSONALIZADAS)
    ========================================== */
-.green-btn-marker + div div.stButton button,
-.green-btn-marker + div button {
+.green-btn-marker+div div.stButton button,
+.green-btn-marker+div button {
     background-color: #28a745 !important;
     color: white !important;
     border-color: #28a745 !important;
@@ -295,8 +320,9 @@ div[data-testid="stSegmentedControl"] button[aria-pressed="true"]:hover {
     align-items: center !important;
     justify-content: center !important;
 }
-.green-btn-marker + div div.stButton button:hover,
-.green-btn-marker + div button:hover {
+
+.green-btn-marker+div div.stButton button:hover,
+.green-btn-marker+div button:hover {
     background-color: #218838 !important;
     border-color: #1e7e34 !important;
 }
@@ -347,7 +373,7 @@ div[data-baseweb="textarea"] textarea::placeholder {
 }
 
 /* Selectbox */
-div[data-baseweb="select"] > div {
+div[data-baseweb="select"]>div {
     background-color: #f7e4da !important;
     border: 1px solid rgba(0, 0, 0, 0.12) !important;
     border-radius: 6px !important;

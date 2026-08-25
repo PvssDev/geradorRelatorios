@@ -23,7 +23,8 @@ from ui.modals import (
     gerenciar_responsaveis_modal,
     gerenciar_coordenadores_modal,
     gerenciar_contratos_modal,
-    adicionar_nc_personalizada_modal
+    adicionar_nc_personalizada_modal,
+    editar_registros_relatorio_modal
 )
 
 st.set_page_config(page_title="Gerador de Relatórios", layout="wide")
@@ -42,7 +43,7 @@ inject_custom_theme_css()
 inicializar_estado_sessao()
 
 is_monitoring = st.session_state.categoria_relatorio == "Monitoramento"
-is_crc_monitoring = (st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring)
+
 terms = obter_termos_ui(is_monitoring)
 term_fisc = terms["term_fisc"]
 term_fisc_lower = terms["term_fisc_lower"]
@@ -69,6 +70,7 @@ with col_center_group:
                 st.session_state.tipo_relatorio = "SOCICAM"
             else:
                 st.session_state.tipo_relatorio = "CRA"
+            st.session_state.nc_form_step = 1
             st.rerun()
     with c_b2:
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
@@ -77,6 +79,7 @@ with col_center_group:
                 st.session_state.categoria_relatorio = "Monitoramento"
             else:
                 st.session_state.categoria_relatorio = "Fiscalização"
+            st.session_state.nc_form_step = 1
             st.rerun()
 
 # Layout principal da aplicação
@@ -157,6 +160,8 @@ with st.container():
                 for item in st.session_state.old_photos_to_match:
                     id_nc = str(item.get("id_nc", "")).strip()
                     t = str(item.get("trecho", "")).strip()
+                    if len(t) > 35:
+                        t = t[:32] + "..."
                     base_label = f"{id_nc} - {t}"
                     label_counts[base_label] = label_counts.get(base_label, 0) + 1
                     
@@ -164,6 +169,8 @@ with st.container():
                 for item in st.session_state.old_photos_to_match:
                     id_nc = str(item.get("id_nc", "")).strip()
                     t = str(item.get("trecho", "")).strip()
+                    if len(t) > 35:
+                        t = t[:32] + "..."
                     base_label = f"{id_nc} - {t}"
                     total = label_counts[base_label]
                     if total > 1:
@@ -423,16 +430,6 @@ with st.container():
                             st.info("💡 Faça o upload de novas fotos para selecioná-las.")
                             foto_default = ""
 
-                    nav_col1, nav_col2 = st.columns(2)
-                    with nav_col1:
-                        if st.button("⬅️ Anterior", disabled=(idx == 0), key="btn_prev_photo_mon"):
-                            st.session_state.carousel_index = idx - 1
-                            st.rerun()
-                    with nav_col2:
-                        if st.button("Próxima ➡️", disabled=(idx == len(st.session_state.old_photos_to_match) - 1), key="btn_next_photo_mon"):
-                            st.session_state.carousel_index = idx + 1
-                            st.rerun()
-
                     st.checkbox(
                         "Avançar foto automaticamente",
                         value=True,
@@ -502,7 +499,15 @@ with st.container():
                         idx = st.session_state.carousel_index
                         if idx < len(st.session_state.old_photos_to_match):
                             current_item = st.session_state.old_photos_to_match[idx]
-                            st.info(f"📍 **Trecho:** {current_item['trecho']} | **Pista:** {current_item['pista']}\n\n🏷️ **NC:** {current_item['id_nc']}\n\n📝 **Constatação:** {current_item['constatacao']}\n\n📷 **Legenda Anterior:** {current_item['old_legend']}")
+                            
+                            def formatar_linha_unica(texto, max_len=65):
+                                if not texto:
+                                    return ""
+                                s = " ".join(str(texto).split())
+                                return s[:max_len - 3] + "..." if len(s) > max_len else s
+
+                            legenda_ant_trunc = formatar_linha_unica(current_item.get("old_legend", ""), max_len=65)
+                            st.info(f"📍 **Trecho:** {current_item['trecho']} | **Pista:** {current_item['pista']}\n\n🏷️ **NC:** {current_item['id_nc']}\n\n📝 **Constatação:** {current_item['constatacao']}\n\n📷 **Legenda Anterior:** {legenda_ant_trunc}")
                         
                             pista = current_item["pista"]
                             trecho = current_item["trecho"]
@@ -534,7 +539,7 @@ with st.container():
                     ponto_atencao = []
                     nc_legenda = st.text_area("Legenda da Foto Atual", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva a legenda da foto atual...")
                 
-                    if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring and current_item:
+                    if is_monitoring and st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"] and current_item:
                         st.markdown("#### 📝 Corpo do Relatório")
                     
                         saved_rec = next(
@@ -548,13 +553,17 @@ with st.container():
                         default_constatacao = saved_rec.get("Observações", current_item["constatacao"]) if saved_rec else current_item["constatacao"]
                         default_analise_arpe = saved_rec.get("Análise ARPE", "") if saved_rec else ""
                     
+                        is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
+                        pos_label = "INFORMAÇÃO SOCICAM" if is_socicam else "POSICIONAMENTO CRC"
+                        pos_placeholder = "Digite a informação prestada pela SOCICAM..." if is_socicam else "Digite o posicionamento da CRC..."
+
                         col_pos, col_const, col_analise = st.columns(3)
                         with col_pos:
                             pos_crc = st.text_area(
-                                "POSICIONAMENTO CRC",
+                                pos_label,
                                 value=default_pos_crc,
                                 key=f"pos_crc_step1_{st.session_state.nc_form_counter}",
-                                placeholder="Digite o posicionamento da CRC...",
+                                placeholder=pos_placeholder,
                                 height=160
                             )
                         with col_const:
@@ -617,33 +626,46 @@ with st.container():
                     nc_key = f"nc_desc_{st.session_state.nc_form_counter}"
                     pa_key = f"pa_desc_{st.session_state.nc_form_counter}"
                 
+                    is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
+                    options_nc = st.session_state.socicam_nc_options if is_socicam else st.session_state.nc_options
+                    label_nc = "Não Conformidade" if is_socicam else "Siglas de Não Conformidade"
+                    label_pa = "Ponto de Atenção" if is_socicam else "Siglas de Ponto de Atenção"
+
                     if tipo_registro == "Não Conformidade":
                         col_pills, col_plus = st.columns([11, 1])
                         with col_pills:
-                            nc_descricao = st.pills(
-                                "Siglas de Não Conformidade",
-                                st.session_state.nc_options,
-                                selection_mode="multi",
-                                key=nc_key
-                            )
+                            if is_socicam and not options_nc:
+                                st.info("Nenhuma Não Conformidade cadastrada para a SOCICAM. Clique no botão (+) ao lado para cadastrar.")
+                                nc_descricao = []
+                            else:
+                                nc_descricao = st.pills(
+                                    label_nc,
+                                    options_nc,
+                                    selection_mode="multi",
+                                    key=nc_key
+                                )
                         with col_plus:
                             st.markdown("<div style='height: 28px;' class='green-btn-marker'></div>", unsafe_allow_html=True)
                             if st.button("+", key=f"btn_add_custom_nc_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
-                                adicionar_nc_personalizada_modal(nc_key)
+                                adicionar_nc_personalizada_modal(nc_key, is_socicam=is_socicam)
                         ponto_atencao = []
                     else:
                         col_pills, col_plus = st.columns([11, 1])
                         with col_pills:
-                            ponto_atencao = st.pills(
-                                "Siglas de Ponto de Atenção",
-                                st.session_state.nc_options,
-                                selection_mode="multi",
-                                key=pa_key
-                            )
+                            if is_socicam and not options_nc:
+                                st.info("Nenhuma Não Conformidade cadastrada para a SOCICAM. Clique no botão (+) ao lado para cadastrar.")
+                                ponto_atencao = []
+                            else:
+                                ponto_atencao = st.pills(
+                                    label_pa,
+                                    options_nc,
+                                    selection_mode="multi",
+                                    key=pa_key
+                                )
                         with col_plus:
                             st.markdown("<div style='height: 28px;' class='green-btn-marker'></div>", unsafe_allow_html=True)
                             if st.button("+", key=f"btn_add_custom_pa_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
-                                adicionar_nc_personalizada_modal(pa_key)
+                                adicionar_nc_personalizada_modal(pa_key, is_socicam=is_socicam)
                         nc_descricao = []
                 
                     nc_legenda = st.text_area("Observações", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva as observações/legenda correspondente...")
@@ -652,7 +674,7 @@ with st.container():
                     # Se for monitoramento e já comparou tudo, não exibe os botões de ação
                     pass
                 else:
-                    if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
+                    if is_monitoring and st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"]:
                         col_save_direct, _ = st.columns([2.5, 7.5], gap="small")
                         with col_save_direct:
                             if st.button("💾 Salvar e Continuar", type="primary", use_container_width=True, key=f"btn_save_crc_mon_step1_{st.session_state.nc_form_counter}"):
@@ -661,10 +683,11 @@ with st.container():
                                 elif not foto_default:
                                     st.error("É obrigatório ter uma foto selecionada no carrossel para continuar.")
                                 else:
-                                    # Validação para CRC Monitoramento
+                                    # Validação para Monitoramento (CRC e SOCICAM)
+                                    pos_label = "INFORMAÇÃO SOCICAM" if st.session_state.get("tipo_relatorio", "") == "SOCICAM" else "POSICIONAMENTO CRC"
                                     campos_vazios = []
                                     if not pos_crc.strip():
-                                        campos_vazios.append("POSICIONAMENTO CRC")
+                                        campos_vazios.append(pos_label)
                                     if not constatacao.strip():
                                         campos_vazios.append("CONSTATAÇÃO")
                                     if not analise_arpe.strip():
@@ -920,7 +943,19 @@ with st.container():
     st.write("")
     acoes_container = st.container(border=True, key="acoes_panel_container")
     with acoes_container:
-        st.subheader("🛠️ Painel de Ações do Relatório")
+        col_hdr_title, col_hdr_gear = st.columns([11, 1])
+        with col_hdr_title:
+            st.subheader("🛠️ Painel de Ações do Relatório")
+        with col_hdr_gear:
+            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("⚙️", help="Editar Fiscalizações e Não Conformidades cadastradas", key="btn_manage_edicao_relatorio"):
+                editar_registros_relatorio_modal(
+                    aba_inicial="fisc",
+                    is_monitoring=is_monitoring,
+                    term_fisc=term_fisc,
+                    term_fisc_prep=term_fisc_prep,
+                    term_fisc_plural=term_fisc_plural
+                )
         
         if st.session_state.temp_fiscalizacoes:
             with st.expander("📋 Resumo do Preenchimento", expanded=False):

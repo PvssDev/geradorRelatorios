@@ -67,6 +67,11 @@ class BaseReport(ABC):
         """Define se o sumário vem antes da lista de abreviaturas na paginação."""
         pass
 
+    @property
+    def signatures_before_apendices(self) -> bool:
+        """Define se as assinaturas devem ser inseridas antes dos apêndices."""
+        return False
+
     # Abreviaturas
     @abstractmethod
     def get_abbreviations(self) -> list:
