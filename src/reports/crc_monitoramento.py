@@ -4,6 +4,7 @@ from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx import Document
 import pandas as pd
+from monitoramento_utils import extrair_metadados_anterior
 
 
 class CrcMonitoramentoReport(CrcReport):
@@ -24,6 +25,10 @@ class CrcMonitoramentoReport(CrcReport):
     @property
     def sumario_before_abreviaturas(self) -> bool:
         return False
+
+    @property
+    def signatures_before_apendices(self) -> bool:
+        return True
 
     def get_abbreviations(self) -> list:
         return []
@@ -50,90 +55,33 @@ class CrcMonitoramentoReport(CrcReport):
         section.left_margin = Inches(0.5)
         section.right_margin = Inches(0.5)
 
-        # 1. Extração do número do monitoramento anterior, CTR e dados do Quadro 1 anterior
-        self.N_prev = "X"
-        self.ctr_num = "XX/XXXX"
-        self.N_ncs_pendentes_prev = "X"
-        self.data_vistoria_prev = "XX/XX/XXXX"
-        self.processo_sei_prev = "XXXXXXXX"
-        self.oficio_num_prev = "xxx/xxxx"
-        self.oficio_data_prev = "xx/xx/xxxx"
-        self.carta_num_prev = "xxxx/xxxx"
-        self.carta_data_prev = "xx/xx/xxxx"
-        self.carta_sei_prev = "xxxxxxxx"
         self.documento_anterior = documento_anterior
-        
+        meta = extrair_metadados_anterior(documento_anterior)
+        self.N_prev = meta["N_prev"]
+        self.N_curr = meta["N_curr"]
+        self.ctr_num = meta["ctr_num"]
+        self.processo_sei_prev = meta["processo_sei_prev"]
+        self.data_vistoria_prev = meta["data_vistoria_prev"]
+        self.oficio_num_prev = meta["oficio_num_prev"]
+        self.oficio_data_prev = meta["oficio_data_prev"]
+        self.carta_num_prev = meta["carta_num_prev"]
+        self.carta_data_prev = meta["carta_data_prev"]
+        self.carta_sei_prev = meta["carta_sei_prev"]
+        self.N_prev_val = 0 if meta["is_fiscalizacao"] else self.N_prev
+
         if documento_anterior:
             try:
-                # Verificar pelo nome do arquivo se é fiscalização ou monitoramento
-                filename = getattr(documento_anterior, "name", str(documento_anterior)).lower()
-                is_fiscalizacao = "fiscaliza" in filename
-
-                if is_fiscalizacao:
-                    self.N_prev = 0
-                
-                # Se for um arquivo temporário/BytesIO do Streamlit, docx consegue ler
                 prev_doc = Document(documento_anterior)
-                
-                if not is_fiscalizacao:
-                    # Buscar número do monitoramento anterior
-                    pattern = re.compile(r'(\d+)(?:\u00ba|\u00b0)?\s*monitoramento', re.IGNORECASE)
-                    for p in prev_doc.paragraphs:
-                        m = pattern.search(p.text)
-                        if m:
-                            self.N_prev = int(m.group(1))
-                            break
-                
-                # Buscar CTR
-                pattern_ctr = re.compile(r'CTR\s*(?:N\u00ba|n\u00ba|N\u00ba)?\s*(\d+/\d+)', re.IGNORECASE)
-                for p in prev_doc.paragraphs:
-                    m = pattern_ctr.search(p.text)
-                    if m:
-                        self.ctr_num = m.group(1)
-                        break
-
-                # Extrair Processo SEI
-                pattern_sei = re.compile(r'PROCESSO SEI\s*(?:N\u00ba|n\u00ba|N\u00ba)?\s*([\d\./-]+)', re.IGNORECASE)
-                for p in prev_doc.paragraphs:
-                    m = pattern_sei.search(p.text)
-                    if m:
-                        self.processo_sei_prev = m.group(1)
-                        break
-                        break
-                
-                # Extrair data da vistoria anterior a partir dos parágrafos (mais robusto)
-                pattern_vist = re.compile(r'realizada na Rodovia Rota.*em\s*(\d{2}/\d{2}/\d{4})', re.IGNORECASE)
-                for p in prev_doc.paragraphs:
-                    m = pattern_vist.search(p.text)
-                    if m:
-                        self.data_vistoria_prev = m.group(1)
-                        break
-                        
-                # Extrair Ofício anterior
-                pattern_oficio = re.compile(r'Of(?:í|i)cio\s+Arpe\s+DTO\s+(?:n|N)(?:º|o)?\s*([\w/.-]+),\s*de\s*(\d{2}/\d{2}/\d{4})', re.IGNORECASE)
-                for p in prev_doc.paragraphs:
-                    m = pattern_oficio.search(p.text)
-                    if m:
-                        self.oficio_num_prev = m.group(1)
-                        self.oficio_data_prev = m.group(2)
-                        break
-                        
-                # Extrair Carta CRC anterior
-                pattern_carta = re.compile(r'Carta\s+CRC/REG\s+(?:n|N)(?:º|o)?\s*([\w/.-]+),\s*de\s*(\d{2}/\d{2}/\d{4})\s*\(\s*Doc\.\s*SEI\s*(?:n|N)(?:º|o)?\s*([\w/.-]+)\)', re.IGNORECASE)
-                for p in prev_doc.paragraphs:
-                    m = pattern_carta.search(p.text)
-                    if m:
-                        self.carta_num_prev = m.group(1)
-                        self.carta_data_prev = m.group(2)
-                        self.carta_sei_prev = m.group(3)
-                        break
-                        
-                # Extrair data da vistoria e quantidade de NCs pendentes do Quadro 1
-                if len(prev_doc.tables) > 0:
-                    quadro1_prev = prev_doc.tables[0]
-                    # Se não encontrou a data de vistoria nos parágrafos, busca no cabeçalho do Quadro 1
+                quadro1_prev = self._encontrar_quadro1_table(prev_doc)
+                if quadro1_prev:
                     if self.data_vistoria_prev == "XX/XX/XXXX":
                         try:
+                            header_text = quadro1_prev.rows[0].cells[2].text
+                            m_date = re.search(r'(\d{2}/\d{2}/\d{4})', header_text)
+                            if m_date:
+                                self.data_vistoria_prev = m_date.group(1)
+                        except Exception:
+                            pass
                             header_text = quadro1_prev.rows[0].cells[2].text
                             m_date = re.search(r'(\d{2}/\d{2}/\d{4})', header_text)
                             if m_date:
@@ -293,6 +241,39 @@ class CrcMonitoramentoReport(CrcReport):
         id_fisc = str(row.get("ID da Fiscalização", "")).strip()
         mes_ano_cap = formatar_mes_ano(row["Data"]).upper()
 
+        # Extrair NCs do documento anterior como suporte para a Seção 3
+        ncs_from_prev = []
+        if documento_anterior:
+            try:
+                prev_doc = Document(documento_anterior)
+                quadro1_prev = self._encontrar_quadro1_table(prev_doc)
+                if quadro1_prev:
+                    col_id = 0
+                    col_desc = 1
+                    for r_idx in range(min(2, len(quadro1_prev.rows))):
+                        for c_idx, cell in enumerate(quadro1_prev.rows[r_idx].cells):
+                            txt = cell.text.strip().upper()
+                            if 'IDENTIFICAÇÃO' in txt or 'ID.NC' in txt:
+                                col_id = c_idx
+                            elif 'DESCRIÇÃO' in txt or 'CONSTATAÇÃO' in txt:
+                                col_desc = c_idx
+
+                    for row_item in quadro1_prev.rows[1:]:
+                        cells = row_item.cells
+                        if len(cells) <= max(col_id, col_desc):
+                            continue
+                        txt0 = cells[col_id].text.strip()
+                        txt1 = cells[col_desc].text.strip()
+                        if not txt0 or any(h in txt0.upper() for h in ['IDENTIFICAÇÃO', 'ID.NC', 'NÃO CONFORMIDADE', 'TOTAL']):
+                            continue
+                        if txt0 != txt1:
+                            ncs_from_prev.append({
+                                "id_nc": txt0,
+                                "constatacao": txt1
+                            })
+            except Exception as e:
+                print(f"Erro ao extrair NCs anteriores para Seção 3: {e}")
+
         if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
             current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc].copy()
             if "Não Conformidade" in current_ncs.columns:
@@ -427,14 +408,18 @@ class CrcMonitoramentoReport(CrcReport):
                 adicionar_titulo_secao(doc, sub_title)
                 doc.add_paragraph()
 
-                for _, nc_row in df_pista.iterrows():
+                for row_idx, (_, nc_row) in enumerate(df_pista.reset_index(drop=True).iterrows()):
                     ident = str(nc_row.get("Identificação", "")).strip()
+                    if not ident or ident.lower().startswith("foto"):
+                        if row_idx < len(ncs_from_prev):
+                            ident = ncs_from_prev[row_idx]["id_nc"]
+
                     nc_desc = str(nc_row.get("Não Conformidade", "")).strip()
                     observacoes = str(nc_row.get("Observações", nc_row.get("Legenda da Foto", ""))).strip()
                     determinacao = str(nc_row.get("Determinação", "")).strip()
                     analise_arpe = str(nc_row.get("Análise ARPE", "")).strip()
 
-                    if ident:
+                    if ident and not ident.lower().startswith("foto"):
                         add_p(ident, bold=True)
                     add_label_text("NÃO CONFORMIDADE: ", nc_desc if nc_desc else "A ser preenchido.")
                     add_label_text("POSICIONAMENTO DA CRC: ", determinacao if determinacao else "A ser preenchido.")
@@ -450,6 +435,17 @@ class CrcMonitoramentoReport(CrcReport):
             f"ARPE/CTR nº {ctr_num}, de acordo com as vistorias técnicas realizadas em {data_vistoria}, dando "
             f"continuidade ao monitoramento das respectivas soluções."
         )
+
+    # ------------------------------------------------------------------
+    # Seção de quadros
+    def _encontrar_quadro1_table(self, prev_doc):
+        if not prev_doc or len(prev_doc.tables) == 0:
+            return None
+        for t in prev_doc.tables:
+            header_text = ' '.join([c.text.upper() for r in t.rows[:min(2, len(t.rows))] for c in r.cells])
+            if any(k in header_text for k in ['IDENTIFICAÇÃO', 'ID.NC', 'REGISTRO FOTOGRÁFICO', 'NÃO CONFORMIDADE']):
+                return t
+        return prev_doc.tables[0]
 
     # ------------------------------------------------------------------
     # Seção de quadros
@@ -502,16 +498,30 @@ class CrcMonitoramentoReport(CrcReport):
         if doc_anterior_path:
             try:
                 prev_doc = Document(doc_anterior_path)
-                if len(prev_doc.tables) > 0:
-                    quadro1_prev = prev_doc.tables[0]
+                quadro1_prev = self._encontrar_quadro1_table(prev_doc)
+                if quadro1_prev:
+                    col_id = 0
+                    col_desc = 1
+                    
+                    for r_idx in range(min(2, len(quadro1_prev.rows))):
+                        for c_idx, cell in enumerate(quadro1_prev.rows[r_idx].cells):
+                            txt = cell.text.strip().upper()
+                            if 'IDENTIFICAÇÃO' in txt or 'ID.NC' in txt:
+                                col_id = c_idx
+                            elif 'DESCRIÇÃO' in txt or 'CONSTATAÇÃO' in txt:
+                                col_desc = c_idx
+
                     for row_item in quadro1_prev.rows[1:]:
                         cells = row_item.cells
-                        if len(cells) < 3:
+                        if len(cells) <= max(col_id, col_desc):
                             continue
-                        txt0 = cells[0].text.strip()
-                        txt1 = cells[1].text.strip()
-                        txt2 = cells[2].text.strip()
-                        if txt0 == txt1 == txt2:
+                        txt0 = cells[col_id].text.strip()
+                        txt1 = cells[col_desc].text.strip()
+                        
+                        if not txt0 or any(h in txt0.upper() for h in ['IDENTIFICAÇÃO', 'ID.NC', 'NÃO CONFORMIDADE', 'TOTAL']):
+                            continue
+                        
+                        if txt0 == txt1:
                             ncs_from_prev.append({
                                 "type": "section",
                                 "text": txt0

@@ -1,4 +1,4 @@
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -6,7 +6,7 @@ import os
 from utils import adicionar_texto_caixa_cinza, formatar_mes_ano, extrair_ano
 from database.manager import carregar_responsaveis
 
-def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_anterior=None):
+def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, documento_anterior=None):
     """
     Gera a primeira página do relatório (Capa) baseada no modelo de referência com dados dinâmicos.
     """
@@ -25,16 +25,34 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
         section.left_margin = Inches(0.5)
         section.right_margin = Inches(0.5)
 
-        # 1. Texto Superior em Caixa Cinza (tabela 1x1 sem bordas)
+        # 1. Texto Superior
         ano = extrair_ano(row["Data"])
         id_fisc = str(row.get("ID da Fiscalização", "")).strip()
         ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc)
-        adicionar_texto_caixa_cinza(doc, ctr_text)
+        if report_config.key == "CRC":
+            p_ctr = doc.add_paragraph()
+            p_ctr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_ctr.paragraph_format.space_before = Pt(6)
+            p_ctr.paragraph_format.space_after = Pt(12)
+            run_ctr = p_ctr.add_run(ctr_text)
+            run_ctr.bold = True
+            run_ctr.font.name = 'Aptos'
+            run_ctr.font.size = Pt(11)
+        else:
+            adicionar_texto_caixa_cinza(doc, ctr_text)
         
         # 1. Imagem da Capa
         if os.path.exists(logo_path):
-            img_w = Inches(6.0) if report_config.key == "SOCICAM" else Inches(4.0)
-            doc.add_picture(logo_path, width=img_w)
+            if report_config.key == "CRC":
+                img_w = Inches(4.0) + Cm(1.0)
+                img_h = Inches(4.0 / (900.0 / 743.0)) + Cm(1.0)
+                doc.add_picture(logo_path, width=img_w, height=img_h)
+            elif report_config.key == "SOCICAM":
+                img_w = Inches(6.0)
+                doc.add_picture(logo_path, width=img_w)
+            else:
+                img_w = Inches(4.0)
+                doc.add_picture(logo_path, width=img_w)
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
             
         doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
@@ -53,7 +71,6 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
             else:
                 p.paragraph_format.space_after = Pt(12)
 
-        
         # 3. Lista de Analistas Dinâmica
         responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
         db_resp = carregar_responsaveis()
@@ -117,11 +134,11 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
     if not has_abbr:
         # Apenas Sumário na Página 2, sem Lista de Abreviaturas
         doc.add_page_break()
-        gerar_sumario(doc, row, report_config)
+        gerar_sumario(doc, row, report_config, nc_df=nc_df)
     elif report_config.sumario_before_abreviaturas:
         # CRC/SOCICAM: Sumário na Página 2, Lista de Abreviaturas na Página 3
         doc.add_page_break()
-        gerar_sumario(doc, row, report_config)
+        gerar_sumario(doc, row, report_config, nc_df=nc_df)
         
         doc.add_page_break()
         gerar_lista_abreviaturas(doc, report_config)
@@ -131,7 +148,7 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, documento_ant
         gerar_lista_abreviaturas(doc, report_config)
         
         doc.add_page_break()
-        gerar_sumario(doc, row, report_config)
+        gerar_sumario(doc, row, report_config, nc_df=nc_df)
         
     # 7. Quebra de seção para ir para a Página 4 (Introdução)
     doc.add_section(WD_SECTION.NEW_PAGE)
@@ -189,9 +206,10 @@ def gerar_lista_abreviaturas(doc, report_config):
             row.cells[idx].width = width
 
 
-def gerar_sumario(doc, row, report_config):
+def gerar_sumario(doc, row, report_config, nc_df=None):
     """Gera a terceira página do cabeçalho (Sumário dinâmico utilizando tabulações e líderes de ponto)."""
     from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
+    import inspect
     
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -201,7 +219,11 @@ def gerar_sumario(doc, row, report_config):
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(24)
     
-    linhas = report_config.get_sumario_linhas(row)
+    sig = inspect.signature(report_config.get_sumario_linhas)
+    if "nc_df" in sig.parameters:
+        linhas = report_config.get_sumario_linhas(row, nc_df=nc_df)
+    else:
+        linhas = report_config.get_sumario_linhas(row)
         
     for idx, linha in enumerate(linhas):
         p_line = doc.add_paragraph()

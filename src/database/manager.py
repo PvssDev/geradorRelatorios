@@ -173,3 +173,31 @@ def salvar_custom_ncs(lista):
         return True
     except Exception:
         return False
+
+# --- CUSTOM NCS SOCICAM ---
+CUSTOM_NCS_SOCICAM_FILE = os.path.join(DB_DIR, "custom_ncs_socicam.json")
+DEFAULT_CUSTOM_NCS_SOCICAM = []
+
+def carregar_custom_ncs_socicam():
+    """Carrega a lista de não conformidades customizadas da SOCICAM (JSON)."""
+    if not os.path.exists(CUSTOM_NCS_SOCICAM_FILE):
+        salvar_custom_ncs_socicam(DEFAULT_CUSTOM_NCS_SOCICAM)
+        return DEFAULT_CUSTOM_NCS_SOCICAM.copy()
+    try:
+        with open(CUSTOM_NCS_SOCICAM_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            return DEFAULT_CUSTOM_NCS_SOCICAM.copy()
+    except Exception:
+        return DEFAULT_CUSTOM_NCS_SOCICAM.copy()
+
+def salvar_custom_ncs_socicam(lista):
+    """Salva a lista de não conformidades customizadas da SOCICAM no banco de dados local (JSON)."""
+    try:
+        os.makedirs(DB_DIR, exist_ok=True)
+        with open(CUSTOM_NCS_SOCICAM_FILE, "w", encoding="utf-8") as f:
+            json.dump(lista, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False

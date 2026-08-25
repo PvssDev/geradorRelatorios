@@ -487,7 +487,7 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
                 add_formatted_paragraph(resolved_runs)
 
     # ----------------------------------------------------
-    # APÊNDICES (Renderizados após as conclusões e antes das assinaturas)
+    # APÊNDICES E ASSINATURAS FINAIS
     # ----------------------------------------------------
     id_fisc = row["ID da Fiscalização"]
     data_fisc = formatar_data_dd_mm_yyyy(row["Data"])
@@ -502,102 +502,108 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         if "Ponto de Atenção" in current_ncs.columns:
             pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
 
-    # Delegate appendix rendering to the strategy
-    report_config.render_apendices(doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos)
+    def render_apendices_fn():
+        report_config.render_apendices(doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos)
 
-    # ----------------------------------------------------
-    # DATAÇÃO E ASSINATURAS FINAIS (Ao final do documento)
-    # ----------------------------------------------------
-    doc.add_paragraph()
-    p_loc1 = doc.add_paragraph()
-    p_loc1.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    p_loc1.paragraph_format.space_before = Pt(12)
-    p_loc1.paragraph_format.space_after = Pt(24)
-    run_loc1 = p_loc1.add_run("Recife, data da assinatura eletrônica.")
-    run_loc1.font.name = 'Aptos'
-    run_loc1.font.size = Pt(11)
-    
-    doc.add_paragraph()
-    
-    responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
-    db_resp = carregar_responsaveis()
-    
-    for nome in responsaveis_list:
-        match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
-        if match:
-            r_nome = match["nome"]
-            r_funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
-            r_matr = match["matricula"]
-        else:
-            r_nome = nome
-            r_funcao = report_config.analyst_title
-            r_matr = "xxxxxxx/xx"
+    def render_assinaturas_fn():
+        doc.add_paragraph()
+        p_loc1 = doc.add_paragraph()
+        p_loc1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_loc1.paragraph_format.space_before = Pt(12)
+        p_loc1.paragraph_format.space_after = Pt(24)
+        run_loc1 = p_loc1.add_run("Recife, data da assinatura eletrônica.")
+        run_loc1.font.name = 'Aptos'
+        run_loc1.font.size = Pt(11)
+        
+        doc.add_paragraph()
+        
+        responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+        db_resp = carregar_responsaveis()
+        
+        for nome in responsaveis_list:
+            match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
+            if match:
+                r_nome = match["nome"]
+                r_funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
+                r_matr = match["matricula"]
+            else:
+                r_nome = nome
+                r_funcao = report_config.analyst_title
+                r_matr = "xxxxxxx/xx"
+                
+            p_ass = doc.add_paragraph()
+            p_ass.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_ass.paragraph_format.space_after = Pt(0)
+            run_ass = p_ass.add_run(r_nome)
+            run_ass.bold = True
+            run_ass.font.name = 'Aptos'
+            run_ass.font.size = Pt(11)
             
-        p_ass = doc.add_paragraph()
-        p_ass.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_ass.paragraph_format.space_after = Pt(0)
-        run_ass = p_ass.add_run(r_nome)
-        run_ass.bold = True
-        run_ass.font.name = 'Aptos'
-        run_ass.font.size = Pt(11)
+            p_carg = doc.add_paragraph()
+            p_carg.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_carg.paragraph_format.space_after = Pt(0)
+            run_carg = p_carg.add_run(f"{r_funcao}, Matrícula nº {r_matr}" if report_config.key == "SOCICAM" else r_funcao)
+            run_carg.font.name = 'Aptos'
+            run_carg.font.size = Pt(11)
+            
+            if report_config.key != "SOCICAM":
+                p_mat = doc.add_paragraph()
+                p_mat.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_mat.paragraph_format.space_after = Pt(12)
+                run_mat = p_mat.add_run(f"Matrícula nº {r_matr}")
+                run_mat.font.name = 'Aptos'
+                run_mat.font.size = Pt(11)
+            else:
+                p_carg.paragraph_format.space_after = Pt(18)
+            
+            doc.add_paragraph()  # Espaço entre assinaturas
+            
+        # Ciente e de acordo (Coordenador)
+        p_ciente = doc.add_paragraph()
+        p_ciente.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_ciente.paragraph_format.space_before = Pt(36)
+        p_ciente.paragraph_format.space_after = Pt(36)
+        run_ciente = p_ciente.add_run("Ciente e de acordo.")
+        run_ciente.font.name = 'Aptos'
+        run_ciente.font.size = Pt(11)
         
-        p_carg = doc.add_paragraph()
-        p_carg.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_carg.paragraph_format.space_after = Pt(0)
-        run_carg = p_carg.add_run(f"{r_funcao}, Matrícula nº {r_matr}" if report_config.key == "SOCICAM" else r_funcao)
-        run_carg.font.name = 'Aptos'
-        run_carg.font.size = Pt(11)
-        
-        if report_config.key != "SOCICAM":
-            p_mat = doc.add_paragraph()
-            p_mat.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_mat.paragraph_format.space_after = Pt(12)
-            run_mat = p_mat.add_run(f"Matrícula nº {r_matr}")
-            run_mat.font.name = 'Aptos'
-            run_mat.font.size = Pt(11)
+        db_coord = carregar_coordenadores()
+        coord_name = str(row["Coordenador"]).strip()
+        match_coord = next((c for c in db_coord if c["nome"].strip().lower() == coord_name.lower()), None)
+        if match_coord:
+            c_nome = match_coord["nome"]
+            c_funcao = match_coord["funcao"]
+            c_matr = match_coord["matricula"]
         else:
-            p_carg.paragraph_format.space_after = Pt(18)
+            c_nome = coord_name
+            c_funcao = "Coordenador(a) de Transportes e Rodovias"
+            c_matr = "xxxxxxx/xx"
+            
+        p_ass3 = doc.add_paragraph()
+        p_ass3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_ass3.paragraph_format.space_after = Pt(0)
+        run_ass3 = p_ass3.add_run(c_nome)
+        run_ass3.bold = True
+        run_ass3.font.name = 'Aptos'
+        run_ass3.font.size = Pt(11)
         
-        doc.add_paragraph()  # Espaço entre assinaturas
+        p_carg3 = doc.add_paragraph()
+        p_carg3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_carg3.paragraph_format.space_after = Pt(0)
+        run_carg3 = p_carg3.add_run(c_funcao)
+        run_carg3.font.name = 'Aptos'
+        run_carg3.font.size = Pt(11)
         
-    # Ciente e de acordo (Coordenador)
-    p_ciente = doc.add_paragraph()
-    p_ciente.paragraph_format.space_before = Pt(36)
-    p_ciente.paragraph_format.space_after = Pt(36)
-    run_ciente = p_ciente.add_run("Ciente e de acordo.")
-    run_ciente.font.name = 'Aptos'
-    run_ciente.font.size = Pt(11)
-    
-    db_coord = carregar_coordenadores()
-    coord_name = str(row["Coordenador"]).strip()
-    match_coord = next((c for c in db_coord if c["nome"].strip().lower() == coord_name.lower()), None)
-    if match_coord:
-        c_nome = match_coord["nome"]
-        c_funcao = match_coord["funcao"]
-        c_matr = match_coord["matricula"]
+        p_mat3 = doc.add_paragraph()
+        p_mat3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_mat3.paragraph_format.space_after = Pt(12)
+        run_mat3 = p_mat3.add_run(f"Matrícula nº {c_matr}")
+        run_mat3.font.name = 'Aptos'
+        run_mat3.font.size = Pt(11)
+
+    if getattr(report_config, "signatures_before_apendices", False):
+        render_assinaturas_fn()
+        render_apendices_fn()
     else:
-        c_nome = coord_name
-        c_funcao = "Coordenador(a) de Transportes e Rodovias"
-        c_matr = "xxxxxxx/xx"
-        
-    p_ass3 = doc.add_paragraph()
-    p_ass3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_ass3.paragraph_format.space_after = Pt(0)
-    run_ass3 = p_ass3.add_run(c_nome)
-    run_ass3.bold = True
-    run_ass3.font.name = 'Aptos'
-    run_ass3.font.size = Pt(11)
-    
-    p_carg3 = doc.add_paragraph()
-    p_carg3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_carg3.paragraph_format.space_after = Pt(0)
-    run_carg3 = p_carg3.add_run(c_funcao)
-    run_carg3.font.name = 'Aptos'
-    run_carg3.font.size = Pt(11)
-    
-    p_mat3 = doc.add_paragraph()
-    p_mat3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_mat3.paragraph_format.space_after = Pt(12)
-    run_mat3 = p_mat3.add_run(f"Matrícula nº {c_matr}")
-    run_mat3.font.name = 'Aptos'
-    run_mat3.font.size = Pt(11)
+        render_apendices_fn()
+        render_assinaturas_fn()
