@@ -30,7 +30,7 @@ class CraReport(BaseReport):
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº 01/{ano}"
+        return "RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº {mes_ano}"
 
     @property
     def capa_prestador_label(self) -> str:
@@ -75,11 +75,12 @@ class CraReport(BaseReport):
         return [
             "1.\tINTRODUÇÃO\t4",
             "2.\tOBJETIVO\t4",
-            "3.\tMETODOLOGIA\t5",
-            "4.\tFISCALIZAÇÃO\t7",
-            "5.\tDETERMINAÇÕES GERAIS\t11",
-            "6.\tRECOMENDAÇÕES\t11",
-            "7.\tCONCLUSÕES\t11",
+            "3.\tINFORMAÇÕES GERAIS\t4",
+            "4.\tMETODOLOGIA\t5",
+            "5.\tFISCALIZAÇÃO\t7",
+            "6.\tDETERMINAÇÕES GERAIS\t11",
+            "7.\tRECOMENDAÇÕES\t11",
+            "8.\tCONCLUSÕES\t11",
             "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
         ]
 
@@ -110,25 +111,25 @@ class CraReport(BaseReport):
 
     def get_general_info_rows(self, row, responsaveis_formatted, periodo_val) -> list:
         return [
-            ("2.1 DO TITULAR E REGULADOR", "", True, False),
+            ("3.1 DO TITULAR E REGULADOR", "", True, False),
             ("Titular:", "SUAPE – Complexo Industrial Portuário Governador Eraldo Gueiros", False, False),
             ("Endereço:", "Engenho Massangana – Km 10 – Rodovia PE – 60 Ipojuca/PE CEP: 55.590-000", False, False),
             ("Responsável:", "JOSÉ CONSTANTINO DA SILVA FILHO", False, True),
             ("Representantes por acompanhar:", "Viviane Alves Walzertudes", False, False),
             
-            ("2.2 DO VERIFICADOR INDEPENDENTE", "", True, False),
+            ("3.2 DO VERIFICADOR INDEPENDENTE", "", True, False),
             ("Verificador Independente:", "Consórcio das Empresas TPF/ECR", False, False),
             ("Endereço:", "Rua Irene Ramos Gomes de Mattos, Nº 176, Pina, Recife/PE CEP: 51011-530", False, False),
             ("Responsável:", "RICARDO MEDEIROS PEREIRA DE CARVALHO", False, True),
             ("Representantes por acompanhar:", "Sónya Albuquerque; Ricardo Henrique Ferraz de Farias; Lauro Ricardo Torres Galindo e Maynara Milena Silva de Lima", False, False),
             
-            ("2.3 DO REGULADO", "", True, False),
+            ("3.3 DO REGULADO", "", True, False),
             ("Regulado:", "CRA - Concessionária Rota do Atlântico", False, False),
             ("Responsável:", "RAFAELA ELAINE DA COSTA LIMA ARAÚJO", False, True),
             ("Endereço:", "Rodovia PE-009, Km 38,5(TDR Norte, 2074) – Distrito Industrial Suape, Cabo de Santo Agostinho/PE – CEP: 54.590-000", False, False),
             ("Representantes por acompanhar:", "Vanessa Monteiro e OuvidoraXXXCRA", False, False),
             
-            ("2.4 DO FISCALIZADOR (CONVÊNIO SUAPE/ARPE Nº 003/2021)", "", True, False),
+            ("3.4 DO FISCALIZADOR (CONVÊNIO SUAPE/ARPE Nº 003/2021)", "", True, False),
             ("Regulador:", "Agência de Regulação de Pernambuco (Arpe)", False, False),
             ("Diretor Presidente:", "CARLOS PORTO FILHO", False, True),
             ("Endereço:", "Avenida Conselheiro Rosa e Silva, 975, Aflitos, Recife/PE, CEP: 52.050-020.\nEstacionamento: Rua do Futuro, 150, Aflitos, Recife/PE.", False, False),
@@ -234,7 +235,141 @@ class CraReport(BaseReport):
         p2_runs = [
             ("Esses achados foram avaliados tomando por base as orientações do PDCL, em especial, o Subitem 4.2.2.1.3 - Parâmetros Mínimos Exigidos, visualizando que \"os pavimentos deverão ser analisados quanto às suas condições de superfície, conforto, deformabilidade, vida remanescente e segurança”, e ainda que os “parâmetros de aceitabilidade do pavimento para essas condições que deverão ser totalmente atendidas durante o período de CONCESSÃO”.", False, False, None)
         ]
-        return ("4. FISCALIZAÇÃO", [p1_runs, p2_runs])
+        return ("5. FISCALIZAÇÃO", [p1_runs, p2_runs])
+
+    def render_post_metodologia_extra_content(self, doc, row) -> None:
+        """Renderiza o Quadro 1 – Demonstrativo da Elegibilidade do Trecho Fiscalizado para Indicação de NC."""
+        from docx.shared import Inches, Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        from docx.oxml import parse_xml
+        from docx.oxml.ns import nsdecls
+
+        # Título do Quadro 1
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(12)
+        p.paragraph_format.space_after = Pt(6)
+        
+        r1 = p.add_run("Quadro 1")
+        r1.bold = True
+        r1.font.name = 'Aptos'
+        r1.font.size = Pt(11)
+        
+        r2 = p.add_run(" – Demonstrativo da Elegibilidade do Trecho Fiscalizado para Indicação de NC")
+        r2.font.name = 'Aptos'
+        r2.font.size = Pt(11)
+
+        # Dados da tabela
+        dados_tabela = [
+            ("PE - 009, PISTA SENTIDO SUL (CRESCENTE)", [
+                ("29,08 - 29,14", "ST 6.02", "49,29\n(página 285)", "FD 4,16\n(página 125)"),
+                ("33,88-33,90", "ST 6.06", "47,02\n(página 296)", "FD 3,58\n(página 125)"),
+                ("34,00-34,02", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
+                ("34,28-34,40", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
+                ("34,52-34,56", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
+                ("34,66-34,68", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
+                ("34,72-34,74", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
+                ("36,02-36,13", "ST 4.01", "71,00\n(página 223)", "FE 3,92\n(página 125)"),
+                ("36,18-36,32", "ST 4.01", "71,00\n(página 223)", "FE 3,92\n(página 125)"),
+                ("36,94-36,98", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
+                ("37,00-37,10", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
+                ("37,10-37,12", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
+                ("37,38-37,38", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
+                ("37,54-37,58", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
+                ("37,62-37,66", "ST 4.03", "51,64\n(página 227)", "FD 3,22\n(página 125)"),
+                ("38,32+38,32", "ST 4.03", "51,64\n(página 227)", "FD 3,22\n(página 125)"),
+                ("41,16-41,22", "ST 3.01", "42,34\n(página 204)", "FD 3,00\n(página 125)"),
+                ("41,84-41,88", "ST 3.02", "45,60\n(página 206)", "FD 2,88\n(página 125)"),
+            ]),
+            ("PE - 009, PISTA SENTIDO NORTE (DECRESCENTE)", [
+                ("40,16-40,60", "ST 4.06", "70,36\n(página 233)", "FD 3,74\n(página 125)"),
+                ("39,94-39,90", "ST 4.06", "70,36\n(página 233)", "FD 3,74\n(página 125)"),
+            ]),
+            ("VPE – 034, PISTA SENTIDO SUL (CRESCENTE)", [
+                ("00,06-00,36", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
+                ("00,45-00,48\n(ROTATÓRIA)", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
+                ("00,52-00,56", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
+                ("00,58-00,62", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
+                ("00,68-00,86", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
+                ("01,56-01,58", "ST 5.02", "35,91\n(página 252)", "FE 4,86\n(página 125)"),
+                ("01,76-01,78", "ST 5.02", "35,91\n(página 252)", "FE 4,86\n(página 125)"),
+                ("02,04-02,12", "ST 5.03", "35,36\n(página 254)", "FD 4,23\n(página 125)"),
+            ]),
+            ("VPE - 034, PISTA SENTIDO NORTE (DECRESCENTE)", [
+                ("02,78-02,72", "ST 5.11", "60,89\n(página 271)", "FE 4,23\n(página 125)"),
+                ("02,16-02,08", "ST 5.11", "60,89\n(página 271)", "FE 4,23\n(página 125)"),
+            ])
+        ]
+
+        total_rows = 1 + sum(1 + len(items) for _, items in dados_tabela)
+        table = doc.add_table(rows=total_rows, cols=4)
+        table.style = 'Table Grid'
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+        # Cabeçalho Principal (Linha 0)
+        headers = [
+            "TRECHO ELEGÍVEL\n(KMinicial-KMfinal)",
+            "SUBTRECHO",
+            "IGG\n(Relatório Anual 01/2025)",
+            "IRI\n(Relatório Anual 01/2025)"
+        ]
+        hdr_row = table.rows[0]
+        for c_idx, text in enumerate(headers):
+            cell = hdr_row.cells[c_idx]
+            cell.text = text
+            shd = parse_xml(r'<w:shd {} w:fill="DDDDDD"/>'.format(nsdecls('w')))
+            cell._tc.get_or_add_tcPr().append(shd)
+            for p_cell in cell.paragraphs:
+                p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in p_cell.runs:
+                    run.font.name = 'Aptos'
+                    run.font.size = Pt(10)
+                    run.bold = True
+
+        # Preenchimento das seções e dados
+        curr_row = 1
+        for track_title, items in dados_tabela:
+            # Linha de Sentido da Pista (mesclada nas 4 colunas)
+            row_track = table.rows[curr_row]
+            a = row_track.cells[0]
+            b = row_track.cells[3]
+            merged_cell = a.merge(b)
+            merged_cell.text = track_title
+            shd_track = parse_xml(r'<w:shd {} w:fill="FFFFCC"/>'.format(nsdecls('w')))
+            merged_cell._tc.get_or_add_tcPr().append(shd_track)
+            for p_cell in merged_cell.paragraphs:
+                p_cell.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                for run in p_cell.runs:
+                    run.font.name = 'Aptos'
+                    run.font.size = Pt(10)
+                    run.bold = False
+            curr_row += 1
+
+            # Linhas de Dados
+            for col0, col1, col2, col3 in items:
+                row_data = table.rows[curr_row]
+                row_data.cells[0].text = col0
+                row_data.cells[1].text = col1
+                row_data.cells[2].text = col2
+                row_data.cells[3].text = col3
+                for cell in row_data.cells:
+                    for p_cell in cell.paragraphs:
+                        p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        for run in p_cell.runs:
+                            run.font.name = 'Aptos'
+                            run.font.size = Pt(10)
+                            run.bold = False
+                curr_row += 1
+
+        # Largura das colunas
+        col_widths = [Inches(1.8), Inches(1.1), Inches(1.9), Inches(1.9)]
+        for row_t in table.rows:
+            for idx, width in enumerate(col_widths):
+                if idx < len(row_t.cells):
+                    row_t.cells[idx].width = width
+
+        doc.add_paragraph()
 
     def render_quadros(self, doc, row, nc_df, criar_tabela_quadros_fn) -> None:
         from utils import formatar_mes_ano
@@ -277,11 +412,11 @@ class CraReport(BaseReport):
                 if italic:
                     run.italic = True
                     
-        # 2. Quadro 4 title
+        # 2. Quadro 2 title
         p7 = doc.add_paragraph()
         p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p7.paragraph_format.space_after = Pt(6)
-        r7_1 = p7.add_run("Quadro 4")
+        r7_1 = p7.add_run("Quadro 2")
         r7_1.bold = True
         r7_1.font.name = 'Aptos'
         r7_1.font.size = Pt(11)
@@ -292,11 +427,11 @@ class CraReport(BaseReport):
         criar_tabela_quadros_fn(doc, ncs_reais, is_pa=False, report_config=self)
         doc.add_paragraph()
         
-        # 3. Quadro 5 title
+        # 3. Quadro 3 title
         p8 = doc.add_paragraph()
         p8.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p8.paragraph_format.space_after = Pt(6)
-        r8_1 = p8.add_run("Quadro 5")
+        r8_1 = p8.add_run("Quadro 3")
         r8_1.bold = True
         r8_1.font.name = 'Aptos'
         r8_1.font.size = Pt(11)
@@ -312,31 +447,23 @@ class CraReport(BaseReport):
 
     @property
     def quadros_section_title(self) -> str:
-        return "4. FISCALIZAÇÃO"
+        return "5. FISCALIZAÇÃO"
 
     def get_quadro_intro_paragraphs(self, row, data_extenso, responsaveis_formatted) -> list:
         return [
-            [("Os trechos com Não Conformidades registradas no Quadro 1 e Quadro 2, a seguir, associadas aos respectivos subtrechos, foram avaliadas pelos valores do Índice de Gravidade Global (IGG) que ultrapassaram o limite máximo previsto ≥ 30, como também os valores do Índice Irregularidade Longitudinal (IRI) que ultrapassaram o limite máximo previsto ≥ 2,7 m/km constantes do Relatório Anual 01 de novembro/2025 elaborado pelo Verificador Independente.", False, False, None)],
+            [("Os trechos com Não Conformidades registradas no Quadro 1, a seguir, associadas aos respectivos subtrechos, foram avaliadas pelos valores do Índice de Gravidade Global (IGG) que ultrapassaram o limite máximo previsto ≥ 30, como também os valores do Índice Irregularidade Longitudinal (IRI) que ultrapassaram o limite máximo previsto ≥ 2,7 m/km constantes do Relatório Anual 01 de novembro/2025 elaborado pelo Verificador Independente.", False, False, None)],
             [],
-            [("Quadro 1 – Aplicação dos Critérios de Elegibilidade Relativos ao Pavimento PE009", False, False, None)],
-            [("Quadro 2 – Aplicação dos Critérios de Elegibilidade Relativos ao Pavimento VPE034", False, False, None)],
-            [("Visando garantir um pavimento de qualidade com a trafegabilidade e segurança viária para os usuários sugere-se que os Pontos de Atenção registrados no Quadro 3 sejam, tratados pela concessionaria. A seguir, estão associados aos respectivos subtrechos, possuem índices de Índice de Gravidade Global (IGG) e/ou Índice de Irregularidade Longitudinal (IRI) que não ultrapassaram o limite máximos previstos constantes do Relatório Anual 01 de novembro/2025 elaborado pelo Verificador Independente.", False, False, None)],
-            [],
-            [("Quadro 3 – Trecho dos pontos de Atenção:", False, False, None)],
-            [("O Quadro 4, a seguir, resume as Não Conformidades constatadas, relacionadas ao PDCL, com indicação dos respectivos registros fotográficos no ", False, False, None),
-             ("Apêndice A", True, False, None),
-             (" e Pontos de Atenção respectivos registros fotográficos no ", False, False, None),
-             ("Apêndice B", True, False, None),
-             (". A descrição da evidência está referenciada conforme a norma de descrição de defeitos do DNIT.", False, False, None)]
+            [("A partir das vistorias de campo, e das avaliações das Não Conformidades registradas pelo Verificador Independente, foram consolidadas as informações no Quadro 2, a seguir, as Não Conformidades e Determinações/Recomendações expedidas pela Arpe.", False, False, None)]
         ]
 
     @property
     def quadro_title_template(self) -> str:
-        return "Quadro 4 – Determinações para Não Conformidades Identificadas – {mes_ano}"
+        return "Quadro 1 – Registro das Não Conformidades na Área de Concessão da CRA - {mes_ano}"
 
     @property
     def nc_table_headers(self) -> list:
         return [
+            "TRECHO", 
             "IDENTIFICAÇÃO", 
             "DESCRIÇÃO / INFRAÇÃO", 
             "REGISTRO FOTOGRÁFICO", 
@@ -361,9 +488,9 @@ class CraReport(BaseReport):
     @property
     def finalizacao_sections_config(self) -> dict:
         return {
-            "5": "determinações",
-            "6": "recomendações",
-            "7": "conclusões"
+            "6": "determinações",
+            "7": "recomendações",
+            "8": "conclusões"
         }
 
     def get_determinations_paragraphs(self, total_ncs) -> list:
@@ -420,8 +547,16 @@ class CraReport(BaseReport):
     def analyst_title(self) -> str:
         return "Analista de Regulação"
 
-    def get_process_sei_texts(self, ano) -> list:
+    def get_process_sei_texts(self, row, ano=None) -> list:
+        from utils import extrair_mes_ano_numerico, extrair_ano
+        if isinstance(row, (str, int)) and ano is None:
+            ano = str(row)
+            mes_ano = f"01/{ano}"
+        else:
+            ano = ano or extrair_ano(row.get("Data", "") if hasattr(row, "get") else row["Data"])
+            data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            mes_ano = extrair_mes_ano_numerico(data_val)
         return [
-            f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº 07/{ano} - CTR",
+            f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº {mes_ano} - CTR",
             f"SEI Nº xxxxxxxxxxxx/{ano}-XX"
         ]

@@ -191,3 +191,51 @@ def extrair_ano(data_val):
             return "2026"
     except Exception:
         return "2026"
+
+
+def extrair_mes_ano_numerico(data_val):
+    """
+    Extrai o mês e ano no formato 'MM/AAAA' (ex: '07/2026') a partir de uma data
+    (string, Timestamp, datetime, date).
+    """
+    if pd.isna(data_val) or not data_val:
+        return "01/2026"
+    
+    try:
+        from datetime import datetime, date
+        import re
+        
+        if hasattr(data_val, "to_pydatetime"):
+            dt = data_val.to_pydatetime()
+            return f"{dt.month:02d}/{dt.year}"
+        elif isinstance(data_val, (datetime, date)):
+            return f"{data_val.month:02d}/{data_val.year}"
+        else:
+            data_str = str(data_val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%m/%Y", "%d/%m/%y", "%m/%y"):
+                try:
+                    dt = datetime.strptime(data_str, fmt)
+                    return f"{dt.month:02d}/{dt.year}"
+                except ValueError:
+                    continue
+            
+            # Se for formato MM/AAAA (ex: '07/2026')
+            m_mes_ano = re.match(r'^(\d{1,2})/(\d{4})$', data_str)
+            if m_mes_ano:
+                mes = int(m_mes_ano.group(1))
+                ano = m_mes_ano.group(2)
+                return f"{mes:02d}/{ano}"
+            
+            # Se for formato DD/MM/AAAA (ex: '15/07/2026')
+            m_full = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', data_str)
+            if m_full:
+                mes = int(m_full.group(2))
+                ano = m_full.group(3)
+                return f"{mes:02d}/{ano}"
+            
+            ano_extraido = extrair_ano(data_val)
+            return f"01/{ano_extraido}"
+    except Exception:
+        ano_extraido = extrair_ano(data_val)
+        return f"01/{ano_extraido}"
+

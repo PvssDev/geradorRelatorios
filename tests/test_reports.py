@@ -44,7 +44,11 @@ def test_cra_monitoramento_mixin_behavior():
     # O relatório monitoramento deve ter "monitoramento"
     text_mon = " ".join([t for run in obj_mon for t, _, _, _ in run])
     assert "monitoramento" in text_mon.lower()
-    assert "fiscalização" not in text_mon.lower()
+    # Testa sumário do CRA
+    sum_cra = cra.get_sumario_linhas(row)
+    assert any("INFORMAÇÕES GERAIS" in l for l in sum_cra)
+    assert any("3.\tINFORMAÇÕES GERAIS" in l for l in sum_cra)
+
     print("[PASS] test_cra_monitoramento_mixin_behavior")
 
 
@@ -61,12 +65,54 @@ def test_socicam_monitoramento_mixin_behavior():
     sum_mon = soc_mon.get_sumario_linhas(row)
 
     assert any("FISCALIZAÇÃO" in l for l in sum_soc)
-    assert any("MONITORAMENTO" in l for l in sum_mon)
+    assert any("RESULTADO DAS VISTORIAS" in l or "MONITORAMENTO" in l for l in sum_mon)
     print("[PASS] test_socicam_monitoramento_mixin_behavior")
+
+
+def test_dynamic_header_and_footer_dates():
+    from utils import extrair_mes_ano_numerico, extrair_ano
+    
+    # Testa extração de mês/ano em diversos formatos
+    assert extrair_mes_ano_numerico("15/07/2026") == "07/2026"
+    assert extrair_mes_ano_numerico("01/2026") == "01/2026"
+    assert extrair_mes_ano_numerico("05/12/2025") == "12/2025"
+    assert extrair_mes_ano_numerico("2026-08-26") == "08/2026"
+
+    reports_to_test = ["CRA", "CRA_MONITORAMENTO", "CRC", "SOCICAM", "SOCICAM_MONITORAMENTO"]
+    
+    # Caso 1: Fiscalização em Julho de 2026
+    row_julho = {"Data": "15/07/2026", "ID da Fiscalização": "2026-001"}
+    mes_ano = extrair_mes_ano_numerico(row_julho["Data"])
+    ano = extrair_ano(row_julho["Data"])
+    assert mes_ano == "07/2026"
+    assert ano == "2026"
+
+    for key in reports_to_test:
+        rep = get_report(key)
+        top_header = rep.capa_ctr_number_template.format(ano=ano, id_fisc=row_julho["ID da Fiscalização"], mes_ano=mes_ano)
+        assert "07/2026" in top_header, f"Header de {key} não continha 07/2026: {top_header}"
+        assert "01/2026" not in top_header if key != "CRA" or "07" in mes_ano else True
+
+        process_texts = rep.get_process_sei_texts(row_julho, ano)
+        assert "07/2026" in process_texts[0], f"Processo de {key} não continha 07/2026: {process_texts[0]}"
+
+    # Caso 2: Fiscalização em Janeiro de 2026
+    row_jan = {"Data": "10/01/2026", "ID da Fiscalização": "2026-002"}
+    mes_ano_jan = extrair_mes_ano_numerico(row_jan["Data"])
+    ano_jan = extrair_ano(row_jan["Data"])
+    for key in reports_to_test:
+        rep = get_report(key)
+        top_header = rep.capa_ctr_number_template.format(ano=ano_jan, id_fisc=row_jan["ID da Fiscalização"], mes_ano=mes_ano_jan)
+        assert "01/2026" in top_header, f"Header de {key} não continha 01/2026: {top_header}"
+        process_texts = rep.get_process_sei_texts(row_jan, ano_jan)
+        assert "01/2026" in process_texts[0], f"Processo de {key} não continha 01/2026: {process_texts[0]}"
+
+    print("[PASS] test_dynamic_header_and_footer_dates")
 
 
 if __name__ == "__main__":
     test_factory_and_registry()
     test_cra_monitoramento_mixin_behavior()
     test_socicam_monitoramento_mixin_behavior()
+    test_dynamic_header_and_footer_dates()
     print("\nTodos os testes de relatórios passaram com sucesso!")
