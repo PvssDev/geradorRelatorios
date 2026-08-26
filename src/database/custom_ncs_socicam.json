@@ -2,5 +2,29 @@
   {
     "sigla": "PINTURA",
     "descricao": "Pintura da tampa da bomba de agua faltando pintura"
+  },
+  {
+    "sigla": "QUEBRADO",
+    "descricao": "Vidraças quebradas"
+  },
+  {
+    "sigla": "VEGETAÇÃO",
+    "descricao": "Vegetação no telhado"
+  },
+  {
+    "sigla": "FERRAGENS",
+    "descricao": "Ferragens expostas na viga do terminal"
+  },
+  {
+    "sigla": "SINALIZAÇÃO",
+    "descricao": "Sinalização apagada na entrada do terminal"
+  },
+  {
+    "sigla": "CONDIÇÕES INADEQUADAS",
+    "descricao": "Banheiro em condições inadequadas"
+  },
+  {
+    "sigla": "BURACO",
+    "descricao": "Buraco no teto do terminal"
   }
 ]

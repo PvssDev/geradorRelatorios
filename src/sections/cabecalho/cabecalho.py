@@ -3,7 +3,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
 import os
-from utils import adicionar_texto_caixa_cinza, formatar_mes_ano, extrair_ano
+from utils import formatar_mes_ano, extrair_ano, extrair_mes_ano_numerico
 from database.manager import carregar_responsaveis
 
 def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, documento_anterior=None):
@@ -25,34 +25,25 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
         section.left_margin = Inches(0.5)
         section.right_margin = Inches(0.5)
 
-        # 1. Texto Superior
+        # 1. Texto Superior (Sem fundo cinza)
         ano = extrair_ano(row["Data"])
+        mes_ano = extrair_mes_ano_numerico(row["Data"])
         id_fisc = str(row.get("ID da Fiscalização", "")).strip()
-        ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc)
-        if report_config.key == "CRC":
-            p_ctr = doc.add_paragraph()
-            p_ctr.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_ctr.paragraph_format.space_before = Pt(6)
-            p_ctr.paragraph_format.space_after = Pt(12)
-            run_ctr = p_ctr.add_run(ctr_text)
-            run_ctr.bold = True
-            run_ctr.font.name = 'Aptos'
-            run_ctr.font.size = Pt(11)
-        else:
-            adicionar_texto_caixa_cinza(doc, ctr_text)
+        ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc, mes_ano=mes_ano)
         
-        # 1. Imagem da Capa
+        p_ctr = doc.add_paragraph()
+        p_ctr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_ctr.paragraph_format.space_before = Pt(6)
+        p_ctr.paragraph_format.space_after = Pt(12)
+        run_ctr = p_ctr.add_run(ctr_text)
+        run_ctr.bold = True
+        run_ctr.font.name = 'Aptos'
+        run_ctr.font.size = Pt(11)
+        
+        # 1. Imagem da Capa (Aumentada em ~50% mantendo proporção nativa)
         if os.path.exists(logo_path):
-            if report_config.key == "CRC":
-                img_w = Inches(4.0) + Cm(1.0)
-                img_h = Inches(4.0 / (900.0 / 743.0)) + Cm(1.0)
-                doc.add_picture(logo_path, width=img_w, height=img_h)
-            elif report_config.key == "SOCICAM":
-                img_w = Inches(6.0)
-                doc.add_picture(logo_path, width=img_w)
-            else:
-                img_w = Inches(4.0)
-                doc.add_picture(logo_path, width=img_w)
+            img_w = Inches(6.0)
+            doc.add_picture(logo_path, width=img_w)
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
             
         doc.add_paragraph()  # Linha vazia antes de FISCALIZAÇÃO...
@@ -119,7 +110,7 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
             p_data.paragraph_format.space_after = Pt(12)
         
         # 5. Processo e SEI Dinâmicos
-        rodape_textos = report_config.get_process_sei_texts(ano)
+        rodape_textos = report_config.get_process_sei_texts(row, ano)
             
         for idx, texto in enumerate(rodape_textos):
             p_rodape = doc.add_paragraph()
@@ -206,15 +197,33 @@ def gerar_lista_abreviaturas(doc, report_config):
             row.cells[idx].width = width
 
 
+def habilitar_atualizacao_campos(doc):
+    """Garante que o Word atualize os campos nativos (como Sumário/TOC) automaticamente ao abrir o documento."""
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    try:
+        settings = doc.settings.element
+        if settings.find('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}updateFields') is None:
+            update_fields = parse_xml('<w:updateFields %s w:val="true"/>' % nsdecls('w'))
+            settings.append(update_fields)
+    except Exception as e:
+        print(f"Aviso: Não foi possível configurar updateFields: {e}")
+
+
 def gerar_sumario(doc, row, report_config, nc_df=None):
-    """Gera a terceira página do cabeçalho (Sumário dinâmico utilizando tabulações e líderes de ponto)."""
-    from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
+    """Gera o Sumário como ferramenta nativa do Word (Table of Contents / SDT / Campo TOC) com atualização automática."""
     import inspect
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    
+    # Habilita a atualização automática de campos pelo Word ao abrir o arquivo
+    habilitar_atualizacao_campos(doc)
     
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run("SUMÁRIO")
     run.bold = True
+    run.font.name = 'Aptos'
     run.font.size = Pt(14)
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(24)
@@ -225,37 +234,85 @@ def gerar_sumario(doc, row, report_config, nc_df=None):
     else:
         linhas = report_config.get_sumario_linhas(row)
         
+    sdt_xml_parts = [
+        f'<w:sdt {nsdecls("w")}>',
+        '  <w:sdtPr>',
+        '    <w:id w:val="914752099"/>',
+        '    <w:docPartObj>',
+        '      <w:docPartGallery w:val="Table of Contents"/>',
+        '      <w:docPartUnique/>',
+        '    </w:docPartObj>',
+        '  </w:sdtPr>',
+        '  <w:sdtEndPr>',
+        '    <w:rPr>',
+        '      <w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/>',
+        '      <w:b/>',
+        '      <w:bCs/>',
+        '    </w:rPr>',
+        '  </w:sdtEndPr>',
+        '  <w:sdtContent>'
+    ]
+
     for idx, linha in enumerate(linhas):
-        p_line = doc.add_paragraph()
-        p_line.paragraph_format.space_after = Pt(6)
-        
-        # Adiciona os tab stops necessários:
-        # 1. Alinhamento esquerdo a 0.5 polegadas para afastar o título do número
-        # 2. Alinhamento direito a 7.27 polegadas para colar o número da página no canto direito com pontilhado
-        tab_stops = p_line.paragraph_format.tab_stops
-        tab_stops.add_tab_stop(Inches(0.5), alignment=WD_TAB_ALIGNMENT.LEFT)
-        tab_stops.add_tab_stop(Inches(7.27), alignment=WD_TAB_ALIGNMENT.RIGHT, leader=WD_TAB_LEADER.DOTS)
-        
         parts = linha.split('\t')
+        num_part = parts[0].strip() if len(parts) > 0 and parts[0].strip() else ""
+        titulo_part = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+        page_part = parts[2].strip() if len(parts) > 2 else "4"
         
-        # Se houver número (ex: "1.")
-        if parts[0]:
-            run_num = p_line.add_run(parts[0])
-            run_num.font.name = 'Aptos'
-            run_num.font.size = Pt(11)
-            run_num.bold = True
+        if idx == 0:
+            toc_begin_xml = (
+                '      <w:r><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/></w:rPr>'
+                '<w:fldChar w:fldCharType="begin"/></w:r>'
+                '      <w:r><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/></w:rPr>'
+                '<w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u </w:instrText></w:r>'
+                '      <w:r><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/></w:rPr>'
+                '<w:fldChar w:fldCharType="separate"/></w:r>'
+            )
+        else:
+            toc_begin_xml = ""
+
+        p_xml = [
+            '    <w:p>',
+            '      <w:pPr>',
+            '        <w:pStyle w:val="Sumrio3"/>',
+            '        <w:tabs>',
+            '          <w:tab w:val="left" w:pos="960"/>',
+            '          <w:tab w:val="right" w:leader="dot" w:pos="10456"/>',
+            '        </w:tabs>',
+            '        <w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>',
+            '      </w:pPr>',
+            toc_begin_xml,
+            '      <w:hyperlink w:history="1">'
+        ]
+        
+        if num_part:
+            p_xml.append(
+                f'        <w:r><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:b/><w:sz w:val="22"/></w:rPr>'
+                f'<w:t>{num_part}</w:t></w:r>'
+                f'        <w:r><w:tab/></w:r>'
+            )
             
-        # Pula para a primeira tabulação (título)
-        p_line.add_run("\t")
-        
-        # Título
-        run_title = p_line.add_run(parts[1])
-        run_title.font.name = 'Aptos'
-        run_title.font.size = Pt(11)
-        run_title.bold = True
-        
-        # Pula para a segunda tabulação (página)
-        run_page = p_line.add_run(f"\t{parts[2]}")
-        run_page.font.name = 'Aptos'
-        run_page.font.size = Pt(11)
-        run_page.bold = True
+        p_xml.append(
+            f'        <w:r><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:b/><w:sz w:val="22"/></w:rPr>'
+            f'<w:t>{titulo_part}</w:t></w:r>'
+            f'        <w:r><w:tab/></w:r>'
+            f'        <w:r><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:b/><w:sz w:val="22"/></w:rPr>'
+            f'<w:t>{page_part}</w:t></w:r>'
+            '      </w:hyperlink>'
+        )
+        p_xml.append('    </w:p>')
+        sdt_xml_parts.extend(p_xml)
+
+    sdt_xml_parts.append(
+        '    <w:p>'
+        '      <w:r><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:b/></w:rPr>'
+        '        <w:fldChar w:fldCharType="end"/>'
+        '      </w:r>'
+        '    </w:p>'
+    )
+    sdt_xml_parts.append('  </w:sdtContent>')
+    sdt_xml_parts.append('</w:sdt>')
+
+    full_sdt_xml = "\n".join(sdt_xml_parts)
+    sdt_element = parse_xml(full_sdt_xml)
+    p._p.addnext(sdt_element)

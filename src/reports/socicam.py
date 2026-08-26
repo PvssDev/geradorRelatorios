@@ -30,7 +30,7 @@ class SocicamReport(BaseReport):
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 03/{ano}"
+        return "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
 
     @property
     def capa_prestador_label(self) -> str:
@@ -407,8 +407,16 @@ class SocicamReport(BaseReport):
     def analyst_title(self) -> str:
         return "Especialista em Regulação"
 
-    def get_process_sei_texts(self, ano) -> list:
+    def get_process_sei_texts(self, row, ano=None) -> list:
+        from utils import extrair_mes_ano_numerico, extrair_ano
+        if isinstance(row, (str, int)) and ano is None:
+            ano = str(row)
+            mes_ano = f"01/{ano}"
+        else:
+            ano = ano or extrair_ano(row.get("Data", "") if hasattr(row, "get") else row["Data"])
+            data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            mes_ano = extrair_mes_ano_numerico(data_val)
         return [
-            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº 04/{ano} - CTR",
-            f"SEI Nº 0030200023.002186/2026-99"
+            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
+            f"SEI Nº 0030200023.002186/{ano}-99"
         ]

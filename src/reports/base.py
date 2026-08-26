@@ -38,7 +38,7 @@ class BaseReport(ABC):
     @property
     @abstractmethod
     def capa_ctr_number_template(self) -> str:
-        """Template do número do CTR na capa (ex: 'PROCESSO ADMINISTRATIVO CTR Nº 01/{ano}')."""
+        """Template do número do CTR na capa (ex: 'PROCESSO ADMINISTRATIVO CTR Nº {mes_ano}')."""
         pass
 
     @property
@@ -254,7 +254,7 @@ class BaseReport(ABC):
         pass
 
     @abstractmethod
-    def get_process_sei_texts(self, ano) -> list:
+    def get_process_sei_texts(self, row, ano=None) -> list:
         """Retorna a lista de textos do rodapé da capa (Processo/SEI)."""
         pass
 

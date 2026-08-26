@@ -30,7 +30,7 @@ class CrcReport(BaseReport):
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 05/{ano}"
+        return "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
 
     @property
     def capa_prestador_label(self) -> str:
@@ -325,9 +325,11 @@ class CrcReport(BaseReport):
         p_intro_fotos.paragraph_format.space_before = Pt(6)
         p_intro_fotos.paragraph_format.space_after = Pt(12)
         p_intro_fotos.paragraph_format.line_spacing = 1.15
+        from utils import extrair_mes_ano_numerico, extrair_ano
+        mes_ano = extrair_mes_ano_numerico(row.get("Data", "") if hasattr(row, "get") else row["Data"])
         run_intro_fotos = p_intro_fotos.add_run(
             f"Estão evidenciadas a seguir as Não Conformidades apontadas neste Relatório de Fiscalização Técnico-Operacional "
-            f"ARPE/CTR Nº 05/{ano} ({fotos_str})."
+            f"ARPE/CTR Nº {mes_ano} ({fotos_str})."
         )
         run_intro_fotos.font.name = 'Aptos'
         run_intro_fotos.font.size = Pt(11)
@@ -344,8 +346,16 @@ class CrcReport(BaseReport):
     def analyst_title(self) -> str:
         return "Analista de Regulação"
 
-    def get_process_sei_texts(self, ano) -> list:
+    def get_process_sei_texts(self, row, ano=None) -> list:
+        from utils import extrair_mes_ano_numerico, extrair_ano
+        if isinstance(row, (str, int)) and ano is None:
+            ano = str(row)
+            mes_ano = f"01/{ano}"
+        else:
+            ano = ano or extrair_ano(row.get("Data", "") if hasattr(row, "get") else row["Data"])
+            data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            mes_ano = extrair_mes_ano_numerico(data_val)
         return [
-            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº 05/{ano} - CTR",
-            f"SEI Nº xxxxxxxxxxxxxxxxxxxxxxx"
+            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
+            "SEI Nº xxxxxxxxxxxxxxxxxxxxxxx"
         ]

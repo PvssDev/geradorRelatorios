@@ -62,21 +62,12 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
 
     # ----------------------------------------------------
     # 3. SEÇÃO: INFORMAÇÕES GERAIS (Tabela)
-    # ----------------------------------------------------
-    p_info = doc.add_paragraph()
-    p_info.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p_info.paragraph_format.space_before = Pt(12)
-    p_info.paragraph_format.space_after = Pt(12)
-    
-    info_title = "3. INFORMAÇÕES GERAIS" if report_config.key == "CRC" else "INFORMAÇÕES GERAIS"
-    run_info = p_info.add_run(info_title)
-    run_info.bold = True
-    run_info.font.name = 'Aptos'
-    run_info.font.size = Pt(12)
+    info_title = "3. INFORMAÇÕES GERAIS" if report_config.key in ["CRC", "CRA", "CRA_MONITORAMENTO"] else "INFORMAÇÕES GERAIS"
+    adicionar_titulo_secao(doc, info_title)
     
     # Construção da tabela de Informações Gerais
     responsaveis_formatted = str(row["Pessoal Responsável"]).replace(",", " e" if "," not in str(row["Pessoal Responsável"]) else ";")
-    periodo_val = str(row["Período"]).strip() if pd.notna(row["Período"]) and str(row["Período"]).strip() else f"{data_extenso}."
+    periodo_val = str(row.get("Período", "")).strip() if pd.notna(row.get("Período")) and str(row.get("Período", "")).strip() else f"{data_extenso}."
     
     rows_data = report_config.get_general_info_rows(row, responsaveis_formatted, periodo_val)
     num_rows = len(rows_data)
@@ -152,7 +143,7 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
     # 3/4. SEÇÃO: METODOLOGIA
     # ----------------------------------------------------
     doc.add_paragraph()  # Pula uma linha antes do título
-    metodo_title = "3. METODOLOGIA" if report_config.key in ["CRA", "SOCICAM"] else "4. METODOLOGIA"
+    metodo_title = "3. METODOLOGIA" if report_config.key in ["SOCICAM", "SOCICAM_MONITORAMENTO"] else "4. METODOLOGIA"
     adicionar_titulo_secao(doc, metodo_title)
     doc.add_paragraph()  # Pula uma linha abaixo do título
     
@@ -266,3 +257,6 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
         doc.add_paragraph()
         for paragraph_runs in extra_paragraphs:
             add_formatted_paragraph(paragraph_runs)
+            
+        if hasattr(report_config, "render_post_metodologia_extra_content"):
+            report_config.render_post_metodologia_extra_content(doc, row)
