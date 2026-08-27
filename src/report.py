@@ -166,7 +166,15 @@ def gerar_relatorio(
             total_achados = has_nc + has_pa
 
         # Primeira Página (Capa)
-        logo_capa_path = os.path.join(BASE_DIR, "assets/capa_2.jpeg")
+        is_monitoring = getattr(report_config, "is_monitoramento", False) or "MONITORAMENTO" in getattr(report_config, "key", "")
+        if is_monitoring:
+            logo_capa_path = os.path.join(BASE_DIR, "assets", "capa_monitoramento.png")
+            if not os.path.exists(logo_capa_path):
+                logo_capa_path = os.path.join(BASE_DIR, "assets", "capa_1.png")
+        else:
+            logo_capa_path = os.path.join(BASE_DIR, "assets", "capa_fiscalizacao.jpeg")
+            if not os.path.exists(logo_capa_path):
+                logo_capa_path = os.path.join(BASE_DIR, "assets", "capa_2.jpeg")
         gerar_capa_primeira_pagina(doc, logo_capa_path, row, report_config, documento_anterior=documento_anterior)
 
         # Geração das Seções

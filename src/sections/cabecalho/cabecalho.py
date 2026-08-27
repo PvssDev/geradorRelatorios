@@ -31,14 +31,16 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
         id_fisc = str(row.get("ID da Fiscalização", "")).strip()
         ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc, mes_ano=mes_ano)
         
-        p_ctr = doc.add_paragraph()
-        p_ctr.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_ctr.paragraph_format.space_before = Pt(6)
-        p_ctr.paragraph_format.space_after = Pt(12)
-        run_ctr = p_ctr.add_run(ctr_text)
-        run_ctr.bold = True
-        run_ctr.font.name = 'Aptos'
-        run_ctr.font.size = Pt(11)
+        lines_ctr = ctr_text.split("\n")
+        for idx_l, line_l in enumerate(lines_ctr):
+            p_ctr = doc.add_paragraph()
+            p_ctr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_ctr.paragraph_format.space_before = Pt(6 if idx_l == 0 else 0)
+            p_ctr.paragraph_format.space_after = Pt(4 if idx_l < len(lines_ctr) - 1 else 12)
+            run_ctr = p_ctr.add_run(line_l)
+            run_ctr.bold = True
+            run_ctr.font.name = 'Aptos'
+            run_ctr.font.size = Pt(11)
         
         # 1. Imagem da Capa (Aumentada em ~50% mantendo proporção nativa)
         if os.path.exists(logo_path):

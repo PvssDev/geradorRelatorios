@@ -18,7 +18,7 @@ def encontrar_quadro1_table(doc):
         return None
     for t in doc.tables:
         header_text = ' '.join([c.text.upper() for r in t.rows[:min(2, len(t.rows))] for c in r.cells])
-        if any(k in header_text for k in ['IDENTIFICAÇÃO', 'ID.NC', 'REGISTRO FOTOGRÁFICO', 'NÃO CONFORMIDADE']):
+        if any(k in header_text for k in ['IDENTIFICAÇÃO', 'ID.NC', 'REGISTRO FOTOGRÁFICO', 'NÃO CONFORMIDADE', 'REFERÊNCIA', 'REFERENCIA']):
             return t
     return doc.tables[0]
 
@@ -88,7 +88,7 @@ def extrair_metadados_anterior(documento_anterior):
                 meta["oficio_data_prev"] = m.group(2)
                 break
 
-        pattern_carta = re.compile(r'Carta\s+(?:CRC/REG|SAP/PER/ARPE)\s+(?:n|N)(?:º|o)?\s*([\w/.-]+),\s*de\s*(\d{2}/\d{2}/\d{4})\s*\(\s*Doc\.\s*SEI\s*(?:n|N)(?:º|o)?\s*([\w/.-]+)\)', re.IGNORECASE)
+        pattern_carta = re.compile(r'Carta\s+(?:CRC/REG|SAP/PER/ARPE|CRA/REG)\s+(?:n|N)(?:º|o)?\s*([\w/.-]+),\s*de\s*(\d{2}/\d{2}/\d{4})\s*\(\s*Doc\.\s*SEI\s*(?:n|N)(?:º|o)?\s*([\w/.-]+)\)', re.IGNORECASE)
         for p in doc.paragraphs:
             m = pattern_carta.search(p.text)
             if m:
@@ -118,13 +118,15 @@ def extrair_linhas_quadro1_anterior(documento_anterior):
         if quadro1:
             col_id = 0
             col_desc = 1
-            for r_idx in range(min(2, len(quadro1.rows))):
-                for c_idx, cell in enumerate(quadro1.rows[r_idx].cells):
-                    txt = cell.text.strip().upper()
-                    if 'IDENTIFICAÇÃO' in txt or 'ID.NC' in txt or 'NÃO CONFORMIDADE' in txt:
-                        col_id = c_idx
-                    elif 'DESCRIÇÃO' in txt or 'CONSTATAÇÃO' in txt or 'INFORMAÇÃO' in txt:
-                        col_desc = c_idx
+            if len(quadro1.columns) >= 2:
+                for r_idx in range(min(2, len(quadro1.rows))):
+                    for c_idx, cell in enumerate(quadro1.rows[r_idx].cells):
+                        txt = cell.text.strip().upper()
+                        if any(k in txt for k in ['REFERÊNCIA', 'REFERENCIA', 'IDENTIFICAÇÃO', 'IDENTIFICACAO', 'ID.NC', 'ID NC', 'ID_NC', 'ITEM']):
+                            col_id = c_idx
+                        elif any(k in txt for k in ['CONSTATAÇÃO', 'CONSTATACAO', 'DESCRIÇÃO', 'DESCRICAO', 'INFORMAÇÃO', 'INFORMACAO', 'NÃO CONFORMIDADE', 'NAO CONFORMIDADE']):
+                            if c_idx != col_id:
+                                col_desc = c_idx
 
             for row_item in quadro1.rows[1:]:
                 cells = row_item.cells
@@ -132,12 +134,17 @@ def extrair_linhas_quadro1_anterior(documento_anterior):
                     continue
                 txt0 = cells[col_id].text.strip()
                 txt1 = cells[col_desc].text.strip()
-                if not txt0 or any(h in txt0.upper() for h in ['IDENTIFICAÇÃO', 'ID.NC', 'NÃO CONFORMIDADE', 'TOTAL']):
+                if not txt0 or any(h in txt0.upper() for h in ['REFERÊNCIA', 'REFERENCIA', 'IDENTIFICAÇÃO', 'IDENTIFICACAO', 'ID.NC', 'TOTAL', 'QUADRO']):
                     continue
                 if txt0 != txt1:
                     ncs.append({
                         "id_nc": txt0,
                         "info_ou_constatacao": txt1
+                    })
+                elif len(cells) > 1 and txt0:
+                    ncs.append({
+                        "id_nc": txt0,
+                        "info_ou_constatacao": cells[1].text.strip()
                     })
     except Exception as e:
         print(f"Erro ao extrair linhas do Quadro 1 anterior: {e}")
