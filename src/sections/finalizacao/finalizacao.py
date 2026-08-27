@@ -492,15 +492,31 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
     id_fisc = row["ID da Fiscalização"]
     data_fisc = formatar_data_dd_mm_yyyy(row["Data"])
     
-    current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
-    
+    if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
+        mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == str(id_fisc).strip()
+        current_ncs = nc_df[mask_id].copy()
+        if current_ncs.empty:
+            current_ncs = nc_df.copy()
+    elif nc_df is not None and not nc_df.empty:
+        current_ncs = nc_df.copy()
+    else:
+        current_ncs = pd.DataFrame()    
     ncs_reais = pd.DataFrame()
     pas_reais = pd.DataFrame()
     if not current_ncs.empty:
-        if "Não Conformidade" in current_ncs.columns:
-            ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
-        if "Ponto de Atenção" in current_ncs.columns:
-            pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
+        is_monitoring = "MONITORAMENTO" in getattr(report_config, "key", "").upper() or getattr(report_config, "is_monitoramento", False)
+        if is_monitoring:
+            cols_check = [c for c in ["Não Conformidade", "Identificação", "Observações", "Determinação"] if c in current_ncs.columns]
+            if cols_check:
+                mask_nc = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                ncs_reais = current_ncs[mask_nc].copy()
+            else:
+                ncs_reais = current_ncs.copy()
+        else:
+            if "Não Conformidade" in current_ncs.columns:
+                ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
+            if "Ponto de Atenção" in current_ncs.columns:
+                pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
 
     def render_apendices_fn():
         report_config.render_apendices(doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos)

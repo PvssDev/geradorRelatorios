@@ -139,15 +139,17 @@ class CrcMonitoramentoReport(CrcReport):
         add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO", bold=True, size_pt=12, space_after=4)
         add_cover_p(f"DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {self.ctr_num}", bold=True, size_pt=12, space_after=12)
 
-        # Imagem da Capa (capa_1.png)
-        # Procuramos capa_1.png na pasta assets
+        # Imagem da Capa (capa_monitoramento.png)
+        # Procuramos capa_monitoramento.png na pasta assets
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        capa_1 = os.path.join(base_dir, "assets", "capa_1.png")
-        if not os.path.exists(capa_1):
-            capa_1 = logo_path  # fallback
+        capa_mon = os.path.join(base_dir, "assets", "capa_monitoramento.png")
+        if not os.path.exists(capa_mon):
+            capa_mon = os.path.join(base_dir, "assets", "capa_1.png")
+        if not os.path.exists(capa_mon):
+            capa_mon = logo_path  # fallback
             
-        if os.path.exists(capa_1):
-            doc.add_picture(capa_1, width=Inches(5.90))
+        if os.path.exists(capa_mon):
+            doc.add_picture(capa_mon, width=Inches(5.90))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
             doc.paragraphs[-1].paragraph_format.space_after = Pt(12)
             doc.paragraphs[-1].paragraph_format.space_before = Pt(12)

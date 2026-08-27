@@ -317,7 +317,7 @@ with st.container():
     nc_num = 1
     terminal_nc = ""
     
-    if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
+    if is_monitoring:
         st.session_state.nc_form_step = 1
     
     uploads_pendentes = False
@@ -539,7 +539,7 @@ with st.container():
                     ponto_atencao = []
                     nc_legenda = st.text_area("Legenda da Foto Atual", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva a legenda da foto atual...")
                 
-                    if is_monitoring and st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"] and current_item:
+                    if is_monitoring and current_item:
                         st.markdown("#### 📝 Corpo do Relatório")
                     
                         saved_rec = next(
@@ -554,8 +554,16 @@ with st.container():
                         default_analise_arpe = saved_rec.get("Análise ARPE", "") if saved_rec else ""
                     
                         is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
-                        pos_label = "INFORMAÇÃO SOCICAM" if is_socicam else "POSICIONAMENTO CRC"
-                        pos_placeholder = "Digite a informação prestada pela SOCICAM..." if is_socicam else "Digite o posicionamento da CRC..."
+                        is_cra = st.session_state.get("tipo_relatorio", "") == "CRA"
+                        if is_socicam:
+                            pos_label = "INFORMAÇÃO SOCICAM"
+                            pos_placeholder = "Digite a informação prestada pela SOCICAM..."
+                        elif is_cra:
+                            pos_label = "POSICIONAMENTO CRA"
+                            pos_placeholder = "Digite o posicionamento da CRA..."
+                        else:
+                            pos_label = "POSICIONAMENTO CRC"
+                            pos_placeholder = "Digite o posicionamento da CRC..."
 
                         col_pos, col_const, col_analise = st.columns(3)
                         with col_pos:
@@ -674,7 +682,7 @@ with st.container():
                     # Se for monitoramento e já comparou tudo, não exibe os botões de ação
                     pass
                 else:
-                    if is_monitoring and st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"]:
+                    if is_monitoring and current_item:
                         col_save_direct, _ = st.columns([2.5, 7.5], gap="small")
                         with col_save_direct:
                             if st.button("💾 Salvar e Continuar", type="primary", use_container_width=True, key=f"btn_save_crc_mon_step1_{st.session_state.nc_form_counter}"):
@@ -683,8 +691,16 @@ with st.container():
                                 elif not foto_default:
                                     st.error("É obrigatório ter uma foto selecionada no carrossel para continuar.")
                                 else:
-                                    # Validação para Monitoramento (CRC e SOCICAM)
-                                    pos_label = "INFORMAÇÃO SOCICAM" if st.session_state.get("tipo_relatorio", "") == "SOCICAM" else "POSICIONAMENTO CRC"
+                                    # Validação para Monitoramento
+                                    is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
+                                    is_cra = st.session_state.get("tipo_relatorio", "") == "CRA"
+                                    if is_socicam:
+                                        pos_label = "INFORMAÇÃO SOCICAM"
+                                    elif is_cra:
+                                        pos_label = "POSICIONAMENTO CRA"
+                                    else:
+                                        pos_label = "POSICIONAMENTO CRC"
+
                                     campos_vazios = []
                                     if not pos_crc.strip():
                                         campos_vazios.append(pos_label)
@@ -717,7 +733,7 @@ with st.container():
                                                 "Terminal": terminal_nc,
                                                 "Pista": pista,
                                                 "Trecho": trecho,
-                                                "Não Conformidade": ", ".join(nc_descricao) if nc_descricao else "",
+                                                "Não Conformidade": ", ".join(nc_descricao) if nc_descricao else current_item.get("constatacao", ""),
                                                 "Ponto de Atenção": "",
                                                 "Foto": foto_default,
                                                 "Foto Anterior": current_item["old_photo_path"],
@@ -741,7 +757,7 @@ with st.container():
                                             rec["Situação"] = situacao
                                             rec["Análise ARPE"] = analise_arpe
 
-                                        # Sincronizar textos para todas as ocorrências de foto para a mesma Identificação (CRC)
+                                        # Sincronizar textos para todas as ocorrências de foto para a mesma Identificação
                                         recs_same_ident = [r for r in st.session_state.temp_nc 
                                                            if r["Identificação"] == current_item["id_nc"] 
                                                            and r["ID da Fiscalização"] == id_vinculo]
@@ -1183,27 +1199,128 @@ with st.container():
                             gc.collect()
                             
     with col_planilha:
-        if st.button("💾 Gerar Planilha Completa", use_container_width=True, key="btn_generate_spreadsheet"):
-            if not st.session_state.temp_fiscalizacoes:
-                st.error(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
+        disable_auto_fill = uploads_pendentes
+        if st.button("⚡ Auto Preenchimento", disabled=disable_auto_fill, use_container_width=True, key="btn_auto_fill"):
+            if uploads_pendentes:
+                st.error(f"⚠️ Não é possível realizar o auto preenchimento. Pendências: {', e '.join(mensagem_pendencias)}.")
             else:
-                output_buffer = gerar_planilha_excel_buffer(
-                    st.session_state.temp_fiscalizacoes,
-                    st.session_state.temp_nc
-                )
-                st.session_state.planilha_download_bytes = output_buffer.getvalue()
-                st.success("Planilha gerada!")
+                tipo_rel = st.session_state.get("tipo_relatorio", "CRA")
+                is_mon = st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento"
                 
-        if "planilha_download_bytes" in st.session_state and st.session_state.planilha_download_bytes:
-            st.write("") # Pequeno espaçamento
-            st.download_button(
-                label="📥 Baixar Planilha",
-                data=st.session_state.planilha_download_bytes,
-                file_name=f"planilha_gerada_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="dl_btn_planilha"
-            )
+                # Definir valores padrão por tipo de relatório
+                if tipo_rel == "CRA":
+                    contrato = "CT. nº 043/2011"
+                    local_default = "=Local="
+                elif tipo_rel == "CRC":
+                    contrato = "CGPE-001/2006"
+                    local_default = "Sistema Viário do Paiva"
+                else: # SOCICAM
+                    contrato = "CT. nº 1.041.080/08"
+                    local_default = "=Local="
+
+                # Responsáveis
+                if st.session_state.pessoal_responsaveis:
+                    resp_nomes = ", ".join([r["nome"] for r in st.session_state.pessoal_responsaveis])
+                else:
+                    resp_nomes = "=Pessoal Responsável="
+
+                # Coordenador
+                if st.session_state.coordenadores:
+                    coord_nome = st.session_state.coordenadores[0]["nome"]
+                else:
+                    coord_nome = "=Coordenador="
+
+                # 1. Garante que exista pelo menos um registro de Fiscalização/Monitoramento
+                if not st.session_state.temp_fiscalizacoes:
+                    id_fisc_auto = f"=ID {term_fisc_prep}=" if term_fisc_prep else "=ID da Fiscalização="
+                    st.session_state.temp_fiscalizacoes.append({
+                        "ID da Fiscalização": id_fisc_auto,
+                        "Data": "=Data=",
+                        "Hora": "=Hora=" if tipo_rel == "CRA" else "",
+                        "Cidade": "=Cidade=" if tipo_rel == "CRA" else "",
+                        "Local": local_default,
+                        "Pessoal Responsável": resp_nomes,
+                        "Coordenador": coord_nome,
+                        "Contrato": contrato,
+                        "Período": "=Período=",
+                        "Relatório Gerado": False
+                    })
+                    id_vinculo = id_fisc_auto
+                    terminal_nc = local_default
+                else:
+                    id_vinculo = st.session_state.temp_fiscalizacoes[0]["ID da Fiscalização"]
+                    terminal_nc = st.session_state.temp_fiscalizacoes[0].get("Local", local_default)
+
+                # 2. Preencher Não Conformidades / Registros
+                st.session_state.temp_nc = []
+                
+                if is_mon and st.session_state.old_photos_to_match:
+                    for idx, item in enumerate(st.session_state.old_photos_to_match):
+                        foto_nova = st.session_state.fill_photos[idx % len(st.session_state.fill_photos)].name if st.session_state.fill_photos else ""
+                        foto_ant = item.get("old_photo_path", "")
+                        legenda_ant = item.get("old_legend", "")
+                        id_nc = item.get("id_nc", f"=Identificação {idx+1}=")
+                        trecho_val = item.get("trecho") or "=Trecho="
+                        pista_val = item.get("pista") or "=Pista="
+                        constatacao_val = item.get("constatacao") or "=CONSTATAÇÃO="
+                        
+                        if tipo_rel == "SOCICAM":
+                            pos_label = "=INFORMAÇÃO SOCICAM="
+                        elif tipo_rel == "CRA":
+                            pos_label = "=POSICIONAMENTO CRA="
+                        else:
+                            pos_label = "=POSICIONAMENTO CRC="
+
+                        rec = {
+                            "ID da Fiscalização": id_vinculo,
+                            "Nº": idx + 1,
+                            "Terminal": terminal_nc,
+                            "Pista": pista_val,
+                            "Trecho": trecho_val,
+                            "Não Conformidade": id_nc if tipo_rel in ["CRC", "SOCICAM", "CRA"] else "=Não Conformidade=",
+                            "Ponto de Atenção": "",
+                            "Foto": foto_nova,
+                            "Foto Anterior": foto_ant,
+                            "Legenda Anterior": legenda_ant,
+                            "Legenda da Foto": "=legenda da foto atual=",
+                            "Observações": constatacao_val if tipo_rel in ["CRC", "SOCICAM", "CRA"] else "=legenda da foto atual=",
+                            "Identificação": id_nc,
+                            "Direção (faixa)": "=Direção (faixa)=" if tipo_rel == "CRA" and not is_mon else "",
+                            "Fundamento da infração": "=Fundamento da infração=" if tipo_rel == "CRA" and not is_mon else "",
+                            "Determinação": pos_label if tipo_rel in ["CRC", "SOCICAM", "CRA"] else "=Determinação=",
+                            "Situação": "Pendente",
+                            "Análise ARPE": "=ANÁLISE ARPE="
+                        }
+                        st.session_state.temp_nc.append(rec)
+                elif st.session_state.fill_photos:
+                    for idx, photo in enumerate(st.session_state.fill_photos):
+                        i = idx + 1
+                        rec = {
+                            "ID da Fiscalização": id_vinculo,
+                            "Nº": i,
+                            "Terminal": terminal_nc,
+                            "Pista": "=Pista=" if tipo_rel == "CRA" else "",
+                            "Trecho": "=Trecho=" if tipo_rel == "CRA" else "",
+                            "Não Conformidade": "=Não Conformidade=",
+                            "Ponto de Atenção": "",
+                            "Foto": photo.name,
+                            "Foto Anterior": "",
+                            "Legenda Anterior": "",
+                            "Legenda da Foto": "=legenda da foto atual=",
+                            "Observações": "=Observações=",
+                            "Identificação": "=Identificação=",
+                            "Direção (faixa)": "=Direção (faixa)=" if tipo_rel == "CRA" else "",
+                            "Fundamento da infração": "=Fundamento da infração=" if tipo_rel == "CRA" else "",
+                            "Determinação": "=Determinação=",
+                            "Situação": "Pendente",
+                            "Análise ARPE": "=Análise ARPE="
+                        }
+                        st.session_state.temp_nc.append(rec)
+
+                st.session_state.nc_form_counter += 1
+                st.session_state.nc_form_step = 1
+                st.success("✅ Auto preenchimento realizado com sucesso!")
+                st.rerun()
             
     with col_limpar:
         if st.button("🗑️ Limpar Registros", type="secondary", use_container_width=True, key="btn_clear_all_data"):
