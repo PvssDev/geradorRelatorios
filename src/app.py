@@ -1162,6 +1162,29 @@ with st.container():
                         if "fill_photos" in st.session_state and st.session_state.fill_photos:
                             salvar_fotos_em_diretorio(st.session_state.fill_photos, fotos_dir)
 
+                        # Diagnóstico: verificar fotos salvas vs fotos referenciadas nas NCs
+                        fotos_salvas = set(os.listdir(fotos_dir)) if os.path.isdir(fotos_dir) else set()
+                        fotos_referenciadas = set()
+                        for nc in st.session_state.temp_nc:
+                            foto_nome = nc.get("Foto", "")
+                            if foto_nome and isinstance(foto_nome, str) and foto_nome.strip():
+                                fotos_referenciadas.add(foto_nome.strip())
+
+                        if fotos_referenciadas and not fotos_salvas:
+                            st.warning(
+                                f"⚠️ **Diagnóstico de Fotos:** As NCs referenciam {len(fotos_referenciadas)} foto(s), "
+                                f"mas nenhuma foto foi salva no diretório temporário. "
+                                f"Verifique se as fotos foram carregadas no uploader acima."
+                            )
+                        elif fotos_referenciadas:
+                            fotos_faltando = fotos_referenciadas - fotos_salvas
+                            if fotos_faltando:
+                                st.warning(
+                                    f"⚠️ **Diagnóstico de Fotos:** {len(fotos_faltando)} foto(s) referenciada(s) nas NCs "
+                                    f"não foram encontrada(s) no diretório: {', '.join(sorted(fotos_faltando)[:5])}"
+                                    f"{'...' if len(fotos_faltando) > 5 else ''}"
+                                )
+
                         try:
                             tipo_key = st.session_state.get("tipo_relatorio", "CRA")
                             if st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento":

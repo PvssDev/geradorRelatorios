@@ -30,27 +30,60 @@ def formatar_data_dd_mm_yyyy(data_val):
     except Exception:
         return str(data_val)
 
+def _obter_caminho_foto_valido(foto_val, fotos_dir):
+    """
+    Resolve o caminho físico de um arquivo de imagem tanto relativo a fotos_dir
+    quanto absoluto no sistema de arquivos.
+    """
+    if foto_val is None or pd.isna(foto_val):
+        return None
+    f_str = str(foto_val).strip()
+    if not f_str or f_str.lower() in ("nan", "none", ""):
+        return None
+        
+    # 1. Se já for um caminho absoluto existente
+    if os.path.isabs(f_str) and os.path.exists(f_str):
+        return f_str
+        
+    # 2. Se o caminho direto existir no sistema
+    if os.path.exists(f_str):
+        return f_str
+        
+    # 3. Se estiver dentro de fotos_dir
+    if fotos_dir and os.path.isdir(fotos_dir):
+        # Tenta com o nome completo
+        c1 = os.path.join(fotos_dir, f_str)
+        if os.path.exists(c1):
+            return c1
+        # Tenta com o basename (caso f_str tenha vindo com separadores de caminho)
+        c2 = os.path.join(fotos_dir, os.path.basename(f_str))
+        if os.path.exists(c2):
+            return c2
+            
+        # Tenta correspondência insensível a maiúsculas/minúsculas
+        f_base = os.path.basename(f_str).lower()
+        try:
+            for arq in os.listdir(fotos_dir):
+                if arq.lower() == f_base:
+                    return os.path.join(fotos_dir, arq)
+        except Exception:
+            pass
+
+    return None
+
 def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_relatorio="CRA"):
-    if df_fotos.empty:
+    if df_fotos is None or df_fotos.empty:
         return
     
     # Compatibilidade com planilhas antigas
-    if "Pista" not in df_fotos.columns:
-        df_fotos = df_fotos.copy()
-        df_fotos["Pista"] = ""
-    if "Trecho" not in df_fotos.columns:
-        df_fotos = df_fotos.copy()
-        df_fotos["Trecho"] = ""
-    if "Foto Anterior" not in df_fotos.columns:
-        df_fotos = df_fotos.copy()
-        df_fotos["Foto Anterior"] = ""
-    if "Legenda Anterior" not in df_fotos.columns:
-        df_fotos = df_fotos.copy()
-        df_fotos["Legenda Anterior"] = ""
+    df_fotos = df_fotos.copy()
+    for col in ["Pista", "Trecho", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação"]:
+        if col not in df_fotos.columns:
+            df_fotos[col] = ""
         
     records = df_fotos.to_dict('records')
     
-    if "MONITORAMENTO" in tipo_relatorio.upper():
+    if "MONITORAMENTO" in str(tipo_relatorio).upper():
         # Agrupa por Pista mantendo a ordem de inserção
         pistas_unicas = []
         for p in df_fotos["Pista"].tolist():
@@ -116,14 +149,13 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_img_left.paragraph_format.space_after = Pt(4)
                 
                 foto_ant = rec.get("Foto Anterior", "")
-                if pd.isna(foto_ant) or not isinstance(foto_ant, str):
-                    foto_ant = ""
-                else:
-                    foto_ant = foto_ant.strip()
-                    
-                if foto_ant and os.path.exists(foto_ant):
-                    run_img_left = p_img_left.add_run()
-                    run_img_left.add_picture(foto_ant, width=Inches(2.708), height=Inches(2.708))
+                foto_path_left = _obter_caminho_foto_valido(foto_ant, fotos_dir)
+                if foto_path_left:
+                    try:
+                        run_img_left = p_img_left.add_run()
+                        run_img_left.add_picture(foto_path_left, width=Inches(2.708), height=Inches(2.708))
+                    except Exception as e:
+                        print(f"Erro ao adicionar foto anterior: {e}")
                 
                 # Foto Direita (Nova)
                 p_img_right = table.rows[0].cells[1].paragraphs[0]
@@ -133,16 +165,14 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_img_right.paragraph_format.space_before = Pt(4)
                 p_img_right.paragraph_format.space_after = Pt(4)
                 
-                foto_new = rec.get("Foto", "")
-                if pd.isna(foto_new) or not isinstance(foto_new, str):
-                    foto_new = ""
-                else:
-                    foto_new = foto_new.strip()
-                    
-                foto_path_right = os.path.join(fotos_dir, foto_new) if fotos_dir and foto_new else ""
-                if foto_path_right and os.path.exists(foto_path_right):
-                    run_img_right = p_img_right.add_run()
-                    run_img_right.add_picture(foto_path_right, width=Inches(2.708), height=Inches(2.708))
+                foto_new = rec.get("Foto") or rec.get("Fotos") or rec.get("foto") or ""
+                foto_path_right = _obter_caminho_foto_valido(foto_new, fotos_dir)
+                if foto_path_right:
+                    try:
+                        run_img_right = p_img_right.add_run()
+                        run_img_right.add_picture(foto_path_right, width=Inches(2.708), height=Inches(2.708))
+                    except Exception as e:
+                        print(f"Erro ao adicionar foto nova: {e}")
                     
                 # Legenda Esquerda
                 p_caption_left = table.rows[1].cells[0].paragraphs[0]
@@ -170,7 +200,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_caption_right.paragraph_format.space_after = Pt(4)
                 
                 num_right = str(2 * idx + 2).zfill(2)
-                obs_text = str(rec.get("Observações", rec.get("Legenda da Foto", ""))).strip()
+                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
                 caption_right_text = f"Foto {num_right} – {obs_text}"
                 if not caption_right_text.endswith("."):
                     caption_right_text += "."
@@ -181,12 +211,12 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 doc.add_paragraph() # Espaço entre tabelas
         return
 
-    if tipo_relatorio in ["CRC", "SOCICAM"]:
+    if str(tipo_relatorio).upper() in ["CRC", "SOCICAM"]:
         # No CRC/SOCICAM cada foto é uma tabela de 1 coluna
         for idx, rec in enumerate(records):
-            obs_text = str(rec.get("Observações", rec.get("Legenda da Foto", ""))).strip()
+            obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
             
-            if tipo_relatorio == "CRC":
+            if str(tipo_relatorio).upper() == "CRC":
                 p_nc_desc = doc.add_paragraph()
                 p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                 p_nc_desc.paragraph_format.space_before = Pt(12)
@@ -194,8 +224,10 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_nc_desc.paragraph_format.line_spacing = 1.15
                 
                 ident = str(rec.get("Identificação", "")).strip()
+                nc_txt = str(rec.get("Não Conformidade", "")).strip()
+                label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or f"Item {idx+1}")
                 
-                run_nc_desc = p_nc_desc.add_run(f"{ident} – {obs_text}")
+                run_nc_desc = p_nc_desc.add_run(label_item)
                 run_nc_desc.bold = True
                 run_nc_desc.font.name = 'Aptos'
                 run_nc_desc.font.size = Pt(11)
@@ -208,7 +240,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
             table.allow_autofit = False
             
             # Largura de 3.12 polegadas para SOCICAM e 5.0 para CRC
-            tbl_width = Inches(3.12) if tipo_relatorio == "SOCICAM" else Inches(5.0)
+            tbl_width = Inches(3.12) if str(tipo_relatorio).upper() == "SOCICAM" else Inches(5.0)
             table.rows[0].cells[0].width = tbl_width
             table.rows[1].cells[0].width = tbl_width
             
@@ -217,14 +249,15 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
             p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p_img.paragraph_format.space_before = Pt(4)
             p_img.paragraph_format.space_after = Pt(4)
-            foto = rec.get("Foto", "")
-            if pd.isna(foto) or not isinstance(foto, str) or not foto.strip():
-                foto = ""
-            foto_path = os.path.join(fotos_dir, foto) if fotos_dir and foto else ""
-            if foto_path and os.path.exists(foto_path):
-                run_img = p_img.add_run()
-                img_dim = Inches(2.96) if tipo_relatorio == "SOCICAM" else Inches(4.5)
-                run_img.add_picture(foto_path, width=img_dim, height=img_dim)
+            foto = rec.get("Foto") or rec.get("Fotos") or rec.get("foto") or ""
+            foto_path = _obter_caminho_foto_valido(foto, fotos_dir)
+            if foto_path:
+                try:
+                    run_img = p_img.add_run()
+                    img_dim = Inches(2.96) if str(tipo_relatorio).upper() == "SOCICAM" else Inches(4.5)
+                    run_img.add_picture(foto_path, width=img_dim, height=img_dim)
+                except Exception as e:
+                    print(f"Erro ao adicionar foto no CRC/SOCICAM: {e}")
                 
             # Row 1: Legenda
             p_caption = table.rows[1].cells[0].paragraphs[0]
@@ -232,14 +265,15 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
             p_caption.paragraph_format.space_before = Pt(4)
             p_caption.paragraph_format.space_after = Pt(4)
             num = str(rec.get("Nº", idx+1)).zfill(2)
-            caption_text = f"Foto {num} – {obs_text}, em {data_fisc}."
+            data_str = f", em {data_fisc}" if data_fisc else ""
+            caption_text = f"Foto {num} – {obs_text}{data_str}."
             run_caption = p_caption.add_run(caption_text)
             run_caption.font.name = 'Aptos'
             run_caption.font.size = Pt(10)
             
             doc.add_paragraph() # Espaço entre tabelas
     else:
-        # Agrupa por Pista mantendo ordem de inserção
+        # CRA (Fiscalização) - Agrupa por Pista mantendo ordem de inserção
         pistas_unicas = []
         for p in df_fotos["Pista"].tolist():
             p_str = str(p).strip() if not pd.isna(p) else ""
@@ -300,13 +334,14 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_img_left.paragraph_format.first_line_indent = Inches(0)
                 p_img_left.paragraph_format.space_before = Pt(4)
                 p_img_left.paragraph_format.space_after = Pt(4)
-                foto_left = rec_left.get("Foto", "")
-                if pd.isna(foto_left) or not isinstance(foto_left, str) or not foto_left.strip():
-                    foto_left = ""
-                foto_path_left = os.path.join(fotos_dir, foto_left) if fotos_dir and foto_left else ""
-                if foto_path_left and os.path.exists(foto_path_left):
-                    run_img_left = p_img_left.add_run()
-                    run_img_left.add_picture(foto_path_left, width=Inches(3.15), height=Inches(3.15))
+                foto_left = rec_left.get("Foto") or rec_left.get("Fotos") or rec_left.get("foto") or ""
+                foto_path_left = _obter_caminho_foto_valido(foto_left, fotos_dir)
+                if foto_path_left:
+                    try:
+                        run_img_left = p_img_left.add_run()
+                        run_img_left.add_picture(foto_path_left, width=Inches(3.15), height=Inches(3.15))
+                    except Exception as e:
+                        print(f"Erro ao adicionar foto esquerda no CRA: {e}")
                     
                 # Imagem Direita
                 p_img_right = row_img.cells[1].paragraphs[0]
@@ -316,13 +351,14 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_img_right.paragraph_format.space_before = Pt(4)
                 p_img_right.paragraph_format.space_after = Pt(4)
                 if rec_right:
-                    foto_right = rec_right.get("Foto", "")
-                    if pd.isna(foto_right) or not isinstance(foto_right, str) or not foto_right.strip():
-                        foto_right = ""
-                    foto_path_right = os.path.join(fotos_dir, foto_right) if fotos_dir and foto_right else ""
-                    if foto_path_right and os.path.exists(foto_path_right):
-                        run_img_right = p_img_right.add_run()
-                        run_img_right.add_picture(foto_path_right, width=Inches(3.15), height=Inches(3.15))
+                    foto_right = rec_right.get("Foto") or rec_right.get("Fotos") or rec_right.get("foto") or ""
+                    foto_path_right = _obter_caminho_foto_valido(foto_right, fotos_dir)
+                    if foto_path_right:
+                        try:
+                            run_img_right = p_img_right.add_run()
+                            run_img_right.add_picture(foto_path_right, width=Inches(3.15), height=Inches(3.15))
+                        except Exception as e:
+                            print(f"Erro ao adicionar foto direita no CRA: {e}")
                 else:
                     row_img.cells[1].width = Inches(3.635)
                         
@@ -341,9 +377,11 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 
                 num_left = str(rec_left.get("Nº", i+1)).zfill(2)
                 trecho_left = str(rec_left.get("Trecho", "")).strip()
-                obs_left = str(rec_left.get("Observações", rec_left.get("Legenda da Foto", ""))).strip()
+                obs_left = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip()
                 
-                desc_text_left = f"Foto {num_left} – Trecho {trecho_left} apresentando {obs_left}, ({data_fisc})."
+                trecho_txt_left = f"Trecho {trecho_left} apresentando " if trecho_left else ""
+                data_txt = f", ({data_fisc})" if data_fisc else ""
+                desc_text_left = f"Foto {num_left} – {trecho_txt_left}{obs_left}{data_txt}."
                 run_desc_left = p_desc_left.add_run(desc_text_left)
                 run_desc_left.font.name = 'Aptos'
                 run_desc_left.font.size = Pt(10)
@@ -359,9 +397,10 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 if rec_right:
                     num_right = str(rec_right.get("Nº", i+2)).zfill(2)
                     trecho_right = str(rec_right.get("Trecho", "")).strip()
-                    obs_right = str(rec_right.get("Observações", rec_right.get("Legenda da Foto", ""))).strip()
+                    obs_right = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip()
                     
-                    desc_text_right = f"Foto {num_right} – Trecho {trecho_right} apresentando {obs_right}, ({data_fisc})."
+                    trecho_txt_right = f"Trecho {trecho_right} apresentando " if trecho_right else ""
+                    desc_text_right = f"Foto {num_right} – {trecho_txt_right}{obs_right}{data_txt}."
                     run_desc_right = p_desc_right.add_run(desc_text_right)
                     run_desc_right.font.name = 'Aptos'
                     run_desc_right.font.size = Pt(10)
@@ -374,6 +413,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     
             if idx_pista < len(pistas_unicas) - 1:
                 doc.add_paragraph()
+
 
 def numero_por_extenso(n):
     extenso_map = {
@@ -506,17 +546,36 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
     if not current_ncs.empty:
         is_monitoring = "MONITORAMENTO" in getattr(report_config, "key", "").upper() or getattr(report_config, "is_monitoramento", False)
         if is_monitoring:
-            cols_check = [c for c in ["Não Conformidade", "Identificação", "Observações", "Determinação"] if c in current_ncs.columns]
+            cols_check = [c for c in ["Não Conformidade", "Identificação", "Observações", "Legenda da Foto", "Determinação", "Foto", "Fotos"] if c in current_ncs.columns]
             if cols_check:
                 mask_nc = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
                 ncs_reais = current_ncs[mask_nc].copy()
             else:
                 ncs_reais = current_ncs.copy()
         else:
-            if "Não Conformidade" in current_ncs.columns:
-                ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
+            # Em Fiscalização:
+            # 1. Pontos de Atenção (específico para CRA)
             if "Ponto de Atenção" in current_ncs.columns:
-                pas_reais = current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""].copy()
+                mask_pa = current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""
+                pas_reais = current_ncs[mask_pa].copy()
+            
+            # 2. Não Conformidades:
+            # Se tiver coluna 'Não Conformidade', pega os preenchidos
+            if "Não Conformidade" in current_ncs.columns:
+                mask_nc = current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""
+                ncs_reais = current_ncs[mask_nc].copy()
+                
+            # Se ncs_reais ficou vazio ou não tem a coluna, busca qualquer linha que tenha Foto/Observação/Identificação
+            if ncs_reais.empty:
+                cols_fisc = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Não Conformidade"] if c in current_ncs.columns]
+                if cols_fisc:
+                    mask_any = current_ncs[cols_fisc].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                    # Não duplicar com pas_reais se for CRA
+                    if not pas_reais.empty and getattr(report_config, "key", "") == "CRA":
+                        mask_any = mask_any & (~current_ncs.index.isin(pas_reais.index))
+                    ncs_reais = current_ncs[mask_any].copy()
+                else:
+                    ncs_reais = current_ncs.copy()
 
     def render_apendices_fn():
         report_config.render_apendices(doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos)

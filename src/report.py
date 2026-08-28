@@ -113,12 +113,29 @@ def gerar_relatorio(
 
     fiscal_df = _carregar_e_normalizar_df(excel_file, abas["fiscalizacoes"])
     nc_df = _carregar_e_normalizar_df(excel_file, abas["nao_conformidades"])
-    nc_df.rename(columns={
-        "Não conformidade": "Não Conformidade",
-        "Observações": "Legenda da Foto"
-    }, inplace=True)
-    if not nc_df.empty and "Situação" not in nc_df.columns:
-        nc_df["Situação"] = "Pendente"
+    
+    # Se a aba de NCs estiver vazia, usa os registros da aba Fiscalizações como fallback
+    if nc_df.empty and not fiscal_df.empty:
+        nc_df = fiscal_df.copy()
+        
+    if not nc_df.empty:
+        # Normalização de nomes de colunas
+        cols_rename = {}
+        for c in nc_df.columns:
+            c_str = str(c).strip()
+            c_lower = c_str.lower()
+            if c_lower in ("não conformidade", "nao conformidade"):
+                cols_rename[c] = "Não Conformidade"
+            elif c_lower in ("foto", "fotos", "registro fotográfico", "registros fotográficos"):
+                cols_rename[c] = "Foto"
+            elif c_lower == "observações" and "Legenda da Foto" not in nc_df.columns:
+                cols_rename[c] = "Observações"
+        if cols_rename:
+            nc_df.rename(columns=cols_rename, inplace=True)
+            
+        if "Situação" not in nc_df.columns:
+            nc_df["Situação"] = "Pendente"
+            
     obs_df = _carregar_e_normalizar_df(excel_file, abas["observacoes"])
     rec_df = _carregar_e_normalizar_df(excel_file, abas["recomendacoes"])
 
