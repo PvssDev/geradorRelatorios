@@ -94,18 +94,29 @@ def gerar_planilha_excel_buffer(temp_fiscalizacoes: list, temp_nc: list) -> io.B
 def salvar_fotos_em_diretorio(fotos: list, destino_dir: str) -> None:
     """
     Salva uma lista de arquivos de imagem (Streamlit UploadedFile ou similares)
-    no diretório de destino especificado.
+    no diretório de destino especificado de forma segura.
     """
     if not fotos or not destino_dir:
         return
     
     os.makedirs(destino_dir, exist_ok=True)
     for photo in fotos:
-        foto_path = os.path.join(destino_dir, photo.name)
-        with open(foto_path, "wb") as f:
-            if hasattr(photo, "getbuffer"):
-                f.write(photo.getbuffer())
-            elif hasattr(photo, "read"):
-                f.write(photo.read())
-            elif isinstance(photo, bytes):
-                f.write(photo)
+        foto_nome = getattr(photo, "name", str(photo))
+        foto_path = os.path.join(destino_dir, os.path.basename(foto_nome))
+        
+        try:
+            if hasattr(photo, "seek"):
+                try:
+                    photo.seek(0)
+                except Exception:
+                    pass
+
+            with open(foto_path, "wb") as f:
+                if hasattr(photo, "getbuffer"):
+                    f.write(photo.getbuffer())
+                elif hasattr(photo, "read"):
+                    f.write(photo.read())
+                elif isinstance(photo, bytes):
+                    f.write(photo)
+        except Exception as e:
+            print(f"Erro ao salvar foto {foto_nome} em {destino_dir}: {e}")
