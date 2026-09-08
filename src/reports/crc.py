@@ -201,17 +201,34 @@ class CrcReport(BaseReport):
         doc.add_paragraph() # Parágrafo vazio
         
         # Obter dados de NC
-        id_fisc = row["ID da Fiscalização"]
-        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
+        from utils import formatar_data_curta
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
+        if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
+            mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc
+            current_ncs = nc_df[mask_id].copy()
+            if current_ncs.empty:
+                current_ncs = nc_df.copy()
+        elif nc_df is not None and not nc_df.empty:
+            current_ncs = nc_df.copy()
+        else:
+            current_ncs = pd.DataFrame()
+
         ncs_reais = pd.DataFrame()
-        if not current_ncs.empty and "Não Conformidade" in current_ncs.columns:
-            ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
+        if not current_ncs.empty:
+            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
+            if col_nc:
+                mask_nc = current_ncs[col_nc].fillna("").astype(str).str.strip() != ""
+                ncs_reais = current_ncs[mask_nc].copy()
             
-        try:
-            dt_obj = pd.to_datetime(row["Data"])
-            data_abreviada = dt_obj.strftime("%d/%m/%Y")
-        except Exception:
-            data_abreviada = "27/05/2026"
+            if ncs_reais.empty:
+                cols_check = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Descrição da Evidência", "Descrição"] if c in current_ncs.columns]
+                if cols_check:
+                    mask_any = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                    ncs_reais = current_ncs[mask_any].copy()
+                else:
+                    ncs_reais = current_ncs.copy()
+            
+        data_abreviada = formatar_data_curta(row.get("Data", "") if hasattr(row, "get") else row["Data"])
             
         # 3. Quadro 1 title
         p7 = doc.add_paragraph()

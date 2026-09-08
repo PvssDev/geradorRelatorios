@@ -36,7 +36,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "COORDENADORIA DE TRANSPORTES E RODOVIAS\nRELATÓRIO DO 1° MONITORAMENTO DO PROCESSO\nDE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº 07/2025"
+        return "COORDENADORIA DE TRANSPORTES E RODOVIAS\nRELATÓRIO DO 1° MONITORAMENTO DO PROCESSO\nDE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
 
     @property
     def sumario_before_abreviaturas(self) -> bool:

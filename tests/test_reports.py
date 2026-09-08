@@ -110,9 +110,70 @@ def test_dynamic_header_and_footer_dates():
     print("[PASS] test_dynamic_header_and_footer_dates")
 
 
+def test_crc_fiscalizacao_quadro1_non_conformities():
+    import pandas as pd
+    from docx import Document
+    from sections.quadros.quadros import criar_tabela_quadros
+
+    crc = get_report("CRC")
+    row = {
+        "ID da Fiscalização": "2026-001",
+        "Data": "27/05/2026",
+        "Local": "Sistema Viário do Paiva"
+    }
+
+    # Caso 1: ID como int vs string e coluna 'Não conformidade' em minúsculo
+    nc_df1 = pd.DataFrame([
+        {
+            "ID da Fiscalização": "2026-001",
+            "Não conformidade": "FI",
+            "Identificação": "CRC.SH015.0646+0648/2026.001",
+            "Nº": 1,
+            "Foto": "foto_01.jpg",
+            "Fundamento da infração": "PER Anexo IV",
+            "Determinação": "Reparar fissuras"
+        }
+    ])
+
+    doc1 = Document()
+    crc.render_quadros(doc1, row, nc_df1, criar_tabela_quadros)
+    
+    # Verifica que foi criada a tabela e contém a NC
+    tables1 = doc1.tables
+    assert len(tables1) >= 1, "Tabela do Quadro 1 não foi criada no CRC"
+    tbl_text1 = " ".join([cell.text for row_t in tables1[0].rows for cell in row_t.cells])
+    assert "CRC.SH015.0646+0648/2026.001" in tbl_text1, "Identificação da NC não encontrada na tabela do Quadro 1"
+    assert "Fissuras" in tbl_text1 or "FI" in tbl_text1, "Descrição da NC não encontrada na tabela"
+
+    # Caso 2: Tipo de ID com número puro e coluna 'Observações' quando Não Conformidade é string
+    row2 = {"ID da Fiscalização": 1, "Data": "2026-05-27", "Local": "Sistema Viário do Paiva"}
+    nc_df2 = pd.DataFrame([
+        {
+            "ID da Fiscalização": "1",
+            "Não Conformidade": "Tachões ausentes",
+            "Identificação": "NC 02",
+            "Nº": 2,
+            "Foto": "foto_02.jpg",
+            "Fundamento da infração": "PER Anexo IV",
+            "Determinação": "Reposição imediata"
+        }
+    ])
+
+    doc2 = Document()
+    crc.render_quadros(doc2, row2, nc_df2, criar_tabela_quadros)
+    tables2 = doc2.tables
+    assert len(tables2) >= 1
+    tbl_text2 = " ".join([cell.text for row_t in tables2[0].rows for cell in row_t.cells])
+    assert "NC 02" in tbl_text2
+    assert "Tachões ausentes" in tbl_text2
+
+    print("[PASS] test_crc_fiscalizacao_quadro1_non_conformities")
+
+
 if __name__ == "__main__":
     test_factory_and_registry()
     test_cra_monitoramento_mixin_behavior()
     test_socicam_monitoramento_mixin_behavior()
     test_dynamic_header_and_footer_dates()
+    test_crc_fiscalizacao_quadro1_non_conformities()
     print("\nTodos os testes de relatórios passaram com sucesso!")

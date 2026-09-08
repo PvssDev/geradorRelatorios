@@ -266,6 +266,8 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         
         siglas_col = "Não Conformidade" if not is_pa else "Ponto de Atenção"
         siglas_str = rec.get(siglas_col, "")
+        if not siglas_str and not is_pa:
+            siglas_str = rec.get("Não conformidade", "") or rec.get("Observações", "") or rec.get("Legenda da Foto", "")
         desc = expandir_siglas(siglas_str)
         
         localizacao = rec["localizacao_formatada"]

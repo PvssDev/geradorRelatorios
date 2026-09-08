@@ -239,3 +239,29 @@ def extrair_mes_ano_numerico(data_val):
         ano_extraido = extrair_ano(data_val)
         return f"01/{ano_extraido}"
 
+
+def formatar_data_curta(data_val):
+    """
+    Converte datas (Timestamp, string, datetime, date) para o formato 'DD/MM/AAAA'.
+    """
+    if pd.isna(data_val) or not data_val:
+        return "27/05/2026"
+    try:
+        from datetime import datetime, date
+        if hasattr(data_val, "to_pydatetime"):
+            dt = data_val.to_pydatetime()
+            return dt.strftime("%d/%m/%Y")
+        elif isinstance(data_val, (datetime, date)):
+            return data_val.strftime("%d/%m/%Y")
+        else:
+            data_str = str(data_val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y"):
+                try:
+                    dt = datetime.strptime(data_str, fmt)
+                    return dt.strftime("%d/%m/%Y")
+                except ValueError:
+                    continue
+            return data_str
+    except Exception:
+        return str(data_val)
+
