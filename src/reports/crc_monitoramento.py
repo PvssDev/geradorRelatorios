@@ -276,14 +276,22 @@ class CrcMonitoramentoReport(CrcReport):
             except Exception as e:
                 print(f"Erro ao extrair NCs anteriores para Seção 3: {e}")
 
-        if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
-            current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc].copy()
-            if "Não Conformidade" in current_ncs.columns:
-                ncs_reais = current_ncs[
-                    current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""
-                ].copy()
+        if nc_df is not None and not nc_df.empty:
+            if "ID da Fiscalização" in nc_df.columns:
+                mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == str(id_fisc).strip()
+                current_ncs = nc_df[mask_id].copy()
             else:
-                ncs_reais = pd.DataFrame()
+                current_ncs = nc_df.copy()
+            
+            if current_ncs.empty:
+                current_ncs = nc_df.copy()
+
+            cols_check = [c for c in ["Não Conformidade", "Identificação", "Observações", "Determinação", "Foto", "Fotos", "Legenda da Foto"] if c in current_ncs.columns]
+            if cols_check:
+                mask_nc = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                ncs_reais = current_ncs[mask_nc].copy()
+            else:
+                ncs_reais = current_ncs.copy()
         else:
             ncs_reais = pd.DataFrame()
 
@@ -384,50 +392,42 @@ class CrcMonitoramentoReport(CrcReport):
         if ncs_reais.empty:
             add_p("Nenhuma Não Conformidade registrada para esta fiscalização.")
         else:
-            if "Pista" in ncs_reais.columns:
-                pistas_unicas = []
-                for p_val in ncs_reais["Pista"].tolist():
-                    p_str = str(p_val).strip() if not pd.isna(p_val) else ""
-                    if p_str and p_str not in pistas_unicas:
-                        pistas_unicas.append(p_str)
-                if not pistas_unicas:
-                    pistas_unicas = ["Unica"]
-            else:
-                pistas_unicas = ["Unica"]
+            for nc_idx, (_, nc_row) in enumerate(ncs_reais.reset_index(drop=True).iterrows(), 1):
+                ident = str(nc_row.get("Identificação", "")).strip()
+                if not ident or ident.lower().startswith("foto"):
+                    if (nc_idx - 1) < len(ncs_from_prev):
+                        ident = ncs_from_prev[nc_idx - 1]["id_nc"]
 
-            for sub_idx, pista_val in enumerate(pistas_unicas):
-                sub_num = sub_idx + 1
-                if pista_val == "Unica":
-                    sub_title = "3.1 RODOVIA ESTADUAL PE – 024"
-                    df_pista = ncs_reais
+                nc_desc = str(nc_row.get("Não Conformidade", "")).strip()
+                pista_val = str(nc_row.get("Pista", "")).strip() if not pd.isna(nc_row.get("Pista")) else ""
+                trecho_val = str(nc_row.get("Trecho", "")).strip() if not pd.isna(nc_row.get("Trecho")) else ""
+                observacoes = str(nc_row.get("Observações", nc_row.get("Legenda da Foto", ""))).strip()
+                determinacao = str(nc_row.get("Determinação", "")).strip()
+                analise_arpe = str(nc_row.get("Análise ARPE", "")).strip()
+
+                # Monta título do subitem: ex: "3.1 NC_01_SH04 – PE-024" ou "3.1 NC_01_SH04 – KM 02+300"
+                partes_titulo = []
+                if ident and not ident.lower().startswith("foto"):
+                    partes_titulo.append(ident)
+                elif nc_desc:
+                    partes_titulo.append(nc_desc)
                 else:
-                    sub_title = f"3.{sub_num} RODOVIA ESTADUAL PE – 024 - PISTA {pista_val.upper()}"
-                    mask = ncs_reais["Pista"].apply(
-                        lambda x: str(x).strip() == pista_val if not pd.isna(x) else False
-                    )
-                    df_pista = ncs_reais[mask]
+                    partes_titulo.append(f"NÃO CONFORMIDADE {nc_idx}")
 
+                if trecho_val:
+                    partes_titulo.append(trecho_val)
+                if pista_val and pista_val.lower() not in ["única", "unica"]:
+                    partes_titulo.append(f"PISTA {pista_val.upper()}")
+
+                sub_title = f"3.{nc_idx} " + " – ".join(partes_titulo)
                 adicionar_titulo_secao(doc, sub_title)
                 doc.add_paragraph()
 
-                for row_idx, (_, nc_row) in enumerate(df_pista.reset_index(drop=True).iterrows()):
-                    ident = str(nc_row.get("Identificação", "")).strip()
-                    if not ident or ident.lower().startswith("foto"):
-                        if row_idx < len(ncs_from_prev):
-                            ident = ncs_from_prev[row_idx]["id_nc"]
-
-                    nc_desc = str(nc_row.get("Não Conformidade", "")).strip()
-                    observacoes = str(nc_row.get("Observações", nc_row.get("Legenda da Foto", ""))).strip()
-                    determinacao = str(nc_row.get("Determinação", "")).strip()
-                    analise_arpe = str(nc_row.get("Análise ARPE", "")).strip()
-
-                    if ident and not ident.lower().startswith("foto"):
-                        add_p(ident, bold=True)
-                    add_label_text("NÃO CONFORMIDADE: ", nc_desc if nc_desc else "A ser preenchido.")
-                    add_label_text("POSICIONAMENTO DA CRC: ", determinacao if determinacao else "A ser preenchido.")
-                    add_label_text("CONSTATAÇÃO: ", observacoes if observacoes else "A ser preenchido.")
-                    add_label_text("ANÁLISE ARPE: ", analise_arpe if analise_arpe else "A ser preenchido.")
-                    doc.add_paragraph()
+                add_label_text("NÃO CONFORMIDADE: ", nc_desc if nc_desc else (ident if ident else "A ser preenchido."))
+                add_label_text("POSICIONAMENTO DA CRC: ", determinacao if determinacao else "A ser preenchido.")
+                add_label_text("CONSTATAÇÃO: ", observacoes if observacoes else "A ser preenchido.")
+                add_label_text("ANÁLISE ARPE: ", analise_arpe if analise_arpe else "A ser preenchido.")
+                doc.add_paragraph()
 
         # 4. RESUMO DA SITUAÇÃO
         adicionar_titulo_secao(doc, f"4. RESUMO DA SITUAÇÃO DAS NÃO CONFORMIDADES MONITORADAS ({mes_ano_cap})")
@@ -474,12 +474,24 @@ class CrcMonitoramentoReport(CrcReport):
             data_vistoria_atual = "XX/XX/XXXX"
 
         # Buscar Não Conformidades do preenchimento atual
-        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
-        ncs_reais = pd.DataFrame()
-        if not current_ncs.empty and "Não Conformidade" in current_ncs.columns:
-            ncs_reais = current_ncs[
-                current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""
-            ].copy()
+        if nc_df is not None and not nc_df.empty:
+            if "ID da Fiscalização" in nc_df.columns:
+                mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == str(id_fisc).strip()
+                current_ncs = nc_df[mask_id].copy()
+            else:
+                current_ncs = nc_df.copy()
+            
+            if current_ncs.empty:
+                current_ncs = nc_df.copy()
+
+            cols_check = [c for c in ["Não Conformidade", "Identificação", "Observações", "Determinação", "Foto", "Fotos", "Legenda da Foto"] if c in current_ncs.columns]
+            if cols_check:
+                mask_nc = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                ncs_reais = current_ncs[mask_nc].copy()
+            else:
+                ncs_reais = current_ncs.copy()
+        else:
+            ncs_reais = pd.DataFrame()
 
         # Adicionar o título do QUADRO 1
         p_q = doc.add_paragraph()

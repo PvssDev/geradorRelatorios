@@ -141,6 +141,14 @@ def gerar_relatorio(
 
     _garantir_colunas_obrigatorias(fiscal_df, ["ID da Fiscalização", "Contrato", "Data", "Local"], abas["fiscalizacoes"])
 
+    # Normaliza nomes de colunas de assinatura caso existam com pequenas variações de caixa
+    for col in fiscal_df.columns:
+        c_clean = str(col).strip().lower()
+        if c_clean == "coordenador" and col != "Coordenador":
+            fiscal_df.rename(columns={col: "Coordenador"}, inplace=True)
+        elif c_clean in ("pessoal responsável", "pessoal responsavel") and col != "Pessoal Responsável":
+            fiscal_df.rename(columns={col: "Pessoal Responsável"}, inplace=True)
+
     COLUNA_STATUS = "Relatório Gerado"
     if COLUNA_STATUS not in fiscal_df.columns:
         # Tenta achar insensível a caso antes de criar nova
@@ -171,15 +179,34 @@ def gerar_relatorio(
         report_config = get_report(tipo_relatorio)
 
         # Calcula o total de achados (soma de não conformidades com pontos de atenção no caso de CRA)
-        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
+        id_fisc_str = str(id_fisc).strip()
+        if not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
+            mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc_str
+            current_ncs = nc_df[mask_id].copy()
+            if current_ncs.empty and len(pendentes_unicos) == 1:
+                current_ncs = nc_df.copy()
+        elif not nc_df.empty:
+            current_ncs = nc_df.copy()
+        else:
+            current_ncs = pd.DataFrame()
+
         total_achados = 0
         if not current_ncs.empty:
+            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
             has_nc = 0
-            if "Não Conformidade" in current_ncs.columns:
-                has_nc = len(current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""])
+            if col_nc:
+                has_nc = len(current_ncs[current_ncs[col_nc].fillna("").astype(str).str.strip() != ""])
+            if has_nc == 0:
+                cols_check = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Descrição da Evidência", "Descrição"] if c in current_ncs.columns]
+                if cols_check:
+                    mask_any = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                    has_nc = len(current_ncs[mask_any])
+                else:
+                    has_nc = len(current_ncs)
             has_pa = 0
-            if report_config.key == "CRA" and "Ponto de Atenção" in current_ncs.columns:
-                has_pa = len(current_ncs[current_ncs["Ponto de Atenção"].fillna("").astype(str).str.strip() != ""])
+            col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
+            if report_config.key == "CRA" and col_pa:
+                has_pa = len(current_ncs[current_ncs[col_pa].fillna("").astype(str).str.strip() != ""])
             total_achados = has_nc + has_pa
 
         # Primeira Página (Capa)
@@ -208,11 +235,11 @@ def gerar_relatorio(
         arquivos_gerados.append(caminho_docx)
         
         # Marca todas as linhas deste ID de fiscalização como geradas
-        fiscal_df.loc[fiscal_df["ID da Fiscalização"] == id_fisc, COLUNA_STATUS] = True
+        fiscal_df.loc[fiscal_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc_str, COLUNA_STATUS] = True
 
     # Finalização da Planilha
     if "Data" in fiscal_df.columns:
-        fiscal_df["Data"] = pd.to_datetime(fiscal_df["Data"], errors="coerce").dt.strftime("%d/%m/%Y")
+        fiscal_df["Data"] = pd.to_datetime(fiscal_df["Data"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")
 
     def salvar_excel(writer):
         fiscal_df.to_excel(writer, sheet_name=abas["fiscalizacoes"], index=False)

@@ -220,7 +220,6 @@ with st.container():
             if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
                 local = "Sistema Viário do Paiva"
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_crc", placeholder="Opcional")
-                submit_fisc = st.button(f"➕ Adicionar {term_fisc}", type="primary")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 local = st.text_input("Local (ex: TIP (RECIFE))", key="fisc_input_local_socicam", placeholder="Nome do Terminal")
         with col2:
@@ -270,8 +269,7 @@ with st.container():
             else:
                 contrato = "CT. nº 1.041.080/08"
  
-        if st.session_state.get("tipo_relatorio", "CRA") in ["CRA", "SOCICAM"]:
-            submit_fisc = st.button(f"➕ Adicionar {term_fisc}", type="primary")
+        submit_fisc = st.button(f"➕ Adicionar {term_fisc}", type="primary")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
             if not id_fisc:

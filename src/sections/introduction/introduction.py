@@ -66,7 +66,11 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
     adicionar_titulo_secao(doc, info_title)
     
     # Construção da tabela de Informações Gerais
-    responsaveis_formatted = str(row["Pessoal Responsável"]).replace(",", " e" if "," not in str(row["Pessoal Responsável"]) else ";")
+    raw_resp = row.get("Pessoal Responsável", "")
+    if pd.isna(raw_resp) or str(raw_resp).strip().lower() in ["", "nan", "none"]:
+        responsaveis_formatted = ""
+    else:
+        responsaveis_formatted = str(raw_resp).replace(",", " e" if "," not in str(raw_resp) else ";")
     periodo_val = str(row.get("Período", "")).strip() if pd.notna(row.get("Período")) and str(row.get("Período", "")).strip() else f"{data_extenso}."
     
     rows_data = report_config.get_general_info_rows(row, responsaveis_formatted, periodo_val)

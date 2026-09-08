@@ -3,6 +3,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
 import os
+import pandas as pd
 from utils import formatar_mes_ano, extrair_ano, extrair_mes_ano_numerico
 from database.manager import carregar_responsaveis
 
@@ -65,7 +66,14 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
                 p.paragraph_format.space_after = Pt(12)
 
         # 3. Lista de Analistas Dinâmica
-        responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+        raw_resp = row.get("Pessoal Responsável", "")
+        if pd.isna(raw_resp) or str(raw_resp).strip().lower() in ["", "nan", "none"]:
+            responsaveis_list = []
+        else:
+            responsaveis_list = [
+                r.strip() for r in str(raw_resp).split(",") 
+                if r.strip() and r.strip().lower() not in ["nan", "none"]
+            ]
         db_resp = carregar_responsaveis()
         
         analistas = []

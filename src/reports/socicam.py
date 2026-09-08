@@ -233,11 +233,31 @@ class SocicamReport(BaseReport):
         doc.add_paragraph() # Parágrafo vazio
         
         # Obter dados de NC
-        id_fisc = row["ID da Fiscalização"]
-        current_ncs = nc_df[nc_df["ID da Fiscalização"] == id_fisc] if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns else pd.DataFrame()
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
+        if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
+            mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc
+            current_ncs = nc_df[mask_id].copy()
+            if current_ncs.empty:
+                current_ncs = nc_df.copy()
+        elif nc_df is not None and not nc_df.empty:
+            current_ncs = nc_df.copy()
+        else:
+            current_ncs = pd.DataFrame()
+
         ncs_reais = pd.DataFrame()
-        if not current_ncs.empty and "Não Conformidade" in current_ncs.columns:
-            ncs_reais = current_ncs[current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""].copy()
+        if not current_ncs.empty:
+            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
+            if col_nc:
+                mask_nc = current_ncs[col_nc].fillna("").astype(str).str.strip() != ""
+                ncs_reais = current_ncs[mask_nc].copy()
+            
+            if ncs_reais.empty:
+                cols_check = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Descrição da Evidência", "Descrição"] if c in current_ncs.columns]
+                if cols_check:
+                    mask_any = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                    ncs_reais = current_ncs[mask_any].copy()
+                else:
+                    ncs_reais = current_ncs.copy()
             
         local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
         
@@ -262,7 +282,14 @@ class SocicamReport(BaseReport):
         return "4. FISCALIZAÇÃO"
 
     def get_quadro_intro_paragraphs(self, row, data_extenso, responsaveis_formatted) -> list:
-        responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+        raw_resp = row.get("Pessoal Responsável", "")
+        if pd.isna(raw_resp) or str(raw_resp).strip().lower() in ["", "nan", "none"]:
+            responsaveis_list = []
+        else:
+            responsaveis_list = [
+                r.strip() for r in str(raw_resp).split(",") 
+                if r.strip() and r.strip().lower() not in ["nan", "none"]
+            ]
         from database.manager import carregar_responsaveis
         db_resp = carregar_responsaveis()
         

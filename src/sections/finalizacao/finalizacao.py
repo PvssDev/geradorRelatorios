@@ -592,7 +592,14 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         
         doc.add_paragraph()
         
-        responsaveis_list = [r.strip() for r in str(row["Pessoal Responsável"]).split(",") if r.strip()]
+        raw_resp = row.get("Pessoal Responsável", "")
+        if pd.isna(raw_resp) or str(raw_resp).strip().lower() in ["", "nan", "none"]:
+            responsaveis_list = []
+        else:
+            responsaveis_list = [
+                r.strip() for r in str(raw_resp).split(",") 
+                if r.strip() and r.strip().lower() not in ["nan", "none"]
+            ]
         db_resp = carregar_responsaveis()
         
         for nome in responsaveis_list:
@@ -643,7 +650,12 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         run_ciente.font.size = Pt(11)
         
         db_coord = carregar_coordenadores()
-        coord_name = str(row["Coordenador"]).strip()
+        raw_coord = row.get("Coordenador", "")
+        if pd.isna(raw_coord) or str(raw_coord).strip().lower() in ["", "nan", "none"]:
+            coord_name = db_coord[0]["nome"] if db_coord else ""
+        else:
+            coord_name = str(raw_coord).strip()
+
         match_coord = next((c for c in db_coord if c["nome"].strip().lower() == coord_name.lower()), None)
         if match_coord:
             c_nome = match_coord["nome"]
