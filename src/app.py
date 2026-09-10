@@ -15,9 +15,15 @@ from services.data_service import (
     gerar_planilha_excel_buffer,
     salvar_fotos_em_diretorio
 )
+from services.image_service import (
+    obter_foto_preview,
+    obter_nomes_fotos_em_nc,
+    foto_esta_em_nc
+)
 from ui.state import inicializar_estado_sessao, obter_termos_ui
 from ui.modals import (
     mostrar_foto_modal,
+    galeria_fotos_modal,
     confirmar_exclusao_lote_modal,
     confirmar_exclusao_nc_modal,
     gerenciar_responsaveis_modal,
@@ -373,22 +379,17 @@ with st.container():
         col_inputs, col_preview = registros_container.columns([1.2, 1.0])
     
         with col_preview:
-            st.markdown("### 🖼️ Carrossel de Fotos")
             foto_default = ""
             if is_monitoring and st.session_state.old_photos_to_match:
+                st.markdown("### 🖼️ Carrossel de Fotos")
                 if current_item:
                     st.markdown(f"**Trecho de Comparação {idx + 1} de {len(st.session_state.old_photos_to_match)}**")
                     col_old, col_new = st.columns(2)
                     with col_old:
                         st.markdown(f"**Foto Anterior ({current_item['id_nc']} - {current_item['trecho']})**")
-                        try:
-                            from PIL import Image, ImageOps
-                            img_old = Image.open(current_item["old_photo_path"])
-                            preview_old = ImageOps.fit(img_old, (320, 240))
-                            st.image(preview_old, use_container_width=True)
-                            st.button("🔍 Ampliar Foto Anterior", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{idx}_{st.session_state.nc_form_counter}")
-                        except Exception:
-                            st.image(current_item["old_photo_path"], use_container_width=True)
+                        preview_old = obter_foto_preview(current_item["old_photo_path"], max_size=(320, 240))
+                        st.image(preview_old, use_container_width=True)
+                        st.button("🔍 Ampliar Foto Anterior", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{idx}_{st.session_state.nc_form_counter}")
                     
                         st.selectbox(
                             "Selecione a foto antiga para comparar",
@@ -409,14 +410,9 @@ with st.container():
                                 st.session_state[selected_key] = current_sel_name
                         
                             img_path = next(f for f in st.session_state.fill_photos if f.name == current_sel_name)
-                            try:
-                                from PIL import Image, ImageOps
-                                img_new = Image.open(img_path)
-                                preview_new = ImageOps.fit(img_new, (320, 240))
-                                st.image(preview_new, use_container_width=True)
-                                st.button("🔍 Ampliar Nova Foto", on_click=mostrar_foto_modal, args=(img_path,), key=f"btn_zoom_new_{idx}_{st.session_state.nc_form_counter}")
-                            except Exception:
-                                st.image(img_path, use_container_width=True)
+                            preview_new = obter_foto_preview(img_path, max_size=(320, 240))
+                            st.image(preview_new, use_container_width=True)
+                            st.button("🔍 Ampliar Nova Foto", on_click=mostrar_foto_modal, args=(img_path,), key=f"btn_zoom_new_{idx}_{st.session_state.nc_form_counter}")
                         
                             sel_name = st.selectbox(
                                 "Selecione a foto correspondente",
@@ -439,53 +435,83 @@ with st.container():
                     if st.session_state.fill_photos:
                         idx_single = min(st.session_state.carousel_index, len(st.session_state.fill_photos) - 1)
                         current_photo = st.session_state.fill_photos[idx_single]
-                        try:
-                            from PIL import Image, ImageOps
-                            image = Image.open(current_photo)
-                            preview_image = ImageOps.fit(image, (400, 300))
-                            st.image(preview_image, caption=f"Foto {idx_single + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}")
-                        except Exception:
-                            st.image(current_photo, caption=f"Foto {idx_single + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}", use_container_width=True)
+                        preview_image = obter_foto_preview(current_photo, max_size=(400, 300))
+                        st.image(preview_image, caption=f"Foto {idx_single + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}")
                         foto_default = current_photo.name
                     else:
                         foto_default = ""
             elif st.session_state.fill_photos:
-                idx = st.session_state.carousel_index
-                idx = min(idx, len(st.session_state.fill_photos) - 1)
-                idx = max(0, idx)
-                current_photo = st.session_state.fill_photos[idx]
-            
-                try:
-                    from PIL import Image, ImageOps
-                    image = Image.open(current_photo)
-                    preview_image = ImageOps.fit(image, (400, 300))
-                    st.image(preview_image, caption=f"Foto {idx + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}")
-                    st.button("🔍 Clique para ampliar a foto", on_click=mostrar_foto_modal, args=(current_photo,), key="btn_zoom_photo_carousel")
-                except Exception as e:
-                    st.image(current_photo, caption=f"Foto {idx + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}", use_container_width=True)
-            
-                # Controles de Navegação (Voltar e Avançar)
-                nav_col1, nav_col2 = st.columns(2)
-                with nav_col1:
-                    if st.button("⬅️ Anterior", disabled=(idx == 0), key="btn_prev_photo"):
-                        st.session_state.carousel_index = idx - 1
-                        st.rerun()
-                with nav_col2:
-                    if st.button("Próxima ➡️", disabled=(idx == len(st.session_state.fill_photos) - 1), key="btn_next_photo"):
-                        st.session_state.carousel_index = idx + 1
-                        st.rerun()
-            
-                st.checkbox(
-                    "Avançar foto automaticamente",
-                    value=True,
-                    key="auto_advance_active",
-                    help="Avança para a próxima foto do carrossel ao adicionar o Registro"
-                )
-            
-                foto_default = current_photo.name
+                with st.container(key="fisc_carousel_container"):
+                    st.markdown("<h3 style='text-align: center; margin: 0 0 14px 0;'>🖼️ Carrossel de Fotos</h3>", unsafe_allow_html=True)
+                    idx = st.session_state.carousel_index
+                    total_photos = len(st.session_state.fill_photos)
+                    idx = min(idx, total_photos - 1)
+                    idx = max(0, idx)
+                    current_photo = st.session_state.fill_photos[idx]
+                
+                    # Palco do Carrossel com 3 colunas simétricas: Foto Anterior | Foto Central Ativa | Foto Posterior
+                    col_side_left, col_main, col_side_right = st.columns([1, 2.5, 1], vertical_alignment="center")
+                    
+                    with col_side_left:
+                        with st.container(key="fisc_carousel_side_left"):
+                            if idx > 0:
+                                prev_side_photo = st.session_state.fill_photos[idx - 1]
+                                prev_side_thumb = obter_foto_preview(prev_side_photo, max_size=(260, 195))
+                                st.image(prev_side_thumb, use_container_width=True)
+                            else:
+                                st.markdown("<div style='min-height: 120px;'></div>", unsafe_allow_html=True)
+                    
+                    nomes_em_nc = obter_nomes_fotos_em_nc(st.session_state.get("temp_nc", []))
+                    is_current_in_nc = foto_esta_em_nc(current_photo, nomes_em_nc)
+
+                    with col_main:
+                        container_key = "fisc_carousel_main_side_nc" if is_current_in_nc else "fisc_carousel_main_side"
+                        with st.container(key=container_key):
+                            preview_image = obter_foto_preview(current_photo, max_size=(380, 285))
+                            caption_text = f"Foto {idx + 1} de {total_photos}: {current_photo.name}"
+                            if is_current_in_nc:
+                                caption_text += " • ⚠️ (Adicionada em NC)"
+                            st.image(preview_image, caption=caption_text, use_container_width=True)
+                    
+                    with col_side_right:
+                        with st.container(key="fisc_carousel_side_right"):
+                            if idx < total_photos - 1:
+                                next_side_photo = st.session_state.fill_photos[idx + 1]
+                                next_side_thumb = obter_foto_preview(next_side_photo, max_size=(260, 195))
+                                st.image(next_side_thumb, use_container_width=True)
+                            else:
+                                st.markdown("<div style='min-height: 120px;'></div>", unsafe_allow_html=True)
+                    
+                    # Controles de Navegação alinhados exatamente no mesmo eixo central da foto
+                    _, col_controls, _ = st.columns([1, 2.5, 1])
+                    with col_controls:
+                        with st.container(key="fisc_carousel_controls"):
+                            if st.button("🖼️ Ver todas as fotos", key="btn_ver_todas_fotos", use_container_width=True):
+                                galeria_fotos_modal()
+                    
+                            nav_col1, nav_col2 = st.columns(2)
+                            with nav_col1:
+                                if st.button("⬅️ Anterior", disabled=(idx == 0), key="btn_prev_photo", use_container_width=True):
+                                    st.session_state.carousel_index = idx - 1
+                                    st.rerun()
+                            with nav_col2:
+                                if st.button("Próxima ➡️", disabled=(idx == total_photos - 1), key="btn_next_photo", use_container_width=True):
+                                    st.session_state.carousel_index = idx + 1
+                                    st.rerun()
+                    
+                            st.checkbox(
+                                "Avançar foto automaticamente",
+                                value=True,
+                                key="auto_advance_active",
+                                help="Avança para a próxima foto do carrossel ao adicionar o Registro"
+                            )
+                
+                    foto_default = current_photo.name
             else:
-                st.info("💡 Faça o upload das fotos do levantamento no topo da página para exibi-las aqui.")
-                foto_default = ""
+                with st.container(key="fisc_carousel_container"):
+                    st.markdown("<h3 style='text-align: center; margin: 0 0 14px 0;'>🖼️ Carrossel de Fotos</h3>", unsafe_allow_html=True)
+                    st.info("💡 Faça o upload das fotos do levantamento no topo da página para exibi-las aqui.")
+                    foto_default = ""
 
         with col_inputs:
             st.markdown("### 📝 Cadastro de Registros")
