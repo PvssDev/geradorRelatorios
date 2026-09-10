@@ -379,3 +379,303 @@ div[data-baseweb="select"]>div {
     border-radius: 6px !important;
     color: #2d2926 !important;
 }
+
+/* ==========================================
+   CARROSSEL 3D CENTRALIZADO DE FISCALIZAÇÕES
+   ========================================== */
+.st-key-fisc_carousel_container {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+
+/* Fotos laterais (Anterior e Posterior) - Maiores, aproximadas do centro e por trás da central */
+.st-key-fisc_carousel_side_left {
+    opacity: 0.50 !important;
+    transform: scale(0.92) translateX(30px) !important;
+    position: relative !important;
+    z-index: 1 !important;
+    filter: blur(0.3px) grayscale(10%) !important;
+    pointer-events: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 120px !important;
+    width: 100% !important;
+}
+
+.st-key-fisc_carousel_side_right {
+    opacity: 0.50 !important;
+    transform: scale(0.92) translateX(-30px) !important;
+    position: relative !important;
+    z-index: 1 !important;
+    filter: blur(0.3px) grayscale(10%) !important;
+    pointer-events: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 120px !important;
+    width: 100% !important;
+}
+
+.st-key-fisc_carousel_side_left div[data-testid="stImage"] img,
+.st-key-fisc_carousel_side_right div[data-testid="stImage"] img {
+    border-radius: 8px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ==========================================
+   DESATIVAR TOOLBAR / BOTÃO FLUTUANTE DE TELA CHEIA EM IMAGENS
+   ========================================== */
+div[data-testid="stElementToolbar"],
+.stElementToolbar,
+div[data-testid="stElementToolbarButtonContainer"],
+div[data-testid="stFullScreenFrame"] div[data-testid="stElementToolbar"],
+div[data-testid="stFullScreenFrame"] .stElementToolbar,
+div[data-testid="stFullScreenFrame"] button,
+button[aria-label="Fullscreen"],
+button[aria-label="Close fullscreen"],
+button[title="Fullscreen"],
+button[title="Close fullscreen"],
+button[title="View fullscreen"],
+button[aria-label="View fullscreen"],
+button[data-testid="stImageZoomButton"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Foto central ativa (Destaque, 100% nítida e opaca, SOBREPOSTA às laterais) */
+.st-key-fisc_carousel_main_side,
+.st-key-fisc_carousel_main_side_nc {
+    opacity: 1 !important;
+    transform: scale(1) !important;
+    position: relative !important;
+    left: 14px !important;
+    z-index: 10 !important;
+    filter: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+}
+
+.st-key-fisc_carousel_main_side div[data-testid="stImage"],
+.st-key-fisc_carousel_main_side_nc div[data-testid="stImage"] {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+    width: 100% !important;
+}
+
+.st-key-fisc_carousel_main_side div[data-testid="stImage"] img,
+.st-key-fisc_carousel_main_side_nc div[data-testid="stImage"] img {
+    margin: 0 auto !important;
+    border-radius: 8px !important;
+    max-width: 380px !important;
+    width: 100% !important;
+    height: auto !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22) !important;
+    border: 2px solid rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Foto central ativa quando já foi adicionada em NC (BORDA CINZA FINA E FOTO TRANSPARENTE) */
+.st-key-fisc_carousel_main_side_nc div[data-testid="stImage"] img {
+    border: 2px solid #a39691 !important;
+    opacity: 0.75 !important;
+    box-shadow: 0 4px 14px rgba(163, 150, 145, 0.25) !important;
+    transition: opacity 0.2s ease, border-color 0.2s ease !important;
+}
+
+.st-key-fisc_carousel_main_side_nc div[data-testid="stImage"] img:hover {
+    opacity: 0.92 !important;
+}
+
+.st-key-fisc_carousel_main_side div[data-testid="stImage"] [data-testid="stImageCaption"],
+.st-key-fisc_carousel_main_side_nc div[data-testid="stImage"] [data-testid="stImageCaption"] {
+    text-align: center !important;
+    width: 100% !important;
+    max-width: 380px !important;
+    margin: 6px auto 0 auto !important;
+    font-weight: 500 !important;
+    color: #3e251b !important;
+}
+
+.st-key-fisc_carousel_main_side_nc div[data-testid="stImage"] [data-testid="stImageCaption"] {
+    font-weight: 600 !important;
+    color: #6f4b3e !important;
+}
+
+/* Bloco dos botões de controle alinhados exatamente na coluna da foto */
+.st-key-fisc_carousel_controls {
+    width: 100% !important;
+    max-width: 380px !important;
+    margin: 8px auto 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.st-key-fisc_carousel_controls div[data-testid="stCheckbox"] {
+    display: flex !important;
+    justify-content: center !important;
+    margin-top: 6px !important;
+}
+
+/* ==========================================
+   ESTILIZAÇÃO E SCROLL CONSISTENTE EM MODAIS (st.dialog)
+   Garante que o fundo acompanhe todo o conteúdo durante o scroll
+   ========================================== */
+div[data-baseweb="modal"] div[role="dialog"] {
+    background-color: #eed2c5 !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    padding-bottom: 30px !important;
+}
+
+div[data-baseweb="modal"] div[role="dialog"]>div {
+    background-color: transparent !important;
+}
+
+/* ==========================================
+   GALERIA DE SELEÇÃO DE FOTOS (MODAL)
+   Cards clicáveis diretamente na foto
+   ========================================== */
+div[class*="st-key-gal_card"] {
+    position: relative !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+    cursor: pointer !important;
+    border: 2px solid rgba(111, 75, 62, 0.15) !important;
+    padding: 6px !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+div[class*="st-key-gal_card"]:hover {
+    transform: translateY(-3px) scale(1.02) !important;
+    box-shadow: 0 8px 22px rgba(111, 75, 62, 0.3) !important;
+    border-color: #b6a9a5 !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* ==========================================
+   Fotos que JÁ FORAM ADICIONADAS EM NC (BORDA MARROM FINA E FOTO TRANSPARENTE)
+   ========================================== */
+div[class*="st-key-gal_card_nc_"],
+div[class*="st-key-gal_card_curr_nc_"] {
+    border: 2px solid #a39691 !important;
+    background: rgba(111, 75, 62, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(111, 75, 62, 0.18) !important;
+}
+
+/* Foto um pouco transparente quando está em NC */
+div[class*="st-key-gal_card_nc_"] img,
+div[class*="st-key-gal_card_curr_nc_"] img {
+    opacity: 0.70 !important;
+    transition: opacity 0.2s ease, filter 0.2s ease !important;
+}
+
+div[class*="st-key-gal_card_nc_"]:hover img,
+div[class*="st-key-gal_card_curr_nc_"]:hover img {
+    opacity: 0.90 !important;
+    filter: brightness(1.03) !important;
+}
+
+div[class*="st-key-gal_card_nc_"]:hover,
+div[class*="st-key-gal_card_curr_nc_"]:hover {
+    border-color: #8f827d !important;
+    background: rgba(163, 150, 145, 0.16) !important;
+    box-shadow: 0 4px 14px rgba(163, 150, 145, 0.28) !important;
+}
+
+/* Foto atualmente ativa no carrossel e que NÃO está em NC */
+div[class*="st-key-gal_card_curr_"] {
+    border: 2px solid #8c6a5d !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Foto atualmente ativa no carrossel e que TAMBÉM está em NC */
+div[class*="st-key-gal_card_curr_nc_"] {
+    border: 2.5px solid #a39691 !important;
+    box-shadow: 0 3px 12px rgba(163, 150, 145, 0.3) !important;
+}
+
+/* Imagem dentro do card da galeria */
+div[class*="st-key-gal_card"] img {
+    border-radius: 6px !important;
+    transition: filter 0.18s ease !important;
+}
+
+div[class*="st-key-gal_card"]:hover img {
+    filter: brightness(1.04) !important;
+}
+
+/* Espaçamento interno vertical compacto */
+div[class*="st-key-gal_card"] div[data-testid="stVerticalBlock"] {
+    gap: 4px !important;
+}
+
+/* Legenda da foto dentro do card */
+div[class*="st-key-gal_card"] [data-testid="stImageCaption"] {
+    margin-top: 4px !important;
+    font-size: 0.82rem !important;
+    color: #3e251b !important;
+    text-align: center !important;
+}
+
+/* Botão invisível sobreposto em toda a área do card para capturar o clique */
+div[class*="st-key-btn_gal_pick_"],
+div[class*="st-key-gal_card"] div[data-testid="stButton"] {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 10 !important;
+}
+
+div[class*="st-key-btn_gal_pick_"] button,
+div[class*="st-key-gal_card"] div[data-testid="stButton"]>button {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    opacity: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    z-index: 10 !important;
+}

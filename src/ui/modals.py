@@ -13,7 +13,77 @@ from ui.state import sincronizar_opcoes_nc, BASE_NC_OPTIONS
 
 @st.dialog("Visualização Completa da Imagem", width="large")
 def mostrar_foto_modal(uploaded_file):
-    st.image(uploaded_file, caption=uploaded_file.name, use_container_width=True)
+    if hasattr(uploaded_file, "seek"):
+        try:
+            uploaded_file.seek(0)
+        except Exception:
+            pass
+    caption = getattr(uploaded_file, "name", str(uploaded_file))
+    st.image(uploaded_file, caption=caption, use_container_width=True)
+
+
+@st.dialog("🖼️ Galeria de Fotos do Levantamento", width="large")
+def galeria_fotos_modal():
+    from services.image_service import obter_foto_preview, obter_nomes_fotos_em_nc, foto_esta_em_nc
+    
+    fotos = st.session_state.get("fill_photos", [])
+    if not fotos:
+        st.info("💡 Nenhuma foto disponível no momento.")
+        return
+
+    nomes_em_nc = obter_nomes_fotos_em_nc(st.session_state.get("temp_nc", []))
+
+    st.markdown(f"Clique diretamente em qualquer foto para defini-la como a foto central do carrossel (**{len(fotos)} fotos disponíveis**). As fotos com **borda cinza** e transparência já foram adicionadas a uma Não Conformidade.")
+    
+    filtro = st.text_input("🔍 Filtrar fotos por nome:", placeholder="Digite parte do nome da foto...", key="input_filtro_galeria")
+    
+    fotos_enumeradas = list(enumerate(fotos))
+    if filtro.strip():
+        filtro_lower = filtro.strip().lower()
+        fotos_enumeradas = [item for item in fotos_enumeradas if filtro_lower in getattr(item[1], "name", "").lower()]
+
+    if not fotos_enumeradas:
+        st.warning("Nenhuma foto encontrada com o filtro informado.")
+        return
+
+    cols_per_row = 4
+    for row_start in range(0, len(fotos_enumeradas), cols_per_row):
+        cols = st.columns(cols_per_row)
+        for c_idx in range(cols_per_row):
+            item_idx = row_start + c_idx
+            if item_idx < len(fotos_enumeradas):
+                orig_idx, photo = fotos_enumeradas[item_idx]
+                with cols[c_idx]:
+                    is_current = (orig_idx == st.session_state.get("carousel_index", 0))
+                    in_nc = foto_esta_em_nc(photo, nomes_em_nc)
+                    
+                    if is_current and in_nc:
+                        card_key = f"gal_card_curr_nc_{orig_idx}"
+                    elif in_nc:
+                        card_key = f"gal_card_nc_{orig_idx}"
+                    elif is_current:
+                        card_key = f"gal_card_curr_{orig_idx}"
+                    else:
+                        card_key = f"gal_card_{orig_idx}"
+
+                    with st.container(key=card_key):
+                        thumb = obter_foto_preview(photo, max_size=(220, 165))
+                        st.image(thumb, use_container_width=True)
+                        nome = getattr(photo, "name", f"Foto {orig_idx + 1}")
+                        nome_curto = nome[:16] + "..." if len(nome) > 19 else nome
+                        
+                        badges = []
+                        if is_current:
+                            badges.append("⭐ *(Atual)*")
+                        if in_nc:
+                            badges.append("⚠️ **[NC]**")
+                        badge_str = f" {' '.join(badges)}" if badges else ""
+
+                        st.caption(f"**#{orig_idx + 1}** {nome_curto}{badge_str}")
+                        
+                        if st.button("", key=f"btn_gal_pick_{orig_idx}"):
+                            st.session_state.carousel_index = orig_idx
+                            st.rerun()
 
 
 @st.dialog("Confirmar Exclusão em Lote")
