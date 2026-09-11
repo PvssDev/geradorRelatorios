@@ -352,6 +352,31 @@ def adicionar_nc_personalizada_modal(pills_key, is_socicam=False):
             st.rerun()
 
 
+def formatar_sigla_nc(sigla: str) -> str:
+    """Retorna a sigla formatada com a sua descrição completa para exibição no seletor."""
+    if not sigla:
+        return ""
+    sigla_clean = str(sigla).strip()
+    desc = MAP_SIGLAS.get(sigla_clean)
+    if not desc:
+        for item in st.session_state.get("custom_ncs", []) + st.session_state.get("custom_ncs_socicam", []):
+            if item.get("sigla") == sigla_clean and item.get("descricao"):
+                desc = item.get("descricao")
+                break
+    if desc and desc.lower() != sigla_clean.lower():
+        return f"{sigla_clean} — {desc}"
+    return sigla_clean
+
+
+def obter_lista_siglas_atuais(val) -> list:
+    """Converte o valor salvo (string ou lista) em uma lista limpa de siglas/opções."""
+    if not val:
+        return []
+    if isinstance(val, list):
+        return [str(x).strip() for x in val if str(x).strip()]
+    return [str(x).strip() for x in str(val).split(",") if str(x).strip()]
+
+
 @st.dialog("Editar Dados Registrados", width="large")
 def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, term_fisc="Fiscalização", term_fisc_prep="da Fiscalização", term_fisc_plural="Fiscalizações"):
     if not st.session_state.temp_fiscalizacoes and not st.session_state.temp_nc:
@@ -386,23 +411,26 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
             
             if fisc_data:
                 st.markdown("---")
+                fisc_version = st.session_state.get("fisc_edit_version", 0)
+                f_key = f"fisc_edit_{sel_id_fisc}_{fisc_version}"
+
                 col_id, col_data = st.columns(2)
                 with col_id:
-                    novo_id = st.text_input(f"ID {term_fisc_prep}", value=str(fisc_data.get("ID da Fiscalização", "")), key="edit_fisc_id_input")
+                    novo_id = st.text_input(f"ID {term_fisc_prep}", value=str(fisc_data.get("ID da Fiscalização", "")), key=f"{f_key}_id")
                 with col_data:
-                    nova_data = st.text_input("Data", value=str(fisc_data.get("Data", "")), key="edit_fisc_data_input")
+                    nova_data = st.text_input("Data", value=str(fisc_data.get("Data", "")), key=f"{f_key}_data")
                 
                 # Campos específicos por tipo
                 if tipo == "CRA":
                     col_h, col_c, col_l = st.columns(3)
                     with col_h:
-                        nova_hora = st.text_input("Hora", value=str(fisc_data.get("Hora", "")), key="edit_fisc_hora_input")
+                        nova_hora = st.text_input("Hora", value=str(fisc_data.get("Hora", "")), key=f"{f_key}_hora")
                     with col_c:
-                        nova_cidade = st.text_input("Cidade", value=str(fisc_data.get("Cidade", "")), key="edit_fisc_cidade_input")
+                        nova_cidade = st.text_input("Cidade", value=str(fisc_data.get("Cidade", "")), key=f"{f_key}_cidade")
                     with col_l:
-                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key="edit_fisc_local_input")
+                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
                 elif tipo == "SOCICAM":
-                    novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key="edit_fisc_local_input")
+                    novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
                     nova_hora = ""
                     nova_cidade = ""
                 else:  # CRC
@@ -412,19 +440,19 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                 
                 col_resp, col_coord = st.columns(2)
                 with col_resp:
-                    novos_responsaveis = st.text_input("Pessoal Responsável", value=str(fisc_data.get("Pessoal Responsável", "")), key="edit_fisc_resp_input")
+                    novos_responsaveis = st.text_input("Pessoal Responsável", value=str(fisc_data.get("Pessoal Responsável", "")), key=f"{f_key}_resp")
                 with col_coord:
-                    novo_coordenador = st.text_input("Coordenador", value=str(fisc_data.get("Coordenador", "")), key="edit_fisc_coord_input")
+                    novo_coordenador = st.text_input("Coordenador", value=str(fisc_data.get("Coordenador", "")), key=f"{f_key}_coord")
                 
-                novo_periodo = st.text_input("Período", value=str(fisc_data.get("Período", "")), key="edit_fisc_periodo_input")
+                novo_periodo = st.text_input("Período", value=str(fisc_data.get("Período", "")), key=f"{f_key}_periodo")
 
-                if st.button("💾 Salvar Alterações na Fiscalização", type="primary", use_container_width=True, key="btn_save_fisc_edit"):
+                if st.button("💾 Salvar Alterações na Fiscalização", type="primary", use_container_width=True, key=f"{f_key}_btn_save"):
                     old_id = fisc_data["ID da Fiscalização"]
                     novo_id_clean = novo_id.strip()
                     
                     if not novo_id_clean:
                         st.error(f"O ID {term_fisc_prep} não pode ser vazio.")
-                    elif tipo in ["CRA", "SOCICAM"] and not novo_local.strip():
+                    elif tipo in ["CRA", "SOCICAM"] and not (novo_local and str(novo_local).strip()):
                         st.error("O campo 'Local' é obrigatório.")
                     else:
                         outros_ids = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] != old_id]
@@ -448,7 +476,8 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
-                                
+                            
+                            st.session_state["fisc_edit_version"] = fisc_version + 1
                             st.success(f"Alterações salvas com sucesso para o ID '{novo_id_clean}'!")
                             st.rerun()
 
@@ -486,10 +515,13 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         "Selecione o item para editar",
                         range(len(ncs_filtradas)),
                         format_func=lambda i: nc_label(ncs_filtradas[i]),
-                        key="edit_modal_sel_nc_item"
+                        key=f"edit_modal_sel_nc_item_{sel_fisc_for_nc}"
                     )
                     
                     nc_target = ncs_filtradas[idx_nc_sel]
+                    nc_version = st.session_state.get("nc_edit_version", 0)
+                    nc_num_val = nc_target.get("Nº", idx_nc_sel + 1)
+                    nc_key_prefix = f"nc_edit_{sel_fisc_for_nc}_{nc_num_val}_{idx_nc_sel}_{nc_version}"
                     
                     st.markdown("---")
                     
@@ -498,14 +530,14 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         situacoes_opts = ["Pendente", "Parcialmente Sanada", "Sanada"]
                         sit_atual = str(nc_target.get("Situação", "Pendente"))
                         sit_idx = situacoes_opts.index(sit_atual) if sit_atual in situacoes_opts else 0
-                        edit_situacao = st.selectbox("Situação", situacoes_opts, index=sit_idx, key="edit_nc_situacao")
+                        edit_situacao = st.selectbox("Situação", situacoes_opts, index=sit_idx, key=f"{nc_key_prefix}_situacao")
                         
                         pos_label = "INFORMAÇÃO SOCICAM" if tipo == "SOCICAM" else "POSICIONAMENTO CRC"
-                        edit_determinacao = st.text_area(pos_label, value=str(nc_target.get("Determinação", "")), height=110, key="edit_nc_determinacao")
-                        edit_observacoes = st.text_area("CONSTATAÇÃO", value=str(nc_target.get("Observações", "")), height=110, key="edit_nc_observacoes")
-                        edit_analise_arpe = st.text_area("ANÁLISE ARPE", value=str(nc_target.get("Análise ARPE", "")), height=110, key="edit_nc_analise_arpe")
+                        edit_determinacao = st.text_area(pos_label, value=str(nc_target.get("Determinação", "")), height=110, key=f"{nc_key_prefix}_determinacao")
+                        edit_observacoes = st.text_area("CONSTATAÇÃO", value=str(nc_target.get("Observações", "")), height=110, key=f"{nc_key_prefix}_observacoes")
+                        edit_analise_arpe = st.text_area("ANÁLISE ARPE", value=str(nc_target.get("Análise ARPE", "")), height=110, key=f"{nc_key_prefix}_analise_arpe")
 
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key="btn_save_nc_edit"):
+                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Situação"] = edit_situacao
                             nc_target["Determinação"] = edit_determinacao
                             nc_target["Observações"] = edit_observacoes
@@ -513,6 +545,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
+                            st.session_state["nc_edit_version"] = nc_version + 1
                             st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
                             st.rerun()
 
@@ -520,84 +553,56 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                     elif tipo == "CRA" and is_mon:
                         c_pista, c_trecho = st.columns(2)
                         with c_pista:
-                            edit_pista = st.text_input("Pista", value=str(nc_target.get("Pista", "")), key="edit_nc_pista")
+                            edit_pista = st.text_input("Pista", value=str(nc_target.get("Pista", "")), key=f"{nc_key_prefix}_pista")
                         with c_trecho:
-                            edit_trecho = st.text_input("Trecho", value=str(nc_target.get("Trecho", "")), key="edit_nc_trecho")
+                            edit_trecho = st.text_input("Trecho", value=str(nc_target.get("Trecho", "")), key=f"{nc_key_prefix}_trecho")
                         
                         situacoes_opts = ["Pendente", "Parcialmente Sanada", "Sanada"]
                         sit_atual = str(nc_target.get("Situação", "Pendente"))
                         sit_idx = situacoes_opts.index(sit_atual) if sit_atual in situacoes_opts else 0
-                        edit_situacao = st.selectbox("Situação", situacoes_opts, index=sit_idx, key="edit_nc_situacao")
+                        edit_situacao = st.selectbox("Situação", situacoes_opts, index=sit_idx, key=f"{nc_key_prefix}_situacao")
+
+                        options_base = list(st.session_state.nc_options)
+                        raw_nc = nc_target.get("Não Conformidade", "")
+                        curr_selected = obter_lista_siglas_atuais(raw_nc)
+                        for s in curr_selected:
+                            if s and s not in options_base:
+                                options_base.append(s)
+
+                        col_sel, col_add = st.columns([10.5, 1.5])
+                        with col_sel:
+                            edit_selected_siglas = st.multiselect(
+                                "Não Conformidade (clique para abrir e selecionar)",
+                                options=options_base,
+                                default=curr_selected,
+                                format_func=formatar_sigla_nc,
+                                placeholder="Clique para abrir e marcar/desmarcar...",
+                                key=f"{nc_key_prefix}_nc_multiselect"
+                            )
+                        with col_add:
+                            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                            if st.button("➕", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
+                                adicionar_nc_personalizada_modal(f"{nc_key_prefix}_nc_multiselect", is_socicam=False)
+
+                        edit_nc_desc = ", ".join(edit_selected_siglas)
                         
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
-                        edit_observacoes = st.text_area("Legenda da Foto Atual", value=str(obs_atual), height=80, key="edit_nc_observacoes")
+                        edit_observacoes = st.text_area("Legenda da Foto Atual", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
                         c_ident, c_dir = st.columns(2)
                         with c_ident:
-                            edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key="edit_nc_ident")
+                            edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key=f"{nc_key_prefix}_ident")
                         with c_dir:
-                            edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key="edit_nc_direcao")
+                            edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
 
-                        edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key="edit_nc_fundamento")
-                        edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key="edit_nc_determinacao")
+                        edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
+                        edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
 
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key="btn_save_nc_edit"):
+                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Pista"] = edit_pista
                             nc_target["Trecho"] = edit_trecho
                             nc_target["Situação"] = edit_situacao
-                            nc_target["Observações"] = edit_observacoes
-                            if "Legenda da Foto" in nc_target:
-                                nc_target["Legenda da Foto"] = edit_observacoes
-                            nc_target["Identificação"] = edit_ident
-                            nc_target["Direção (faixa)"] = edit_direcao
-                            nc_target["Fundamento da infração"] = edit_fundamento
-                            nc_target["Determinação"] = edit_determinacao
-                            st.session_state.relatorios_preenchimento_data = []
-                            if "planilha_download_bytes" in st.session_state:
-                                del st.session_state.planilha_download_bytes
-                            st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
-                            st.rerun()
-
-                    # 3. CRA em Fiscalização:
-                    elif tipo == "CRA" and not is_mon:
-                        c_pista, c_trecho = st.columns(2)
-                        with c_pista:
-                            edit_pista = st.text_input("Pista", value=str(nc_target.get("Pista", "")), key="edit_nc_pista")
-                        with c_trecho:
-                            edit_trecho = st.text_input("Trecho", value=str(nc_target.get("Trecho", "")), key="edit_nc_trecho")
-
-                        is_pa = bool(nc_target.get("Ponto de Atenção")) and not bool(nc_target.get("Não Conformidade"))
-                        if is_pa:
-                            pa_val_str = nc_target.get("Ponto de Atenção", "")
-                            if isinstance(pa_val_str, list):
-                                pa_val_str = ", ".join(pa_val_str)
-                            edit_pa_desc = st.text_area("Ponto de Atenção", value=str(pa_val_str), height=90, key="edit_pa_desc_input")
-                            edit_nc_desc = ""
-                        else:
-                            nc_val_str = nc_target.get("Não Conformidade", "")
-                            if isinstance(nc_val_str, list):
-                                nc_val_str = ", ".join(nc_val_str)
-                            edit_nc_desc = st.text_area("Não Conformidade", value=str(nc_val_str), height=90, key="edit_nc_desc_input")
-                            edit_pa_desc = ""
-
-                        obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
-                        edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key="edit_nc_observacoes")
-
-                        c_ident, c_dir = st.columns(2)
-                        with c_ident:
-                            edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key="edit_nc_ident")
-                        with c_dir:
-                            edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key="edit_nc_direcao")
-
-                        edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key="edit_nc_fundamento")
-                        edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key="edit_nc_determinacao")
-
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key="btn_save_nc_edit"):
-                            nc_target["Pista"] = edit_pista
-                            nc_target["Trecho"] = edit_trecho
-                            if is_pa:
-                                nc_target["Ponto de Atenção"] = edit_pa_desc
-                            else:
+                            if edit_nc_desc:
                                 nc_target["Não Conformidade"] = edit_nc_desc
                             nc_target["Observações"] = edit_observacoes
                             if "Legenda da Foto" in nc_target:
@@ -609,24 +614,149 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
+                            st.session_state["nc_edit_version"] = nc_version + 1
+                            st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
+                            st.rerun()
+
+                    # 3. CRA em Fiscalização:
+                    elif tipo == "CRA" and not is_mon:
+                        c_pista, c_trecho = st.columns(2)
+                        with c_pista:
+                            edit_pista = st.text_input("Pista", value=str(nc_target.get("Pista", "")), key=f"{nc_key_prefix}_pista")
+                        with c_trecho:
+                            edit_trecho = st.text_input("Trecho", value=str(nc_target.get("Trecho", "")), key=f"{nc_key_prefix}_trecho")
+
+                        init_is_pa = bool(nc_target.get("Ponto de Atenção")) and not bool(nc_target.get("Não Conformidade"))
+                        tipo_reg_edit = st.radio(
+                            "Tipo de Registro",
+                            ["Não Conformidade", "Ponto de Atenção"],
+                            index=1 if init_is_pa else 0,
+                            horizontal=True,
+                            key=f"{nc_key_prefix}_tipo_reg"
+                        )
+                        edit_is_pa = (tipo_reg_edit == "Ponto de Atenção")
+
+                        options_base = list(st.session_state.nc_options)
+
+                        if edit_is_pa:
+                            raw_val = nc_target.get("Ponto de Atenção") or nc_target.get("Não Conformidade", "")
+                            curr_selected = obter_lista_siglas_atuais(raw_val)
+                            for s in curr_selected:
+                                if s and s not in options_base:
+                                    options_base.append(s)
+
+                            col_sel, col_add = st.columns([10.5, 1.5])
+                            with col_sel:
+                                edit_selected_siglas = st.multiselect(
+                                    "Siglas de Ponto de Atenção (clique para abrir e selecionar)",
+                                    options=options_base,
+                                    default=curr_selected,
+                                    format_func=formatar_sigla_nc,
+                                    placeholder="Clique para abrir e marcar/desmarcar...",
+                                    key=f"{nc_key_prefix}_pa_multiselect"
+                                )
+                            with col_add:
+                                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                                if st.button("➕", key=f"{nc_key_prefix}_btn_custom_pa", help="Adicionar Não Conformidade Personalizada"):
+                                    adicionar_nc_personalizada_modal(f"{nc_key_prefix}_pa_multiselect", is_socicam=False)
+
+                            edit_pa_desc = ", ".join(edit_selected_siglas)
+                            edit_nc_desc = ""
+                        else:
+                            raw_val = nc_target.get("Não Conformidade") or nc_target.get("Ponto de Atenção", "")
+                            curr_selected = obter_lista_siglas_atuais(raw_val)
+                            for s in curr_selected:
+                                if s and s not in options_base:
+                                    options_base.append(s)
+
+                            col_sel, col_add = st.columns([10.5, 1.5])
+                            with col_sel:
+                                edit_selected_siglas = st.multiselect(
+                                    "Siglas de Não Conformidade (clique para abrir e selecionar)",
+                                    options=options_base,
+                                    default=curr_selected,
+                                    format_func=formatar_sigla_nc,
+                                    placeholder="Clique para abrir e marcar/desmarcar...",
+                                    key=f"{nc_key_prefix}_nc_multiselect"
+                                )
+                            with col_add:
+                                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                                if st.button("➕", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
+                                    adicionar_nc_personalizada_modal(f"{nc_key_prefix}_nc_multiselect", is_socicam=False)
+
+                            edit_nc_desc = ", ".join(edit_selected_siglas)
+                            edit_pa_desc = ""
+
+                        obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
+                        edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
+
+                        c_ident, c_dir = st.columns(2)
+                        with c_ident:
+                            edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key=f"{nc_key_prefix}_ident")
+                        with c_dir:
+                            edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
+
+                        edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
+                        edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
+
+                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
+                            nc_target["Pista"] = edit_pista
+                            nc_target["Trecho"] = edit_trecho
+                            if edit_is_pa:
+                                nc_target["Ponto de Atenção"] = edit_pa_desc
+                                nc_target["Não Conformidade"] = ""
+                            else:
+                                nc_target["Não Conformidade"] = edit_nc_desc
+                                nc_target["Ponto de Atenção"] = ""
+                            nc_target["Observações"] = edit_observacoes
+                            if "Legenda da Foto" in nc_target:
+                                nc_target["Legenda da Foto"] = edit_observacoes
+                            nc_target["Identificação"] = edit_ident
+                            nc_target["Direção (faixa)"] = edit_direcao
+                            nc_target["Fundamento da infração"] = edit_fundamento
+                            nc_target["Determinação"] = edit_determinacao
+                            st.session_state.relatorios_preenchimento_data = []
+                            if "planilha_download_bytes" in st.session_state:
+                                del st.session_state.planilha_download_bytes
+                            st.session_state["nc_edit_version"] = nc_version + 1
                             st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
                             st.rerun()
 
                     # 4. CRC ou SOCICAM em Fiscalização:
                     else:
-                        nc_val_str = nc_target.get("Não Conformidade", "")
-                        if isinstance(nc_val_str, list):
-                            nc_val_str = ", ".join(nc_val_str)
-                        edit_nc_desc = st.text_area("Não Conformidade", value=str(nc_val_str), height=90, key="edit_nc_desc_input")
+                        is_soc = (tipo == "SOCICAM")
+                        options_base = list(st.session_state.socicam_nc_options if is_soc else st.session_state.nc_options)
+                        raw_val = nc_target.get("Não Conformidade", "")
+                        curr_selected = obter_lista_siglas_atuais(raw_val)
+                        for s in curr_selected:
+                            if s and s not in options_base:
+                                options_base.append(s)
+
+                        col_sel, col_add = st.columns([10.5, 1.5])
+                        with col_sel:
+                            edit_selected_siglas = st.multiselect(
+                                "Não Conformidade (clique para abrir e selecionar)",
+                                options=options_base,
+                                default=curr_selected,
+                                format_func=formatar_sigla_nc,
+                                placeholder="Clique para abrir e marcar/desmarcar...",
+                                key=f"{nc_key_prefix}_nc_multiselect"
+                            )
+                        with col_add:
+                            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                            if st.button("➕", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
+                                adicionar_nc_personalizada_modal(f"{nc_key_prefix}_nc_multiselect", is_socicam=is_soc)
+
+                        edit_nc_desc = ", ".join(edit_selected_siglas)
 
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
-                        edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key="edit_nc_observacoes")
+                        edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
-                        edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key="edit_nc_ident")
-                        edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key="edit_nc_fundamento")
-                        edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key="edit_nc_determinacao")
+                        edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key=f"{nc_key_prefix}_ident")
+                        edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
+                        edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
 
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key="btn_save_nc_edit"):
+                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Não Conformidade"] = edit_nc_desc
                             nc_target["Observações"] = edit_observacoes
                             if "Legenda da Foto" in nc_target:
@@ -637,7 +767,9 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
+                            st.session_state["nc_edit_version"] = nc_version + 1
                             st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
                             st.rerun()
+
 
 

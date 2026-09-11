@@ -776,10 +776,15 @@ with st.container():
                                             rec["Foto"] = foto_default
                                             rec["Foto Anterior"] = current_item["old_photo_path"]
                                             rec["Legenda Anterior"] = current_item["old_legend"]
+                                            if nc_descricao:
+                                                rec["Não Conformidade"] = ", ".join(nc_descricao)
                                             rec["Observações"] = constatacao
                                             rec["Determinação"] = pos_crc
                                             rec["Situação"] = situacao
                                             rec["Análise ARPE"] = analise_arpe
+                                            st.session_state.relatorios_preenchimento_data = []
+                                            if "planilha_download_bytes" in st.session_state:
+                                                del st.session_state.planilha_download_bytes
 
                                         # Sincronizar textos para todas as ocorrências de foto para a mesma Identificação
                                         recs_same_ident = [r for r in st.session_state.temp_nc 
@@ -905,32 +910,21 @@ with st.container():
                             if campos_vazios:
                                 st.warning(f"⚠️ Atenção: Os seguintes campos de texto da CRC estão vazios: {', '.join(campos_vazios)}.")
                     
-                        # 1. Tentar encontrar registro com a mesma foto anterior
-                        rec = next((r for r in st.session_state.temp_nc 
-                                    if r["Identificação"] == identificacao 
-                                    and r["Foto Anterior"] == st.session_state.get("step1_foto_anterior", "") 
-                                    and r["ID da Fiscalização"] == st.session_state.step1_id_vinculo), None)
-                    
-                        # 2. Se não encontrou, tentar encontrar um registro com foto anterior vazia
-                        if not rec:
-                            rec = next((r for r in st.session_state.temp_nc 
-                                        if r["Identificação"] == identificacao 
-                                        and not r.get("Foto Anterior") 
-                                        and r["ID da Fiscalização"] == st.session_state.step1_id_vinculo), None)
-                    
-                        # 3. Se ainda assim não encontrou, cria um novo
-                        if not rec:
+                        if not is_monitoring:
+                            # Na Fiscalização, cada envio adiciona um novo registro independente com a NC selecionada
+                            ncs_existentes = [nc for nc in st.session_state.temp_nc if nc.get("ID da Fiscalização") == st.session_state.step1_id_vinculo]
+                            novo_nc_num = len(ncs_existentes) + 1
                             rec = {
                                 "ID da Fiscalização": st.session_state.step1_id_vinculo,
-                                "Nº": st.session_state.step1_nc_num,
+                                "Nº": novo_nc_num,
                                 "Terminal": st.session_state.step1_terminal_nc,
                                 "Pista": st.session_state.step1_pista,
                                 "Trecho": st.session_state.step1_trecho,
                                 "Não Conformidade": st.session_state.step1_nc_desc_str,
                                 "Ponto de Atenção": st.session_state.step1_pa_desc_str,
                                 "Foto": st.session_state.step1_foto_default,
-                                "Foto Anterior": st.session_state.get("step1_foto_anterior", ""),
-                                "Legenda Anterior": st.session_state.get("step1_legenda_anterior", ""),
+                                "Foto Anterior": "",
+                                "Legenda Anterior": "",
                                 "Observações": observacoes_crc,
                                 "Identificação": identificacao,
                                 "Direção (faixa)": direcao_faixa,
@@ -941,14 +935,60 @@ with st.container():
                             }
                             st.session_state.temp_nc.append(rec)
                         else:
-                            # Atualiza registro existente
-                            rec["Foto"] = st.session_state.step1_foto_default
-                            rec["Foto Anterior"] = st.session_state.get("step1_foto_anterior", "")
-                            rec["Legenda Anterior"] = st.session_state.get("step1_legenda_anterior", "")
-                            rec["Observações"] = observacoes_crc
-                            rec["Determinação"] = determinacao
-                            rec["Situação"] = situacao
-                            rec["Análise ARPE"] = analise_arpe
+                            # No Monitoramento, busca registro correspondente para atualizar ou criar
+                            rec = next((r for r in st.session_state.temp_nc 
+                                        if r.get("Identificação") == identificacao 
+                                        and r.get("Foto Anterior") == st.session_state.get("step1_foto_anterior", "") 
+                                        and r.get("ID da Fiscalização") == st.session_state.step1_id_vinculo), None)
+                        
+                            if not rec:
+                                rec = next((r for r in st.session_state.temp_nc 
+                                            if r.get("Identificação") == identificacao 
+                                            and not r.get("Foto Anterior") 
+                                            and r.get("ID da Fiscalização") == st.session_state.step1_id_vinculo), None)
+                        
+                            if not rec:
+                                rec = {
+                                    "ID da Fiscalização": st.session_state.step1_id_vinculo,
+                                    "Nº": st.session_state.step1_nc_num,
+                                    "Terminal": st.session_state.step1_terminal_nc,
+                                    "Pista": st.session_state.step1_pista,
+                                    "Trecho": st.session_state.step1_trecho,
+                                    "Não Conformidade": st.session_state.step1_nc_desc_str,
+                                    "Ponto de Atenção": st.session_state.step1_pa_desc_str,
+                                    "Foto": st.session_state.step1_foto_default,
+                                    "Foto Anterior": st.session_state.get("step1_foto_anterior", ""),
+                                    "Legenda Anterior": st.session_state.get("step1_legenda_anterior", ""),
+                                    "Observações": observacoes_crc,
+                                    "Identificação": identificacao,
+                                    "Direção (faixa)": direcao_faixa,
+                                    "Fundamento da infração": fundamento_infracao,
+                                    "Determinação": determinacao,
+                                    "Situação": situacao,
+                                    "Análise ARPE": analise_arpe
+                                }
+                                st.session_state.temp_nc.append(rec)
+                            else:
+                                # Atualiza registro existente no Monitoramento sem descartar dados
+                                rec["Foto"] = st.session_state.step1_foto_default
+                                rec["Foto Anterior"] = st.session_state.get("step1_foto_anterior", "")
+                                rec["Legenda Anterior"] = st.session_state.get("step1_legenda_anterior", "")
+                                if st.session_state.step1_nc_desc_str:
+                                    rec["Não Conformidade"] = st.session_state.step1_nc_desc_str
+                                if st.session_state.step1_pa_desc_str:
+                                    rec["Ponto de Atenção"] = st.session_state.step1_pa_desc_str
+                                if st.session_state.step1_pista:
+                                    rec["Pista"] = st.session_state.step1_pista
+                                if st.session_state.step1_trecho:
+                                    rec["Trecho"] = st.session_state.step1_trecho
+                                rec["Observações"] = observacoes_crc
+                                rec["Determinação"] = determinacao
+                                rec["Situação"] = situacao
+                                rec["Análise ARPE"] = analise_arpe
+
+                        st.session_state.relatorios_preenchimento_data = []
+                        if "planilha_download_bytes" in st.session_state:
+                            del st.session_state.planilha_download_bytes
 
                         # Sincronizar textos para todas as ocorrências de foto para a mesma Identificação (CRC)
                         if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
