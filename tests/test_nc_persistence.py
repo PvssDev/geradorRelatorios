@@ -123,3 +123,44 @@ def test_edicao_nc_atualiza_valor_e_reflete_na_planilha():
     assert df_fisc["Observações"].iloc[0] == "Observação atualizada com sucesso"
     assert df_nc["Não Conformidade"].iloc[0] == "Nova NC Corrigida e Salva"
     assert df_nc["Determinação"].iloc[0] == "Nova determinação atualizada"
+
+
+def test_quadro_exibe_siglas_de_nc_na_identificacao():
+    """
+    Garante que no Quadro de Não Conformidades (relatório Word),
+    a primeira coluna ('IDENTIFICAÇÃO') receba diretamente as siglas
+    da Não Conformidade cadastradas, sem depender de digitação manual de identificação.
+    """
+    from docx import Document
+    from sections.quadros.quadros import criar_tabela_quadros
+    from reports.factory import get_report
+
+    report_config = get_report("CRA")
+    doc = Document()
+
+    df_dados = pd.DataFrame([
+        {
+            "Nº": 1,
+            "Não Conformidade": "NC 01, NC 02",
+            "Ponto de Atenção": "",
+            "Identificação": "",  # Vazio ou não preenchido manualmente
+            "Direção (faixa)": "Faixa 1",
+            "Pista": "Norte",
+            "Trecho": "KM 10",
+            "Observações": "Observação teste",
+            "Fundamento da infração": "Contrato Cláusula 5",
+            "Determinação": "Reparar em 48h"
+        }
+    ])
+
+    criar_tabela_quadros(doc, df_dados, is_pa=False, report_config=report_config)
+    assert len(doc.tables) == 1
+    table = doc.tables[0]
+
+    # No CRA (fiscalização), linhas 0 e 1 são cabeçalho. Linha 2 é a primeira linha de dados.
+    row_dados = table.rows[2]
+    # Célula 0 deve ser a IDENTIFICAÇÃO com as siglas
+    assert row_dados.cells[0].text == "NC 01, NC 02"
+    # Célula 1 deve ser a DESCRIÇÃO expandida
+    assert len(row_dados.cells[1].text) > 0
+

@@ -589,11 +589,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
                         edit_observacoes = st.text_area("Legenda da Foto Atual", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
-                        c_ident, c_dir = st.columns(2)
-                        with c_ident:
-                            edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key=f"{nc_key_prefix}_ident")
-                        with c_dir:
-                            edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
+                        edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
 
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
@@ -607,7 +603,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             nc_target["Observações"] = edit_observacoes
                             if "Legenda da Foto" in nc_target:
                                 nc_target["Legenda da Foto"] = edit_observacoes
-                            nc_target["Identificação"] = edit_ident
+                            nc_target["Identificação"] = str(nc_target.get("Identificação", "")).strip() or edit_nc_desc
                             nc_target["Direção (faixa)"] = edit_direcao
                             nc_target["Fundamento da infração"] = edit_fundamento
                             nc_target["Determinação"] = edit_determinacao
@@ -690,11 +686,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
                         edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
-                        c_ident, c_dir = st.columns(2)
-                        with c_ident:
-                            edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key=f"{nc_key_prefix}_ident")
-                        with c_dir:
-                            edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
+                        edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
 
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
@@ -711,7 +703,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             nc_target["Observações"] = edit_observacoes
                             if "Legenda da Foto" in nc_target:
                                 nc_target["Legenda da Foto"] = edit_observacoes
-                            nc_target["Identificação"] = edit_ident
+                            nc_target["Identificação"] = edit_pa_desc if edit_is_pa else edit_nc_desc
                             nc_target["Direção (faixa)"] = edit_direcao
                             nc_target["Fundamento da infração"] = edit_fundamento
                             nc_target["Determinação"] = edit_determinacao
@@ -752,7 +744,6 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
                         edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
-                        edit_ident = st.text_input("Identificação", value=str(nc_target.get("Identificação", "")), key=f"{nc_key_prefix}_ident")
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
 
@@ -761,7 +752,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             nc_target["Observações"] = edit_observacoes
                             if "Legenda da Foto" in nc_target:
                                 nc_target["Legenda da Foto"] = edit_observacoes
-                            nc_target["Identificação"] = edit_ident
+                            nc_target["Identificação"] = edit_nc_desc
                             nc_target["Fundamento da infração"] = edit_fundamento
                             nc_target["Determinação"] = edit_determinacao
                             st.session_state.relatorios_preenchimento_data = []

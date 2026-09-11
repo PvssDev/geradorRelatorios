@@ -911,9 +911,9 @@ with st.container():
                                         st.rerun()
             else:
                 if is_monitoring and st.session_state.get("step1_identificacao"):
-                    identificacao = st.text_input("Identificação", value=st.session_state.step1_identificacao, disabled=True)
+                    identificacao = st.session_state.step1_identificacao
                 else:
-                    identificacao = st.text_input("Identificação", key=f"nc_ident_{st.session_state.nc_form_counter}", placeholder="Identificação da infração...")
+                    identificacao = st.session_state.get("step1_nc_desc_str") or st.session_state.get("step1_pa_desc_str") or ""
                 
                 if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                     direcao_faixa = st.text_input("Direção (faixa)", key=f"nc_dir_{st.session_state.nc_form_counter}", placeholder="Direção/faixa...")
@@ -1150,7 +1150,7 @@ with st.container():
                         df_nc_only.insert(0, "Excluir", False)
                         
                         # Garante ordenação exata das colunas
-                        cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Não Conformidade', 'Identificação', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
+                        cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Não Conformidade', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
                         for c in ['Situação', 'Foto', 'Fotos', 'Observações', 'Legenda da Foto', 'Análise ARPE']:
                             if c in df_nc_only.columns:
                                 cols_order.append(c)
@@ -1196,7 +1196,7 @@ with st.container():
                             df_pa_only.insert(0, "Excluir", False)
                             
                             # Garante ordenação exata das colunas (Ponto de Atenção após Terminal e antes de Foto)
-                            cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Ponto de Atenção', 'Identificação', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
+                            cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Ponto de Atenção', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
                             for c in ['Foto', 'Fotos', 'Observações', 'Legenda da Foto']:
                                 if c in df_pa_only.columns:
                                     cols_order.append(c)
@@ -1435,7 +1435,7 @@ with st.container():
                             "Legenda Anterior": "",
                             "Legenda da Foto": "=legenda da foto atual=",
                             "Observações": "=Observações=",
-                            "Identificação": "=Identificação=",
+                            "Identificação": "=Não Conformidade=",
                             "Direção (faixa)": "=Direção (faixa)=" if tipo_rel == "CRA" else "",
                             "Fundamento da infração": "=Fundamento da infração=" if tipo_rel == "CRA" else "",
                             "Determinação": "=Determinação=",
