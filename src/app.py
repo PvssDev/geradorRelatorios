@@ -18,7 +18,8 @@ from services.data_service import (
 from services.image_service import (
     obter_foto_preview,
     obter_nomes_fotos_em_nc,
-    foto_esta_em_nc
+    foto_esta_em_nc,
+    chave_ordenacao_natural
 )
 from ui.state import inicializar_estado_sessao, obter_termos_ui
 from ui.modals import (
@@ -111,15 +112,39 @@ with st.container():
             st.write("") # Alinhamento vertical discreto
             st.write("**Ordenar Fotos por:**")
             with st.popover(f"↕️ {st.session_state.fill_photos_sort_option}", use_container_width=True):
-                if st.button("Nome (A-Z / 0-9)", use_container_width=True, key="btn_sort_asc"):
-                    st.session_state.fill_photos_sort_option = "Nome (A-Z / 0-9)"
-                    st.rerun()
-                if st.button("Nome (Z-A / 9-0)", use_container_width=True, key="btn_sort_desc"):
-                    st.session_state.fill_photos_sort_option = "Nome (Z-A / 9-0)"
-                    st.rerun()
-                if st.button("Ordem de Upload", use_container_width=True, key="btn_sort_upload"):
-                    st.session_state.fill_photos_sort_option = "Ordem de Upload"
-                    st.rerun()
+                is_asc = st.session_state.fill_photos_sort_option == "Nome (A-Z / 0-9)"
+                is_desc = st.session_state.fill_photos_sort_option == "Nome (Z-A / 9-0)"
+                is_upload = st.session_state.fill_photos_sort_option == "Ordem de Upload"
+
+                if st.button(
+                    "Nome (A-Z / 0-9)" + ("  ✓" if is_asc else ""),
+                    type="primary" if is_asc else "secondary",
+                    use_container_width=True,
+                    key="btn_sort_asc"
+                ):
+                    if not is_asc:
+                        st.session_state.fill_photos_sort_option = "Nome (A-Z / 0-9)"
+                        st.rerun()
+
+                if st.button(
+                    "Nome (Z-A / 9-0)" + ("  ✓" if is_desc else ""),
+                    type="primary" if is_desc else "secondary",
+                    use_container_width=True,
+                    key="btn_sort_desc"
+                ):
+                    if not is_desc:
+                        st.session_state.fill_photos_sort_option = "Nome (Z-A / 9-0)"
+                        st.rerun()
+
+                if st.button(
+                    "Ordem de Upload" + ("  ✓" if is_upload else ""),
+                    type="primary" if is_upload else "secondary",
+                    use_container_width=True,
+                    key="btn_sort_upload"
+                ):
+                    if not is_upload:
+                        st.session_state.fill_photos_sort_option = "Ordem de Upload"
+                        st.rerun()
         with col_clear:
             st.write("") # Alinhamento vertical discreto
             st.write("**Limpar Fotos:**")
@@ -131,14 +156,29 @@ with st.container():
                     st.session_state.carousel_index = 0
                 st.rerun()
 
+        # Guarda a foto que estava ativa no carrossel para não perder o foco após reordenação
+        foto_ativa_anterior = None
+        if st.session_state.get("fill_photos") and "carousel_index" in st.session_state:
+            idx_anterior = st.session_state.carousel_index
+            if 0 <= idx_anterior < len(st.session_state.fill_photos):
+                foto_ativa_anterior = st.session_state.fill_photos[idx_anterior].name
+
         sort_option = st.session_state.fill_photos_sort_option
         if uploaded_nc_photos:
             photos_to_sort = list(uploaded_nc_photos)
             if sort_option == "Nome (A-Z / 0-9)":
-                photos_to_sort.sort(key=lambda x: x.name.lower())
+                photos_to_sort.sort(key=chave_ordenacao_natural)
             elif sort_option == "Nome (Z-A / 9-0)":
-                photos_to_sort.sort(key=lambda x: x.name.lower(), reverse=True)
+                photos_to_sort.sort(key=chave_ordenacao_natural, reverse=True)
+            # Se for "Ordem de Upload", preserva exatamente a ordem de envio original do uploader
             st.session_state.fill_photos = photos_to_sort
+
+            # Se havia uma foto ativa antes, restaura o índice para essa mesma foto na nova ordem
+            if foto_ativa_anterior:
+                for new_idx, photo in enumerate(photos_to_sort):
+                    if photo.name == foto_ativa_anterior:
+                        st.session_state.carousel_index = new_idx
+                        break
         else:
             st.session_state.fill_photos = []
 
