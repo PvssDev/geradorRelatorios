@@ -2,15 +2,7 @@ streamlit
 pandas
 openpyxl
 pillow
-colorama
-docx2pdf
-lxml
-numpy
-python-dateutil
 python-docx
-pytz
-pywin32
-six
-tqdm
+lxml
 typing_extensions
 tzdata
