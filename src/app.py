@@ -230,7 +230,7 @@ with st.container():
                 local = st.text_input("Local (ex: TIP (RECIFE))", key="fisc_input_local_socicam", placeholder="Nome do Terminal")
         with col2:
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
-                local = st.text_input("Local (ex: TIP (RECIFE))", key="fisc_input_local_cra", placeholder="Nome do Terminal")
+                local = st.text_input("Local", key="fisc_input_local_cra", placeholder="Rota do Atlântico", help="Deixe em branco para usar o padrão 'Rota do Atlântico'")
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_cra", placeholder="Opcional")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_socicam", placeholder="Opcional")
@@ -278,9 +278,13 @@ with st.container():
         submit_fisc = st.button(f"➕ Adicionar {term_fisc}", type="primary")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
+            local_limpo = local.strip() if local else ""
+            if st.session_state.get("tipo_relatorio", "CRA") == "CRA" and not local_limpo:
+                local_limpo = "Rota do Atlântico"
+
             if not id_fisc:
                 st.error(f"O ID {term_fisc_prep} é obrigatório.")
-            elif not local.strip():
+            elif not local_limpo:
                 st.error("O campo 'Local' é obrigatório.")
             elif id_fisc.strip() in ids_existentes:
                 st.error(f"O ID {term_fisc_prep} '{id_fisc}' já está cadastrado. Por favor, utilize um ID único.")
@@ -290,7 +294,7 @@ with st.container():
                     "Data": data_fisc,
                     "Hora": hora,
                     "Cidade": cidade,
-                    "Local": local,
+                    "Local": local_limpo,
                     "Pessoal Responsável": responsaveis,
                     "Coordenador": coordenador,
                     "Contrato": contrato,
@@ -1297,7 +1301,7 @@ with st.container():
                 # Definir valores padrão por tipo de relatório
                 if tipo_rel == "CRA":
                     contrato = "CT. nº 043/2011"
-                    local_default = "=Local="
+                    local_default = "Rota do Atlântico"
                 elif tipo_rel == "CRC":
                     contrato = "CGPE-001/2006"
                     local_default = "Sistema Viário do Paiva"

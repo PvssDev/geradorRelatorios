@@ -474,8 +474,12 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         r_desc.font.name = "Aptos"
         r_desc.font.size = Pt(11)
 
+        local_val = row.get("Local", "")
+        if not local_val or str(local_val).strip() in ("", "=Local="):
+            local_val = "Rota do Atlântico"
+
         if not ncs_reais.empty:
-            criar_grade_fotos_fn(doc, ncs_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+            criar_grade_fotos_fn(doc, ncs_reais, local_val, fotos_dir, data_fisc, self.key)
         else:
             p_empty = doc.add_paragraph()
             r_empty = p_empty.add_run("Nenhuma foto de não conformidade anexada.")

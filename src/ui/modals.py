@@ -428,7 +428,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                     with col_c:
                         nova_cidade = st.text_input("Cidade", value=str(fisc_data.get("Cidade", "")), key=f"{f_key}_cidade")
                     with col_l:
-                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
+                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local", placeholder="Rota do Atlântico")
                 elif tipo == "SOCICAM":
                     novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
                     nova_hora = ""
@@ -449,10 +449,13 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                 if st.button("💾 Salvar Alterações na Fiscalização", type="primary", use_container_width=True, key=f"{f_key}_btn_save"):
                     old_id = fisc_data["ID da Fiscalização"]
                     novo_id_clean = novo_id.strip()
+                    novo_local_clean = str(novo_local).strip() if novo_local else ""
+                    if tipo == "CRA" and not novo_local_clean:
+                        novo_local_clean = "Rota do Atlântico"
                     
                     if not novo_id_clean:
                         st.error(f"O ID {term_fisc_prep} não pode ser vazio.")
-                    elif tipo in ["CRA", "SOCICAM"] and not (novo_local and str(novo_local).strip()):
+                    elif tipo == "SOCICAM" and not novo_local_clean:
                         st.error("O campo 'Local' é obrigatório.")
                     else:
                         outros_ids = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] != old_id]
@@ -463,7 +466,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             fisc_data["Data"] = nova_data
                             fisc_data["Hora"] = nova_hora
                             fisc_data["Cidade"] = nova_cidade
-                            fisc_data["Local"] = novo_local.strip() if isinstance(novo_local, str) else novo_local
+                            fisc_data["Local"] = novo_local_clean
                             fisc_data["Pessoal Responsável"] = novos_responsaveis
                             fisc_data["Coordenador"] = novo_coordenador
                             fisc_data["Período"] = novo_periodo

@@ -552,8 +552,12 @@ class CraReport(BaseReport):
         p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
         p_ap_a.paragraph_format.page_break_before = True
         
+        local_val = row.get("Local", "")
+        if not local_val or str(local_val).strip() in ("", "=Local="):
+            local_val = "Rota do Atlântico"
+
         if not ncs_reais.empty:
-            criar_grade_fotos_fn(doc, ncs_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+            criar_grade_fotos_fn(doc, ncs_reais, local_val, fotos_dir, data_fisc, self.key)
         else:
             p_empty = doc.add_paragraph()
             r_empty = p_empty.add_run("Nenhum registro fotográfico de não conformidade cadastrado.")
@@ -564,7 +568,7 @@ class CraReport(BaseReport):
         p_ap_b.paragraph_format.page_break_before = True
         
         if not pas_reais.empty:
-            criar_grade_fotos_fn(doc, pas_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+            criar_grade_fotos_fn(doc, pas_reais, local_val, fotos_dir, data_fisc, self.key)
         else:
             p_empty = doc.add_paragraph()
             r_empty = p_empty.add_run("Nenhum registro fotográfico de ponto de atenção cadastrado.")
