@@ -118,7 +118,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     parts.append(ident)
                 if trecho_val:
                     parts.append(trecho_val)
-                if desc_nc:
+                if desc_nc and desc_nc != ident:
                     parts.append(desc_nc)
                 
                 run_nc_desc = p_nc_desc.add_run(" – ".join(parts))

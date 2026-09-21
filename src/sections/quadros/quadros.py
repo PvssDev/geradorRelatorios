@@ -124,7 +124,7 @@ def agrupar_registros(df):
         found = False
         for g_rec in grouped:
             chaves = [
-                "Identificação", "Não Conformidade", "Ponto de Atenção",
+                "Não Conformidade", "Ponto de Atenção",
                 "Direção (faixa)", "Pista", "Trecho", "Observações",
                 "Fundamento da infração", "Determinação"
             ]
@@ -275,7 +275,8 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         fund = str(rec.get("Fundamento da infração", "")).strip()
         det = str(rec.get("Determinação", "")).strip()
         
-        row.cells[0].text = ident
+        # A coluna IDENTIFICAÇÃO do quadro exibe diretamente as siglas da NC/PA
+        row.cells[0].text = siglas_str if siglas_str else ident
         row.cells[1].text = desc
         row.cells[2].text = localizacao
         row.cells[3].text = fund

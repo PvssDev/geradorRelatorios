@@ -75,8 +75,6 @@ def test_gerar_relatorio_crc_pipeline(tmp_path):
     table_texts = [" ".join([c.text for row in t.rows for c in row.cells]) for t in doc.tables]
     combined_tables = " ".join(table_texts)
 
-    assert "CRC.SH015.0646+0648/2026.001" in combined_tables
-    assert "CRC.SH015.0646+0648/2026.002" in combined_tables
-    assert "Fissuras" in combined_tables or "FI" in combined_tables
+    assert "FI" in combined_tables
     assert "Tachões soltos" in combined_tables
     print("[PASS] test_gerar_relatorio_crc_pipeline")

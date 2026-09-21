@@ -18,7 +18,8 @@ from services.data_service import (
 from services.image_service import (
     obter_foto_preview,
     obter_nomes_fotos_em_nc,
-    foto_esta_em_nc
+    foto_esta_em_nc,
+    chave_ordenacao_natural
 )
 from ui.state import inicializar_estado_sessao, obter_termos_ui
 from ui.modals import (
@@ -110,16 +111,40 @@ with st.container():
         with col_sort:
             st.write("") # Alinhamento vertical discreto
             st.write("**Ordenar Fotos por:**")
-            with st.popover(f"{st.session_state.fill_photos_sort_option}", icon=":material/sort:", use_container_width=True):
-                if st.button("Nome (A-Z / 0-9)", icon=":material/arrow_upward:", use_container_width=True, key="btn_sort_asc"):
-                    st.session_state.fill_photos_sort_option = "Nome (A-Z / 0-9)"
-                    st.rerun()
-                if st.button("Nome (Z-A / 9-0)", icon=":material/arrow_downward:", use_container_width=True, key="btn_sort_desc"):
-                    st.session_state.fill_photos_sort_option = "Nome (Z-A / 9-0)"
-                    st.rerun()
-                if st.button("Ordem de Upload", icon=":material/history:", use_container_width=True, key="btn_sort_upload"):
-                    st.session_state.fill_photos_sort_option = "Ordem de Upload"
-                    st.rerun()
+            with st.popover(f"↕️ {st.session_state.fill_photos_sort_option}", use_container_width=True):
+                is_asc = st.session_state.fill_photos_sort_option == "Nome (A-Z / 0-9)"
+                is_desc = st.session_state.fill_photos_sort_option == "Nome (Z-A / 9-0)"
+                is_upload = st.session_state.fill_photos_sort_option == "Ordem de Upload"
+
+                if st.button(
+                    "Nome (A-Z / 0-9)" + ("  ✓" if is_asc else ""),
+                    type="primary" if is_asc else "secondary",
+                    use_container_width=True,
+                    key="btn_sort_asc"
+                ):
+                    if not is_asc:
+                        st.session_state.fill_photos_sort_option = "Nome (A-Z / 0-9)"
+                        st.rerun()
+
+                if st.button(
+                    "Nome (Z-A / 9-0)" + ("  ✓" if is_desc else ""),
+                    type="primary" if is_desc else "secondary",
+                    use_container_width=True,
+                    key="btn_sort_desc"
+                ):
+                    if not is_desc:
+                        st.session_state.fill_photos_sort_option = "Nome (Z-A / 9-0)"
+                        st.rerun()
+
+                if st.button(
+                    "Ordem de Upload" + ("  ✓" if is_upload else ""),
+                    type="primary" if is_upload else "secondary",
+                    use_container_width=True,
+                    key="btn_sort_upload"
+                ):
+                    if not is_upload:
+                        st.session_state.fill_photos_sort_option = "Ordem de Upload"
+                        st.rerun()
         with col_clear:
             st.write("") # Alinhamento vertical discreto
             st.write("**Limpar Fotos:**")
@@ -131,14 +156,29 @@ with st.container():
                     st.session_state.carousel_index = 0
                 st.rerun()
 
+        # Guarda a foto que estava ativa no carrossel para não perder o foco após reordenação
+        foto_ativa_anterior = None
+        if st.session_state.get("fill_photos") and "carousel_index" in st.session_state:
+            idx_anterior = st.session_state.carousel_index
+            if 0 <= idx_anterior < len(st.session_state.fill_photos):
+                foto_ativa_anterior = st.session_state.fill_photos[idx_anterior].name
+
         sort_option = st.session_state.fill_photos_sort_option
         if uploaded_nc_photos:
             photos_to_sort = list(uploaded_nc_photos)
             if sort_option == "Nome (A-Z / 0-9)":
-                photos_to_sort.sort(key=lambda x: x.name.lower())
+                photos_to_sort.sort(key=chave_ordenacao_natural)
             elif sort_option == "Nome (Z-A / 9-0)":
-                photos_to_sort.sort(key=lambda x: x.name.lower(), reverse=True)
+                photos_to_sort.sort(key=chave_ordenacao_natural, reverse=True)
+            # Se for "Ordem de Upload", preserva exatamente a ordem de envio original do uploader
             st.session_state.fill_photos = photos_to_sort
+
+            # Se havia uma foto ativa antes, restaura o índice para essa mesma foto na nova ordem
+            if foto_ativa_anterior:
+                for new_idx, photo in enumerate(photos_to_sort):
+                    if photo.name == foto_ativa_anterior:
+                        st.session_state.carousel_index = new_idx
+                        break
         else:
             st.session_state.fill_photos = []
 
@@ -875,9 +915,9 @@ with st.container():
                                         st.rerun()
             else:
                 if is_monitoring and st.session_state.get("step1_identificacao"):
-                    identificacao = st.text_input("Identificação", value=st.session_state.step1_identificacao, disabled=True)
+                    identificacao = st.session_state.step1_identificacao
                 else:
-                    identificacao = st.text_input("Identificação", key=f"nc_ident_{st.session_state.nc_form_counter}", placeholder="Identificação da infração...")
+                    identificacao = st.session_state.get("step1_nc_desc_str") or st.session_state.get("step1_pa_desc_str") or ""
                 
                 if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                     direcao_faixa = st.text_input("Direção (faixa)", key=f"nc_dir_{st.session_state.nc_form_counter}", placeholder="Direção/faixa...")
@@ -1119,7 +1159,13 @@ with st.container():
                                 if col in df_nc_only.columns:
                                     df_nc_only = df_nc_only.drop(columns=[col])
                         
-                        df_nc_only.insert(0, "Excluir", False)
+                        # Garante ordenação exata das colunas
+                        cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Não Conformidade', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
+                        for c in ['Situação', 'Foto', 'Fotos', 'Observações', 'Legenda da Foto', 'Análise ARPE']:
+                            if c in df_nc_only.columns:
+                                cols_order.append(c)
+                        cols_order = [c for c in cols_order if c in df_nc_only.columns]
+                        df_nc_only = df_nc_only[cols_order]
                         
                         edited_nc_df = st.data_editor(
                             df_nc_only,
@@ -1173,7 +1219,13 @@ with st.container():
                                 if col in df_pa_only.columns:
                                     df_pa_only = df_pa_only.drop(columns=[col])
                             
-                            df_pa_only.insert(0, "Excluir", False)
+                            # Garante ordenação exata das colunas (Ponto de Atenção após Terminal e antes de Foto)
+                            cols_order = ['Excluir', 'ID da Fiscalização', 'Nº', 'Terminal', 'Trecho', 'Pista', 'Ponto de Atenção', 'Direção (faixa)', 'Fundamento da infração', 'Determinação']
+                            for c in ['Foto', 'Fotos', 'Observações', 'Legenda da Foto']:
+                                if c in df_pa_only.columns:
+                                    cols_order.append(c)
+                            cols_order = [c for c in cols_order if c in df_pa_only.columns]
+                            df_pa_only = df_pa_only[cols_order]
                             
                             edited_pa_df = st.data_editor(
                                 df_pa_only,
@@ -1420,7 +1472,7 @@ with st.container():
                             "Legenda Anterior": "",
                             "Legenda da Foto": "=legenda da foto atual=",
                             "Observações": "=Observações=",
-                            "Identificação": "=Identificação=",
+                            "Identificação": "=Não Conformidade=",
                             "Direção (faixa)": "=Direção (faixa)=" if tipo_rel == "CRA" else "",
                             "Fundamento da infração": "=Fundamento da infração=" if tipo_rel == "CRA" else "",
                             "Determinação": "=Determinação=",

@@ -1,8 +1,36 @@
 # -*- coding: utf-8 -*-
 import io
 import os
+import re
+import unicodedata
 import streamlit as st
 from PIL import Image, ImageOps
+
+
+def chave_ordenacao_natural(item):
+    """
+    Retorna uma chave para ordenação natural (humana) de arquivos/fotos.
+    Garante que 'Foto 2' venha antes de 'Foto 10', tratando acentuação,
+    maiúsculas/minúsculas e sequências numéricas de qualquer tamanho.
+    Funciona tanto com objetos que possuem atributo 'name' (como UploadedFile)
+    quanto com strings e caminhos de arquivo.
+    """
+    if item is None:
+        return []
+    name = getattr(item, "name", str(item))
+    # Normaliza unicode para remover variações de acentuação na comparação
+    normalized = unicodedata.normalize("NFKD", name)
+    # Divide em blocos de dígitos e não-dígitos
+    parts = re.split(r"(\d+)", normalized)
+    key = []
+    for part in parts:
+        if part.isdigit():
+            # Tupla: (0, int_value, length) para ordenação numérica prioritária
+            key.append((0, int(part), len(part)))
+        else:
+            key.append((1, part.lower()))
+    return key
+
 
 
 @st.cache_data(show_spinner=False, max_entries=2000)
