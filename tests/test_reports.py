@@ -170,10 +170,62 @@ def test_crc_fiscalizacao_quadro1_non_conformities():
     print("[PASS] test_crc_fiscalizacao_quadro1_non_conformities")
 
 
+def test_cra_fiscalizacao_quadros_total_rows():
+    import pandas as pd
+    from docx import Document
+    from sections.quadros.quadros import criar_tabela_quadros
+
+    cra = get_report("CRA")
+    row = {
+        "ID da Fiscalização": "2026-001",
+        "Data": "15/07/2026",
+        "Local": "CRA"
+    }
+
+    nc_df = pd.DataFrame([
+        {
+            "ID da Fiscalização": "2026-001",
+            "Não Conformidade": "Panela",
+            "Identificação": "NC 01",
+            "Nº": 1,
+            "Fundamento da infração": "PDCL",
+            "Determinação": "Tapar"
+        },
+        {
+            "ID da Fiscalização": "2026-001",
+            "Ponto de Atenção": "Lixo",
+            "Identificação": "PA 01",
+            "Nº": 2,
+            "Fundamento da infração": "PDCL",
+            "Determinação": "Limpar"
+        }
+    ])
+
+    doc = Document()
+    cra.render_quadros(doc, row, nc_df, criar_tabela_quadros)
+
+    assert len(doc.tables) == 2, f"Esperado 2 quadros (NC e PA), obtido {len(doc.tables)}"
+
+    # Quadro 2 (NC)
+    q2 = doc.tables[0]
+    last_row_q2 = [c.text for c in q2.rows[-1].cells]
+    assert "TOTAL" in last_row_q2[0], f"Linha de total ausente no Quadro 2: {last_row_q2}"
+    assert last_row_q2[4] == "1", f"Total de NCs incorreto no Quadro 2: {last_row_q2[4]}"
+
+    # Quadro 3 (PA)
+    q3 = doc.tables[1]
+    last_row_q3 = [c.text for c in q3.rows[-1].cells]
+    assert "TOTAL" in last_row_q3[0], f"Linha de total ausente no Quadro 3: {last_row_q3}"
+    assert last_row_q3[4] == "1", f"Total de PAs incorreto no Quadro 3: {last_row_q3[4]}"
+
+    print("[PASS] test_cra_fiscalizacao_quadros_total_rows")
+
+
 if __name__ == "__main__":
     test_factory_and_registry()
     test_cra_monitoramento_mixin_behavior()
     test_socicam_monitoramento_mixin_behavior()
     test_dynamic_header_and_footer_dates()
     test_crc_fiscalizacao_quadro1_non_conformities()
+    test_cra_fiscalizacao_quadros_total_rows()
     print("\nTodos os testes de relatórios passaram com sucesso!")
