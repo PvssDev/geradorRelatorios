@@ -206,8 +206,8 @@ class BaseReport(ABC):
         pass
 
     @abstractmethod
-    def format_nc_table_total_row(self, table, row_idx, total_ncs) -> None:
-        """Formata a linha de TOTAL do Quadro 1 para este relatório."""
+    def format_nc_table_total_row(self, table, row_idx, total_ncs, col_widths=None) -> None:
+        """Formata a linha de TOTAL do Quadro para este relatório."""
         pass
 
     # Seções Finais

@@ -11,7 +11,7 @@ from sections.quadros.quadros import MAP_SIGLAS
 from ui.state import sincronizar_opcoes_nc, BASE_NC_OPTIONS
 
 
-@st.dialog("Visualização Completa da Imagem", width="large")
+@st.dialog("Visualização Completa da Imagem", width="large", icon=":material/zoom_in:")
 def mostrar_foto_modal(uploaded_file):
     if hasattr(uploaded_file, "seek"):
         try:
@@ -22,20 +22,20 @@ def mostrar_foto_modal(uploaded_file):
     st.image(uploaded_file, caption=caption, use_container_width=True)
 
 
-@st.dialog("🖼️ Galeria de Fotos do Levantamento", width="large")
+@st.dialog("Galeria de Fotos do Levantamento", width="large", icon=":material/photo_library:")
 def galeria_fotos_modal():
     from services.image_service import obter_foto_preview, obter_nomes_fotos_em_nc, foto_esta_em_nc
     
     fotos = st.session_state.get("fill_photos", [])
     if not fotos:
-        st.info("💡 Nenhuma foto disponível no momento.")
+        st.info("Nenhuma foto disponível no momento.")
         return
 
     nomes_em_nc = obter_nomes_fotos_em_nc(st.session_state.get("temp_nc", []))
 
     st.markdown(f"Clique diretamente em qualquer foto para defini-la como a foto central do carrossel (**{len(fotos)} fotos disponíveis**). As fotos com **borda cinza** e transparência já foram adicionadas a uma Não Conformidade.")
     
-    filtro = st.text_input("🔍 Filtrar fotos por nome:", placeholder="Digite parte do nome da foto...", key="input_filtro_galeria")
+    filtro = st.text_input("Filtrar fotos por nome:", placeholder="Digite parte do nome da foto...", key="input_filtro_galeria")
     
     fotos_enumeradas = list(enumerate(fotos))
     if filtro.strip():
@@ -74,9 +74,9 @@ def galeria_fotos_modal():
                         
                         badges = []
                         if is_current:
-                            badges.append("⭐ *(Atual)*")
+                            badges.append("*(Atual)*")
                         if in_nc:
-                            badges.append("⚠️ **[NC]**")
+                            badges.append("**[NC]**")
                         badge_str = f" {' '.join(badges)}" if badges else ""
 
                         st.caption(f"**#{orig_idx + 1}** {nome_curto}{badge_str}")
@@ -86,37 +86,37 @@ def galeria_fotos_modal():
                             st.rerun()
 
 
-@st.dialog("Confirmar Exclusão em Lote")
+@st.dialog("Confirmar Exclusão em Lote", icon=":material/delete:")
 def confirmar_exclusao_lote_modal(ids, term_plural_lower="fiscalizações", term_plural="Fiscalizações"):
     st.write(f"Você tem certeza que deseja excluir as seguintes {term_plural_lower}?")
     for id_fisc in ids:
         st.write(f"- **{id_fisc}**")
     st.write("Isso também removerá todas as Não Conformidades vinculadas a estes IDs.")
-    st.warning("⚠️ Esta ação não pode ser desfeita.")
+    st.warning("Esta ação não pode ser desfeita.")
     
     col_sim, col_nao = st.columns(2)
     with col_sim:
-        if st.button("Sim, Excluir", type="primary", use_container_width=True, key="btn_confirm_bulk_del"):
+        if st.button("Sim, Excluir", icon=":material/delete:", type="primary", use_container_width=True, key="btn_confirm_bulk_del"):
             st.session_state.temp_fiscalizacoes = [f for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] not in ids]
             st.session_state.temp_nc = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] not in ids]
             st.session_state.relatorios_preenchimento_data = []
             st.success(f"{term_plural} selecionadas excluídas com sucesso!")
             st.rerun()
     with col_nao:
-        if st.button("Cancelar", use_container_width=True, key="btn_cancel_bulk_del"):
+        if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_cancel_bulk_del"):
             st.rerun()
 
 
-@st.dialog("Confirmar Exclusão de Itens")
+@st.dialog("Confirmar Exclusão de Itens", icon=":material/delete:")
 def confirmar_exclusao_nc_modal(nc_keys):
     st.write("Você tem certeza que deseja excluir os seguintes itens selecionados?")
     for id_fisc, num in nc_keys:
         st.write(f"- **ID {id_fisc} - Item nº {num}**")
-    st.warning("⚠️ Esta ação não pode ser desfeita.")
+    st.warning("Esta ação não pode ser desfeita.")
     
     col_sim, col_nao = st.columns(2)
     with col_sim:
-        if st.button("Sim, Excluir", type="primary", use_container_width=True, key="btn_confirm_nc_del"):
+        if st.button("Sim, Excluir", icon=":material/delete:", type="primary", use_container_width=True, key="btn_confirm_nc_del"):
             # Mantém apenas as NCs que NÃO foram marcadas para exclusão
             st.session_state.temp_nc = [
                 nc for nc in st.session_state.temp_nc 
@@ -142,11 +142,11 @@ def confirmar_exclusao_nc_modal(nc_keys):
             st.success("Não Conformidades selecionadas excluídas com sucesso!")
             st.rerun()
     with col_nao:
-        if st.button("Cancelar", use_container_width=True, key="btn_cancel_nc_del"):
+        if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_cancel_nc_del"):
             st.rerun()
 
 
-@st.dialog("Gerenciar Pessoal Responsável")
+@st.dialog("Gerenciar Pessoal Responsável", icon=":material/group:")
 def gerenciar_responsaveis_modal(term_pessoal="pela fiscalização"):
     st.write(f"Adicione, veja ou remova os responsáveis técnicos {term_pessoal}.")
     
@@ -155,7 +155,7 @@ def gerenciar_responsaveis_modal(term_pessoal="pela fiscalização"):
     nova_matricula = st.text_input("Número de Matrícula (ex: 40672015/01)")
     nova_funcao = st.text_input("Função / Cargo (ex: Analista de Regulação)")
     
-    if st.button("➕ Adicionar Responsável", type="primary", use_container_width=True):
+    if st.button("Adicionar Responsável", icon=":material/add:", type="primary", use_container_width=True):
         if not novo_resp.strip():
             st.error("O nome do responsável é obrigatório.")
         elif not nova_matricula.strip():
@@ -188,13 +188,13 @@ def gerenciar_responsaveis_modal(term_pessoal="pela fiscalização"):
             with col_name:
                 st.markdown(f"- **{resp['nome']}**  \n  *{resp['funcao']} - Matrícula: {resp['matricula']}*")
             with col_del:
-                if st.button("🗑️", key=f"del_resp_{idx}", help="Remover responsável"):
+                if st.button("", icon=":material/delete:", key=f"del_resp_{idx}", help="Remover responsável"):
                     st.session_state.pessoal_responsaveis.pop(idx)
                     salvar_responsaveis(st.session_state.pessoal_responsaveis)
                     st.rerun()
 
 
-@st.dialog("Gerenciar Coordenadores")
+@st.dialog("Gerenciar Coordenadores", icon=":material/manage_accounts:")
 def gerenciar_coordenadores_modal(term_prep_f="de fiscalização"):
     st.write(f"Adicione, veja ou remova os coordenadores {term_prep_f.lower()}.")
     
@@ -203,7 +203,7 @@ def gerenciar_coordenadores_modal(term_prep_f="de fiscalização"):
     nova_matricula = st.text_input("Número de Matrícula (ex: 209640/01)")
     nova_funcao = st.text_input("Função / Cargo (ex: Coordenador(a) de Transportes e Rodovias)")
     
-    if st.button("➕ Adicionar Coordenador", type="primary", use_container_width=True):
+    if st.button("Adicionar Coordenador", icon=":material/add:", type="primary", use_container_width=True):
         if not novo_coord.strip():
             st.error("O nome do coordenador é obrigatório.")
         elif not nova_matricula.strip():
@@ -236,19 +236,19 @@ def gerenciar_coordenadores_modal(term_prep_f="de fiscalização"):
             with col_name:
                 st.markdown(f"- **{coord['nome']}**  \n  *{coord['funcao']} - Matrícula: {coord['matricula']}*")
             with col_del:
-                if st.button("🗑️", key=f"del_coord_{idx}", help="Remover coordenador"):
+                if st.button("", icon=":material/delete:", key=f"del_coord_{idx}", help="Remover coordenador"):
                     st.session_state.coordenadores.pop(idx)
                     salvar_coordenadores(st.session_state.coordenadores)
                     st.rerun()
 
 
-@st.dialog("Gerenciar Contratos")
+@st.dialog("Gerenciar Contratos", icon=":material/assignment:")
 def gerenciar_contratos_modal():
     st.write("Adicione, veja ou remova os números de contrato cadastrados.")
     
     # 1. Input para adicionar novo
     novo_contrato = st.text_input("Número do Novo Contrato")
-    if st.button("➕ Adicionar Contrato", type="primary", use_container_width=True):
+    if st.button("Adicionar Contrato", icon=":material/add:", type="primary", use_container_width=True):
         if novo_contrato.strip():
             if novo_contrato.strip() not in st.session_state.contratos:
                 st.session_state.contratos.append(novo_contrato.strip())
@@ -260,7 +260,7 @@ def gerenciar_contratos_modal():
                 st.rerun()
 
 
-@st.dialog("Adicionar Não Conformidade Personalizada")
+@st.dialog("Adicionar Não Conformidade Personalizada", icon=":material/add_circle:")
 def adicionar_nc_personalizada_modal(pills_key, is_socicam=False):
     prefix_key = "socicam_" if is_socicam else "norm_"
     st.write("Selecione uma Não Conformidade criada anteriormente ou cadastre uma nova:")
@@ -289,7 +289,7 @@ def adicionar_nc_personalizada_modal(pills_key, is_socicam=False):
                         st.session_state[pills_key] = current_sel + [val_to_select]
                     st.rerun()
             with col_del:
-                if st.button("🗑️", key=f"del_custom_nc_{prefix_key}{idx}", help="Apagar esta não conformidade permanentemente"):
+                if st.button("", icon=":material/delete:", key=f"del_custom_nc_{prefix_key}{idx}", help="Apagar esta não conformidade permanentemente"):
                     del_item = custom_ncs.pop(idx)
                     if is_socicam:
                         salvar_custom_ncs_socicam(st.session_state.custom_ncs_socicam)
@@ -319,7 +319,7 @@ def adicionar_nc_personalizada_modal(pills_key, is_socicam=False):
     
     col_salvar, col_cancelar = st.columns(2)
     with col_salvar:
-        if st.button("Cadastrar e Selecionar", type="primary", use_container_width=True, key=f"btn_confirm_add_custom_nc_{prefix_key}"):
+        if st.button("Cadastrar e Selecionar", icon=":material/check:", type="primary", use_container_width=True, key=f"btn_confirm_add_custom_nc_{prefix_key}"):
             desc_strip = nova_desc.strip()
             sigla_strip = nova_sigla.strip().upper()
             
@@ -348,7 +348,7 @@ def adicionar_nc_personalizada_modal(pills_key, is_socicam=False):
                 st.rerun()
                     
     with col_cancelar:
-        if st.button("Cancelar", use_container_width=True, key=f"btn_cancel_add_custom_nc_{prefix_key}"):
+        if st.button("Cancelar", icon=":material/close:", use_container_width=True, key=f"btn_cancel_add_custom_nc_{prefix_key}"):
             st.rerun()
 
 
@@ -377,11 +377,11 @@ def obter_lista_siglas_atuais(val) -> list:
     return [str(x).strip() for x in str(val).split(",") if str(x).strip()]
 
 
-@st.dialog("Editar Dados Registrados", width="large")
+@st.dialog("Editar Dados Registrados", width="large", icon=":material/edit:")
 def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, term_fisc="Fiscalização", term_fisc_prep="da Fiscalização", term_fisc_plural="Fiscalizações"):
     if not st.session_state.temp_fiscalizacoes and not st.session_state.temp_nc:
         st.info("Nenhum dado cadastrado para edição.")
-        if st.button("Fechar", use_container_width=True, key="btn_close_edit_modal_empty"):
+        if st.button("Fechar", icon=":material/close:", use_container_width=True, key="btn_close_edit_modal_empty"):
             st.rerun()
         return
 
@@ -390,8 +390,8 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
 
     st.write(f"Edite as informações registradas para **{tipo} ({'Monitoramento' if is_mon else 'Fiscalização'})**.")
 
-    label_nc_tab = "⚠️ Não Conformidades" if tipo in ["CRC", "SOCICAM"] or is_mon else "⚠️ Não Conformidades e Pontos de Atenção"
-    tab_fisc, tab_nc = st.tabs([f"📌 {term_fisc_plural}", label_nc_tab])
+    label_nc_tab = "Não Conformidades" if tipo in ["CRC", "SOCICAM"] or is_mon else "Não Conformidades e Pontos de Atenção"
+    tab_fisc, tab_nc = st.tabs([f":material/location_on: {term_fisc_plural}", f":material/warning: {label_nc_tab}"])
 
     # -------------------------------------------------------------
     # TAB 1: EDITAR FISCALIZAÇÃO / MONITORAMENTO
@@ -428,7 +428,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                     with col_c:
                         nova_cidade = st.text_input("Cidade", value=str(fisc_data.get("Cidade", "")), key=f"{f_key}_cidade")
                     with col_l:
-                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
+                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local", placeholder="Rota do Atlântico")
                 elif tipo == "SOCICAM":
                     novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
                     nova_hora = ""
@@ -446,13 +446,16 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                 
                 novo_periodo = st.text_input("Período", value=str(fisc_data.get("Período", "")), key=f"{f_key}_periodo")
 
-                if st.button("💾 Salvar Alterações na Fiscalização", type="primary", use_container_width=True, key=f"{f_key}_btn_save"):
+                if st.button("Salvar Alterações na Fiscalização", icon=":material/save:", type="primary", use_container_width=True, key=f"{f_key}_btn_save"):
                     old_id = fisc_data["ID da Fiscalização"]
                     novo_id_clean = novo_id.strip()
+                    novo_local_clean = str(novo_local).strip() if novo_local else ""
+                    if tipo == "CRA" and not novo_local_clean:
+                        novo_local_clean = "Rota do Atlântico"
                     
                     if not novo_id_clean:
                         st.error(f"O ID {term_fisc_prep} não pode ser vazio.")
-                    elif tipo in ["CRA", "SOCICAM"] and not (novo_local and str(novo_local).strip()):
+                    elif tipo == "SOCICAM" and not novo_local_clean:
                         st.error("O campo 'Local' é obrigatório.")
                     else:
                         outros_ids = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] != old_id]
@@ -463,7 +466,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             fisc_data["Data"] = nova_data
                             fisc_data["Hora"] = nova_hora
                             fisc_data["Cidade"] = nova_cidade
-                            fisc_data["Local"] = novo_local.strip() if isinstance(novo_local, str) else novo_local
+                            fisc_data["Local"] = novo_local_clean
                             fisc_data["Pessoal Responsável"] = novos_responsaveis
                             fisc_data["Coordenador"] = novo_coordenador
                             fisc_data["Período"] = novo_periodo
@@ -537,7 +540,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         edit_observacoes = st.text_area("CONSTATAÇÃO", value=str(nc_target.get("Observações", "")), height=110, key=f"{nc_key_prefix}_observacoes")
                         edit_analise_arpe = st.text_area("ANÁLISE ARPE", value=str(nc_target.get("Análise ARPE", "")), height=110, key=f"{nc_key_prefix}_analise_arpe")
 
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
+                        if st.button("Salvar Alterações", icon=":material/save:", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Situação"] = edit_situacao
                             nc_target["Determinação"] = edit_determinacao
                             nc_target["Observações"] = edit_observacoes
@@ -581,7 +584,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             )
                         with col_add:
                             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                            if st.button("➕", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
+                            if st.button("", icon=":material/add:", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
                                 adicionar_nc_personalizada_modal(f"{nc_key_prefix}_nc_multiselect", is_socicam=False)
 
                         edit_nc_desc = ", ".join(edit_selected_siglas)
@@ -594,7 +597,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
 
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
+                        if st.button("Salvar Alterações", icon=":material/save:", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Pista"] = edit_pista
                             nc_target["Trecho"] = edit_trecho
                             nc_target["Situação"] = edit_situacao
@@ -653,7 +656,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                                 )
                             with col_add:
                                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                                if st.button("➕", key=f"{nc_key_prefix}_btn_custom_pa", help="Adicionar Não Conformidade Personalizada"):
+                                if st.button("", icon=":material/add:", key=f"{nc_key_prefix}_btn_custom_pa", help="Adicionar Não Conformidade Personalizada"):
                                     adicionar_nc_personalizada_modal(f"{nc_key_prefix}_pa_multiselect", is_socicam=False)
 
                             edit_pa_desc = ", ".join(edit_selected_siglas)
@@ -677,7 +680,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                                 )
                             with col_add:
                                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                                if st.button("➕", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
+                                if st.button("", icon=":material/add:", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
                                     adicionar_nc_personalizada_modal(f"{nc_key_prefix}_nc_multiselect", is_socicam=False)
 
                             edit_nc_desc = ", ".join(edit_selected_siglas)
@@ -691,7 +694,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
 
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
+                        if st.button("Salvar Alterações", icon=":material/save:", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Pista"] = edit_pista
                             nc_target["Trecho"] = edit_trecho
                             if edit_is_pa:
@@ -736,7 +739,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             )
                         with col_add:
                             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                            if st.button("➕", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
+                            if st.button("", icon=":material/add:", key=f"{nc_key_prefix}_btn_custom_nc", help="Adicionar Não Conformidade Personalizada"):
                                 adicionar_nc_personalizada_modal(f"{nc_key_prefix}_nc_multiselect", is_socicam=is_soc)
 
                         edit_nc_desc = ", ".join(edit_selected_siglas)
@@ -747,7 +750,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
 
-                        if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
+                        if st.button("Salvar Alterações", icon=":material/save:", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Não Conformidade"] = edit_nc_desc
                             nc_target["Observações"] = edit_observacoes
                             if "Legenda da Foto" in nc_target:

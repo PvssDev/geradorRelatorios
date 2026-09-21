@@ -503,15 +503,15 @@ class CraReport(BaseReport):
     def nc_table_col_widths(self) -> list:
         return [Inches(1.40), Inches(1.40), Inches(1.22), Inches(1.69), Inches(1.56)]
 
-    def format_nc_table_total_row(self, table, row_idx, total_ncs) -> None:
+    def format_nc_table_total_row(self, table, row_idx, total_ncs, col_widths=None) -> None:
         r_total = table.rows[row_idx]
         r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2]).merge(r_total.cells[3])
         r_total.cells[0].text = "TOTAL"
         r_total.cells[4].text = str(total_ncs)
         
-        col_widths = self.nc_table_col_widths
-        r_total.cells[0].width = col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3]
-        r_total.cells[4].width = col_widths[4]
+        widths = col_widths if col_widths is not None else self.nc_table_col_widths
+        r_total.cells[0].width = widths[0] + widths[1] + widths[2] + widths[3]
+        r_total.cells[4].width = widths[4]
 
     @property
     def finalizacao_sections_config(self) -> dict:
@@ -552,8 +552,12 @@ class CraReport(BaseReport):
         p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
         p_ap_a.paragraph_format.page_break_before = True
         
+        local_val = row.get("Local", "")
+        if not local_val or str(local_val).strip() in ("", "=Local="):
+            local_val = "Rota do Atlântico"
+
         if not ncs_reais.empty:
-            criar_grade_fotos_fn(doc, ncs_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+            criar_grade_fotos_fn(doc, ncs_reais, local_val, fotos_dir, data_fisc, self.key)
         else:
             p_empty = doc.add_paragraph()
             r_empty = p_empty.add_run("Nenhum registro fotográfico de não conformidade cadastrado.")
@@ -564,7 +568,7 @@ class CraReport(BaseReport):
         p_ap_b.paragraph_format.page_break_before = True
         
         if not pas_reais.empty:
-            criar_grade_fotos_fn(doc, pas_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+            criar_grade_fotos_fn(doc, pas_reais, local_val, fotos_dir, data_fisc, self.key)
         else:
             p_empty = doc.add_paragraph()
             r_empty = p_empty.add_run("Nenhum registro fotográfico de ponto de atenção cadastrado.")

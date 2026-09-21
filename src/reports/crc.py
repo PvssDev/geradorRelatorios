@@ -284,17 +284,17 @@ class CrcReport(BaseReport):
     def nc_table_col_widths(self) -> list:
         return [Inches(1.34), Inches(1.68), Inches(0.81), Inches(2.46), Inches(0.98)]
 
-    def format_nc_table_total_row(self, table, row_idx, total_ncs) -> None:
+    def format_nc_table_total_row(self, table, row_idx, total_ncs, col_widths=None) -> None:
         r_total = table.rows[row_idx]
         r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2])
         r_total.cells[0].text = "TOTAL"
         r_total.cells[3].text = ""
         r_total.cells[4].text = str(total_ncs)
         
-        col_widths = self.nc_table_col_widths
-        r_total.cells[0].width = col_widths[0] + col_widths[1] + col_widths[2]
-        r_total.cells[3].width = col_widths[3]
-        r_total.cells[4].width = col_widths[4]
+        widths = col_widths if col_widths is not None else self.nc_table_col_widths
+        r_total.cells[0].width = widths[0] + widths[1] + widths[2]
+        r_total.cells[3].width = widths[3]
+        r_total.cells[4].width = widths[4]
 
     @property
     def finalizacao_sections_config(self) -> dict:

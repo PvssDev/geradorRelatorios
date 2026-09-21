@@ -306,14 +306,18 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         for c_idx, cell in enumerate(row.cells):
             cell.width = col_widths[c_idx]
 
-    if report_config.key in ["CRC", "SOCICAM"] and not is_pa:
+    if report_config.key in ["CRC", "SOCICAM", "CRA"]:
         # Add TOTAL row
         r_total = table.add_row()
-        report_config.format_nc_table_total_row(table, len(table.rows) - 1, num_rows)
+        report_config.format_nc_table_total_row(table, len(table.rows) - 1, num_rows, col_widths=col_widths)
         
         # Format the cells
-        for c_idx, cell in enumerate(r_total.cells):
-            set_cell_shading(cell, "D9D9D9")
+        seen_cells = set()
+        for cell in r_total.cells:
+            if cell._tc in seen_cells:
+                continue
+            seen_cells.add(cell._tc)
+            set_cell_shading(cell, header_color)
             set_cell_margins(cell, top=100, bottom=100, left=150, right=150)
             cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
             
