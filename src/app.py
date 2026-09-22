@@ -36,13 +36,43 @@ from ui.modals import (
 
 st.set_page_config(page_title="Gerador de Relatórios", layout="wide")
 
+@st.cache_data
+def _obter_fundo_base64(filename: str, opacity: float = 0.35):
+    import os
+    import io
+    import base64
+    img_path = os.path.join(os.path.dirname(__file__), "assets", filename)
+    if not os.path.exists(img_path):
+        return ""
+    try:
+        from PIL import Image
+        with Image.open(img_path) as img:
+            img = img.convert("RGBA")
+            r, g, b, a = img.split()
+            a = a.point(lambda p: int(p * opacity))
+            img.putalpha(a)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return base64.b64encode(buf.getvalue()).decode("utf-8")
+    except Exception:
+        with open(img_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
 def inject_custom_theme_css():
     import os
     css_path = os.path.join(os.path.dirname(__file__), "style.css")
+    fundo1_b64 = _obter_fundo_base64("fundo1.png", opacity=0.38)
+    fundo2_b64 = _obter_fundo_base64("fundo2.png", opacity=0.28)
+    bg_vars = []
+    if fundo1_b64:
+        bg_vars.append(f"--bg-fundo1: url('data:image/png;base64,{fundo1_b64}');")
+    if fundo2_b64:
+        bg_vars.append(f"--bg-fundo2: url('data:image/png;base64,{fundo2_b64}');")
+    bg_var_str = f":root {{ {' '.join(bg_vars)} }}" if bg_vars else ""
     if os.path.exists(css_path):
         with open(css_path, "r", encoding="utf-8") as f:
             css_content = f.read()
-        st.html(f"<style>{css_content}</style>")
+        st.html(f"<style>{bg_var_str}\n{css_content}</style>")
 
 inject_custom_theme_css()
 
