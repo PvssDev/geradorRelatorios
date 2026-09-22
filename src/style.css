@@ -11,9 +11,40 @@ div[data-testid="stVerticalBlock"] {
 }
 
 /* ==========================================
+   CABEÇALHO NATIVO DO STREAMLIT FIXO NO TOPO
+   Permanece fixo no topo ao rolar a página
+   ========================================== */
+header[data-testid="stHeader"],
+[data-testid="stHeader"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    z-index: 999999 !important;
+    background-color: #D7D8D9 !important;
+}
+
+/* ==========================================
    FUNDO DA APLICAÇÃO E TIPOGRAFIA
    Paleta: #D7D8D9 (mais clara), #2F5173, #0D2740, #011A33 (mais escura)
    ========================================== */
+
+/* Fundo decorativo aplicado nativamente como background da página (sempre atrás de botões, containers e palavras) */
+.stApp,
+[data-testid="stAppViewContainer"] {
+    background-color: #D7D8D9 !important;
+    background-image: var(--bg-fundo1), var(--bg-fundo2) !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-position: -16vw calc(50% + 50vh), calc(100% + 20vw) calc(100% + 5vh) !important;
+    background-size: clamp(520px, 48vw, 850px) auto, clamp(480px, 44vw, 750px) auto !important;
+    background-attachment: fixed, fixed !important;
+}
+
+[data-testid="stAppViewContainer"]>section {
+    background-color: transparent !important;
+}
+
 h2,
 h3,
 h4,
@@ -178,11 +209,7 @@ details summary:hover {
 /* ==========================================
    MENSAGENS INFORMATIVAS E ALERTAS (st.info)
    ========================================== */
-div[data-testid="stAlert"],
-div[data-testid="stAlert"]>div,
-div[data-testid="stAlert"] [data-testid*="stNotificationContent"],
-div[data-testid="stAlert"] [role="alert"],
-div[data-testid="stNotificationContentInfo"] {
+div[data-testid="stAlert"] {
     background-color: #D7D8D9 !important;
     background: #D7D8D9 !important;
     border: 1px solid #2F5173 !important;
@@ -190,6 +217,20 @@ div[data-testid="stNotificationContentInfo"] {
     border-radius: 8px !important;
     color: #011A33 !important;
     box-shadow: none !important;
+}
+
+div[data-testid="stAlert"]>div,
+div[data-testid="stAlert"] [data-testid*="stNotificationContent"],
+div[data-testid="stAlert"] [role="alert"],
+div[data-testid="stNotificationContentInfo"],
+div[data-testid="stNotificationContentSuccess"],
+div[data-testid="stNotificationContentError"],
+div[data-testid="stNotificationContentWarning"] {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
 }
 
 div[data-testid="stAlert"] p,
@@ -210,9 +251,7 @@ div[data-testid="stAlert"] svg {
 }
 
 /* Alerta de Sucesso */
-div[data-testid="stAlert"]:has([data-testid*="Success"]),
-div[data-testid="stAlert"]:has([data-testid*="Success"])>div,
-div[data-testid="stNotificationContentSuccess"] {
+div[data-testid="stAlert"]:has([data-testid*="Success"]) {
     background-color: #D7D8D9 !important;
     background: #D7D8D9 !important;
     border: 1px solid #2F5173 !important;
@@ -226,9 +265,7 @@ div[data-testid="stAlert"]:has([data-testid*="Success"]) span {
 }
 
 /* Alerta de Erro */
-div[data-testid="stAlert"]:has([data-testid*="Error"]),
-div[data-testid="stAlert"]:has([data-testid*="Error"])>div,
-div[data-testid="stNotificationContentError"] {
+div[data-testid="stAlert"]:has([data-testid*="Error"]) {
     background-color: #D7D8D9 !important;
     background: #D7D8D9 !important;
     border: 1px solid #0D2740 !important;
@@ -242,9 +279,7 @@ div[data-testid="stAlert"]:has([data-testid*="Error"]) span {
 }
 
 /* Alerta de Atenção */
-div[data-testid="stAlert"]:has([data-testid*="Warning"]),
-div[data-testid="stAlert"]:has([data-testid*="Warning"])>div,
-div[data-testid="stNotificationContentWarning"] {
+div[data-testid="stAlert"]:has([data-testid*="Warning"]) {
     background-color: #D7D8D9 !important;
     background: #D7D8D9 !important;
     border: 1px solid #011A33 !important;
@@ -576,11 +611,22 @@ div[data-baseweb="input"] {
     background-color: #D7D8D9 !important;
     border: 1.5px solid #2F5173 !important;
     border-radius: 6px !important;
+    overflow: hidden !important;
+}
+
+div[data-baseweb="input"] div,
+div[data-baseweb="input"] [data-baseweb="base-input"] {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* Elemento input em si */
 div[data-baseweb="input"] input {
     background-color: #D7D8D9 !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
     color: #011A33 !important;
     caret-color: #011A33 !important;
 }
@@ -596,11 +642,22 @@ div[data-baseweb="textarea"] {
     background-color: #D7D8D9 !important;
     border: 1.5px solid #2F5173 !important;
     border-radius: 6px !important;
+    overflow: hidden !important;
+}
+
+div[data-baseweb="textarea"] div,
+div[data-baseweb="textarea"] [data-baseweb="base-input"] {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* Elemento textarea em si */
 div[data-baseweb="textarea"] textarea {
     background-color: #D7D8D9 !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
     color: #011A33 !important;
     caret-color: #011A33 !important;
 }
