@@ -3,7 +3,7 @@
 primaryColor = "#aab2b9ff"
 
 # Fundo principal da aplicação
-backgroundColor = "#D7D8D9"
+backgroundColor = "#c9d2dbff"
 
 # Fundo secundário (usado em inputs, textareas, pills não selecionadas)
 secondaryBackgroundColor = "#D7D8D9"
