@@ -22,7 +22,7 @@ header[data-testid="stHeader"],
     right: 0 !important;
     width: 100% !important;
     z-index: 999999 !important;
-    background-color: #D7D8D9 !important;
+    background-color: #d7e6f0 !important;
 }
 
 /* ==========================================
@@ -33,7 +33,7 @@ header[data-testid="stHeader"],
 /* Fundo decorativo aplicado nativamente como background da página (sempre atrás de botões, containers e palavras) */
 .stApp,
 [data-testid="stAppViewContainer"] {
-    background-color: #D7D8D9 !important;
+    background-color: #d7e6f0 !important;
     background-image: var(--bg-fundo1), var(--bg-fundo2) !important;
     background-repeat: no-repeat, no-repeat !important;
     background-position: -16vw calc(50% + 50vh), calc(100% + 20vw) calc(100% + 5vh) !important;
