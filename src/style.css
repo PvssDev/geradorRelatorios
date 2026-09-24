@@ -168,7 +168,7 @@ div[class*="st-key-btn_view_"] button:hover [data-testid="stIconMaterial"] {
     border-radius: 12px !important;
     margin: 16px 4px !important;
     overflow: visible !important;
-    background-color: #e5e8eb !important;
+    background-color: #dfe5eb !important;
     border: 1.5px solid #2F5173 !important;
     box-shadow: 0 4px 12px rgba(13, 39, 64, 0.12) !important;
     transition: box-shadow 0.3s ease, transform 0.3s ease !important;
@@ -701,6 +701,13 @@ div[data-baseweb="menu"] li:hover {
     align-items: center !important;
     justify-content: center !important;
     text-align: center !important;
+}
+
+.st-key-fisc_carousel_container iframe {
+    width: 100% !important;
+    border: none !important;
+    background: transparent !important;
+    overflow: visible !important;
 }
 
 /* Fotos laterais (Anterior e Posterior) */

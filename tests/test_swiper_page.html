@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Teste Swiper</title>
+</head>
+<body style="background: #111; padding: 20px;">
+  <div id="logs" style="color: lime; font-family: monospace; height: 100px; overflow: auto; background: #222; padding: 10px; margin-bottom: 20px;">Logs:</div>
+  <iframe id="swiperFrame" src="../src/ui/components/swiper/index.html" style="width: 100%; height: 380px; border: 1px solid #444;"></iframe>
+
+  <script>
+    const logs = document.getElementById('logs');
+    function log(msg) {
+      logs.innerHTML += '<br>' + msg;
+      logs.scrollTop = logs.scrollHeight;
+      console.log(msg);
+    }
+
+    const frame = document.getElementById('swiperFrame');
+    
+    // SVG de teste com números bem visíveis
+    function makeDummySvg(num, color) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+        <rect width="100%" height="100%" fill="${color}"/>
+        <text x="50%" y="50%" font-size="64" font-weight="bold" fill="white" dominant-baseline="middle" text-anchor="middle">Foto ${num}</text>
+      </svg>`;
+      return "data:image/svg+xml;base64," + btoa(svg);
+    }
+
+    const photos = [
+      { name: "Foto 1", is_nc: false, src: makeDummySvg(1, "#2563eb") },
+      { name: "Foto 2", is_nc: true,  src: makeDummySvg(2, "#dc2626") },
+      { name: "Foto 3", is_nc: false, src: makeDummySvg(3, "#16a34a") },
+      { name: "Foto 4", is_nc: false, src: makeDummySvg(4, "#d97706") }
+    ];
+
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.isStreamlitMessage) {
+        log("Mensagem recebida do componente: " + JSON.stringify(e.data));
+        if (e.data.type === "streamlit:componentReady") {
+          log("Enviando render com 4 fotos e activeIndex 0...");
+          frame.contentWindow.postMessage({
+            type: "streamlit:render",
+            args: {
+              photos: photos,
+              currentIndex: 0
+            }
+          }, "*");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
