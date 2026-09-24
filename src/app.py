@@ -33,6 +33,7 @@ from ui.modals import (
     adicionar_nc_personalizada_modal,
     editar_registros_relatorio_modal
 )
+from ui.components.swiper import render_swiper_carousel
 
 st.set_page_config(page_title="Gerador de Relatórios", layout="wide")
 
@@ -516,70 +517,45 @@ with st.container():
                         foto_default = ""
             elif st.session_state.fill_photos:
                 with st.container(key="fisc_carousel_container"):
-                    st.markdown("<h3 style='text-align: center; margin: 0 0 14px 0;'><span class='material-symbols-rounded' style='vertical-align: -3px; margin-right: 6px;'>photo_library</span>Carrossel de Fotos</h3>", unsafe_allow_html=True)
-                    idx = st.session_state.carousel_index
+                    st.markdown("<h3 style='text-align: center; margin: 0 0 10px 0;'><span class='material-symbols-rounded' style='vertical-align: -3px; margin-right: 6px;'>photo_library</span>Carrossel de Fotos</h3>", unsafe_allow_html=True)
                     total_photos = len(st.session_state.fill_photos)
-                    idx = min(idx, total_photos - 1)
-                    idx = max(0, idx)
-                    current_photo = st.session_state.fill_photos[idx]
-                
-                    # Palco do Carrossel com 3 colunas simétricas: Foto Anterior | Foto Central Ativa | Foto Posterior
-                    col_side_left, col_main, col_side_right = st.columns([1, 2.5, 1], vertical_alignment="center")
-                    
-                    with col_side_left:
-                        with st.container(key="fisc_carousel_side_left"):
-                            if idx > 0:
-                                prev_side_photo = st.session_state.fill_photos[idx - 1]
-                                prev_side_thumb = obter_foto_preview(prev_side_photo, max_size=(260, 195))
-                                st.image(prev_side_thumb, use_container_width=True)
-                            else:
-                                st.markdown("<div style='min-height: 120px;'></div>", unsafe_allow_html=True)
-                    
+                    idx = min(max(0, st.session_state.carousel_index), total_photos - 1)
                     nomes_em_nc = obter_nomes_fotos_em_nc(st.session_state.get("temp_nc", []))
-                    is_current_in_nc = foto_esta_em_nc(current_photo, nomes_em_nc)
 
-                    with col_main:
-                        container_key = "fisc_carousel_main_side_nc" if is_current_in_nc else "fisc_carousel_main_side"
-                        with st.container(key=container_key):
-                            preview_image = obter_foto_preview(current_photo, max_size=(380, 285))
-                            caption_text = f"Foto {idx + 1} de {total_photos}: {current_photo.name}"
-                            if is_current_in_nc:
-                                caption_text += " • (Adicionada em NC)"
-                            st.image(preview_image, caption=caption_text, use_container_width=True)
-                    
-                    with col_side_right:
-                        with st.container(key="fisc_carousel_side_right"):
-                            if idx < total_photos - 1:
-                                next_side_photo = st.session_state.fill_photos[idx + 1]
-                                next_side_thumb = obter_foto_preview(next_side_photo, max_size=(260, 195))
-                                st.image(next_side_thumb, use_container_width=True)
-                            else:
-                                st.markdown("<div style='min-height: 120px;'></div>", unsafe_allow_html=True)
-                    
-                    # Controles de Navegação alinhados exatamente no mesmo eixo central da foto
-                    _, col_controls, _ = st.columns([1, 2.5, 1])
-                    with col_controls:
-                        with st.container(key="fisc_carousel_controls"):
+                    # Carrossel Swiper com arraste suave, física fluida e transição 3D
+                    selected_idx = render_swiper_carousel(
+                        photos=st.session_state.fill_photos,
+                        current_index=idx,
+                        nomes_em_nc=nomes_em_nc,
+                        key="fisc_swiper_carousel"
+                    )
+
+                    st.session_state.carousel_index = selected_idx
+                    current_photo = st.session_state.fill_photos[selected_idx]
+
+                    # Ações de suporte e atalhos rápidos do carrossel
+                    with st.container(key="fisc_carousel_controls"):
+                        ctrl_col1, ctrl_col2 = st.columns(2)
+                        with ctrl_col1:
+                            st.button(
+                                "Ampliar Foto",
+                                icon=":material/zoom_in:",
+                                on_click=mostrar_foto_modal,
+                                args=(current_photo,),
+                                key=f"btn_zoom_current_{selected_idx}_{st.session_state.nc_form_counter}",
+                                use_container_width=True
+                            )
+                        with ctrl_col2:
                             if st.button("Ver todas as fotos", icon=":material/photo_library:", key="btn_ver_todas_fotos", use_container_width=True):
                                 galeria_fotos_modal()
-                    
-                            nav_col1, nav_col2 = st.columns(2)
-                            with nav_col1:
-                                if st.button("Anterior", icon=":material/arrow_back:", disabled=(idx == 0), key="btn_prev_photo", use_container_width=True):
-                                    st.session_state.carousel_index = idx - 1
-                                    st.rerun()
-                            with nav_col2:
-                                if st.button("Próxima", icon=":material/arrow_forward:", disabled=(idx == total_photos - 1), key="btn_next_photo", use_container_width=True):
-                                    st.session_state.carousel_index = idx + 1
-                                    st.rerun()
-                    
-                            st.checkbox(
-                                "Avançar foto automaticamente",
-                                value=True,
-                                key="auto_advance_active",
-                                help="Avança para a próxima foto do carrossel ao adicionar o Registro"
-                            )
-                
+
+                        st.checkbox(
+                            "Avançar foto automaticamente",
+                            value=True,
+                            key="auto_advance_active",
+                            help="Avança para a próxima foto do carrossel ao adicionar o Registro"
+                        )
+
                     foto_default = current_photo.name
             else:
                 with st.container(key="fisc_carousel_container"):
