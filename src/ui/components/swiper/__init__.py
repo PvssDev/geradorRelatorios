@@ -95,11 +95,21 @@ def render_swiper_carousel(
 
     # Rastreamento de sincronismo para evitar saltos indesejados
     last_synced_key = f"{key}_last_synced"
+    photos_count_key = f"{key}_last_photo_count"
     last_synced = st.session_state.get(last_synced_key, None)
     comp_val = st.session_state.get(key, None)
+    prev_count = st.session_state.get(photos_count_key, 0)
 
-    # Se o componente acabou de disparar um novo valor pelo arraste do usuário
-    if isinstance(comp_val, int) and 0 <= comp_val < total:
+    # Detecta se a lista de fotos mudou (ex: novo upload)
+    photos_changed = prev_count != total
+    st.session_state[photos_count_key] = total
+
+    if photos_changed:
+        # Fotos mudaram: reseta o tracking para evitar loop de rerun
+        # com o valor antigo do componente apontando para índice stale
+        st.session_state[last_synced_key] = current_index
+        last_synced = current_index
+    elif isinstance(comp_val, int) and 0 <= comp_val < total:
         if last_synced is not None and comp_val != last_synced:
             # O usuário arrastou no frontend: adota imediatamente o índice do frontend
             current_index = comp_val

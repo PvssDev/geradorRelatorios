@@ -33,7 +33,7 @@ def galeria_fotos_modal():
 
     nomes_em_nc = obter_nomes_fotos_em_nc(st.session_state.get("temp_nc", []))
 
-    st.markdown(f"Clique diretamente em qualquer foto para defini-la como a foto central do carrossel (**{len(fotos)} fotos disponíveis**). As fotos com **borda cinza** e transparência já foram adicionadas a uma Não Conformidade.")
+    st.markdown(f"Clique diretamente em qualquer foto para defini-la como a foto central do carrossel (**{len(fotos)} fotos disponíveis**). As fotos **apagadas** já foram adicionadas a uma Não Conformidade.")
     
     filtro = st.text_input("Filtrar fotos por nome:", placeholder="Digite parte do nome da foto...", key="input_filtro_galeria")
     
@@ -73,8 +73,10 @@ def galeria_fotos_modal():
                         nome_curto = nome[:16] + "..." if len(nome) > 19 else nome
                         
                         badges = []
-                        if is_current:
-                            badges.append("*(Atual)*")
+                        if is_current and in_nc:
+                            badges.append(":material/warning:")
+                        elif is_current:
+                            badges.append(":material/push_pin:")
                         if in_nc:
                             badges.append("**[NC]**")
                         badge_str = f" {' '.join(badges)}" if badges else ""
