@@ -300,6 +300,7 @@
     let currentPhotosHash = "";
     let isInternalUpdate = false;
     let lastReportedIndex = -1;
+    let isDestroying = false;
 
     function renderSlides(photos, activeIndex) {
       const container = document.getElementById("swiperSlidesContainer");
@@ -325,7 +326,7 @@
 
         // Garante que o clique em qualquer foto (inclusive 1, 2 e 3) deslize para ela diretamente
         slide.addEventListener("click", () => {
-          if (swiperInstance && swiperInstance.activeIndex !== idx) {
+          if (swiperInstance && !isDestroying && swiperInstance.activeIndex !== idx) {
             swiperInstance.slideTo(idx);
           }
         });
@@ -334,18 +335,30 @@
       });
     }
 
+    function destroySwiper() {
+      if (!swiperInstance) return;
+      isDestroying = true;
+      try {
+        swiperInstance.destroy(true, true);
+      } catch (_) {
+        // Silencia erros de limpeza em elementos já removidos do DOM
+      }
+      swiperInstance = null;
+      isDestroying = false;
+    }
+
     function initOrUpdateSwiper(photos, activeIndex) {
-      const photosHash = photos.map(p => p.name + "_" + (p.is_nc ? "1" : "0")).join("|");
+      // Hash inclui a quantidade de fotos para detecção confiável de mudanças
+      const photosHash = photos.length + ":" + photos.map(p => p.name + "_" + (p.is_nc ? "1" : "0")).join("|");
       const slidesChanged = photosHash !== currentPhotosHash;
 
       if (slidesChanged || !swiperInstance) {
         currentPhotosHash = photosHash;
-        renderSlides(photos, activeIndex);
 
-        if (swiperInstance) {
-          swiperInstance.destroy(true, true);
-          swiperInstance = null;
-        }
+        // IMPORTANTE: Destruir o Swiper ANTES de trocar o DOM para evitar
+        // referências órfãs a elementos que serão removidos pelo renderSlides
+        destroySwiper();
+        renderSlides(photos, activeIndex);
 
         swiperInstance = new Swiper("#mySwiper", {
           effect: "coverflow",
@@ -385,7 +398,8 @@
           },
           on: {
             slideChangeTransitionEnd: function () {
-              if (isInternalUpdate) {
+              // Não reporta durante destruição ou recriação do Swiper
+              if (isInternalUpdate || isDestroying || !swiperInstance) {
                 isInternalUpdate = false;
                 return;
               }

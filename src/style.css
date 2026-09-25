@@ -122,8 +122,6 @@ button[kind="primary"] [data-testid="stIconMaterial"],
 div.stButton>button[kind="primary"] [data-testid="stIconMaterial"],
 section[data-testid="stFileUploader"] [data-testid="stIconMaterial"],
 section[data-testid="stFileUploadDropzone"] [data-testid="stIconMaterial"],
-div[data-testid="stPills"] button[aria-pressed="true"] [data-testid="stIconMaterial"],
-div[data-testid="stSegmentedControl"] button[aria-pressed="true"] [data-testid="stIconMaterial"],
 .green-btn-marker+div button [data-testid="stIconMaterial"] {
     color: #D7D8D9 !important;
     fill: #D7D8D9 !important;
@@ -133,7 +131,8 @@ div[data-testid="stSegmentedControl"] button[aria-pressed="true"] [data-testid="
 div.stButton>button:not([kind="primary"]):not([data-testid="stPill"]) [data-testid="stIconMaterial"],
 div.stDownloadButton>button:not([kind="primary"]) [data-testid="stIconMaterial"],
 div[data-testid="stPopover"] button [data-testid="stIconMaterial"],
-div[data-testid="stPills"] button:not([aria-pressed="true"]) [data-testid="stIconMaterial"],
+div[data-testid="stButtonGroup"] button [data-testid="stIconMaterial"],
+button[kind*="pills"] [data-testid="stIconMaterial"],
 div[class*="st-key-btn_swap_"] button [data-testid="stIconMaterial"],
 div[class*="st-key-btn_manage_"] button [data-testid="stIconMaterial"],
 div[class*="st-key-del_"] button [data-testid="stIconMaterial"],
@@ -508,61 +507,107 @@ span[data-baseweb="tag"] * {
 
 /* ==========================================
    BOTÕES DE SELEÇÃO / PILLS (SELECIONADOS)
+   Siglas NC e Tipo de Registro quando selecionados:
+   permanece com a mesma cor de fundo (#c9d2db), contorno escuro (#011A33) e fonte escura (#011A33).
+   O estado NÃO selecionado mantém sua estilização padrão intacta.
    ========================================== */
-div[data-testid="stPills"] button[aria-pressed="true"],
-div[data-testid="stPills"] button[aria-checked="true"],
-div[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
-    background-color: #0D2740 !important;
-    color: #D7D8D9 !important;
+div[class*="st-key-nc_tipo_"] button[kind="pillsActive"],
+div[class*="st-key-nc_tipo_"] button[data-testid*="pillsActive"],
+div[class*="st-key-nc_tipo_"] button[aria-checked="true"],
+div[class*="st-key-nc_desc_"] button[kind="pillsActive"],
+div[class*="st-key-nc_desc_"] button[data-testid*="pillsActive"],
+div[class*="st-key-nc_desc_"] button[aria-checked="true"],
+div[class*="st-key-pa_desc_"] button[kind="pillsActive"],
+div[class*="st-key-pa_desc_"] button[data-testid*="pillsActive"],
+div[class*="st-key-pa_desc_"] button[aria-checked="true"],
+div[data-testid="stButtonGroup"] button[kind="pillsActive"],
+div[data-testid="stButtonGroup"] button[data-testid*="pillsActive"],
+div[data-testid="stButtonGroup"] button[aria-checked="true"],
+div.stButtonGroup button[kind="pillsActive"],
+div.stButtonGroup button[data-testid*="pillsActive"],
+div.stButtonGroup button[aria-checked="true"],
+button[kind="pillsActive"],
+button[data-testid="stBaseButton-pillsActive"] {
+    background-color: #999ea3 !important;
+    background: #dae0e7 !important;
+    border: 0.5px solid #011A33 !important;
     border-color: #011A33 !important;
-    font-weight: 600 !important;
-}
-
-div[data-testid="stPills"] button[aria-pressed="true"] *,
-div[data-testid="stPills"] button[aria-checked="true"] *,
-div[data-testid="stSegmentedControl"] button[aria-pressed="true"] * {
-    color: #D7D8D9 !important;
-    background-color: transparent !important;
-}
-
-div[data-testid="stPills"] button[aria-pressed="true"]:hover,
-div[data-testid="stPills"] button[aria-checked="true"]:hover,
-div[data-testid="stSegmentedControl"] button[aria-pressed="true"]:hover {
-    background-color: #2F5173 !important;
-    border-color: #0D2740 !important;
-    color: #D7D8D9 !important;
-}
-
-div[data-testid="stPills"] button[aria-pressed="true"]:hover *,
-div[data-testid="stPills"] button[aria-checked="true"]:hover *,
-div[data-testid="stSegmentedControl"] button[aria-pressed="true"]:hover * {
-    color: #D7D8D9 !important;
-    background-color: transparent !important;
-}
-
-/* Pills não selecionadas */
-div[data-testid="stPills"] button:not([aria-pressed="true"]):not([aria-checked="true"]),
-div[data-testid="stSegmentedControl"] button:not([aria-pressed="true"]) {
-    background-color: #D7D8D9 !important;
+    box-shadow: none !important;
     color: #011A33 !important;
-    border: 1px solid #2F5173 !important;
+    font-weight: 700 !important;
 }
 
-div[data-testid="stPills"] button:not([aria-pressed="true"]):not([aria-checked="true"]) *,
-div[data-testid="stSegmentedControl"] button:not([aria-pressed="true"]) * {
+div[class*="st-key-nc_tipo_"] button[kind="pillsActive"] *,
+div[class*="st-key-nc_tipo_"] button[data-testid*="pillsActive"] *,
+div[class*="st-key-nc_tipo_"] button[aria-checked="true"] *,
+div[class*="st-key-nc_desc_"] button[kind="pillsActive"] *,
+div[class*="st-key-nc_desc_"] button[data-testid*="pillsActive"] *,
+div[class*="st-key-nc_desc_"] button[aria-checked="true"] *,
+div[class*="st-key-pa_desc_"] button[kind="pillsActive"] *,
+div[class*="st-key-pa_desc_"] button[data-testid*="pillsActive"] *,
+div[class*="st-key-pa_desc_"] button[aria-checked="true"] *,
+div[data-testid="stButtonGroup"] button[kind="pillsActive"] *,
+div[data-testid="stButtonGroup"] button[data-testid*="pillsActive"] *,
+div[data-testid="stButtonGroup"] button[aria-checked="true"] *,
+div.stButtonGroup button[kind="pillsActive"] *,
+div.stButtonGroup button[data-testid*="pillsActive"] *,
+div.stButtonGroup button[aria-checked="true"] *,
+button[kind="pillsActive"] *,
+button[data-testid="stBaseButton-pillsActive"] * {
     color: #011A33 !important;
+    fill: #011A33 !important;
     background-color: transparent !important;
+    font-weight: 700 !important;
 }
 
-div[data-testid="stPills"] button:not([aria-pressed="true"]):not([aria-checked="true"]):hover,
-div[data-testid="stSegmentedControl"] button:not([aria-pressed="true"]):hover {
-    background-color: #2F5173 !important;
-    color: #D7D8D9 !important;
+div[class*="st-key-nc_tipo_"] button[kind="pillsActive"]:hover,
+div[class*="st-key-nc_tipo_"] button[data-testid*="pillsActive"]:hover,
+div[class*="st-key-nc_tipo_"] button[aria-checked="true"]:hover,
+div[class*="st-key-nc_desc_"] button[kind="pillsActive"]:hover,
+div[class*="st-key-nc_desc_"] button[data-testid*="pillsActive"]:hover,
+div[class*="st-key-nc_desc_"] button[aria-checked="true"]:hover,
+div[class*="st-key-pa_desc_"] button[kind="pillsActive"]:hover,
+div[class*="st-key-pa_desc_"] button[data-testid*="pillsActive"]:hover,
+div[class*="st-key-pa_desc_"] button[aria-checked="true"]:hover,
+div[data-testid="stButtonGroup"] button[kind="pillsActive"]:hover,
+div[data-testid="stButtonGroup"] button[data-testid*="pillsActive"]:hover,
+div[data-testid="stButtonGroup"] button[aria-checked="true"]:hover,
+div.stButtonGroup button[kind="pillsActive"]:hover,
+div.stButtonGroup button[data-testid*="pillsActive"]:hover,
+div.stButtonGroup button[aria-checked="true"]:hover,
+button[kind="pillsActive"]:hover,
+button[kind="pillsActive"]:focus-visible,
+button[data-testid="stBaseButton-pillsActive"]:hover,
+button[data-testid="stBaseButton-pillsActive"]:focus-visible {
+    background-color: #f4f8fb !important;
+    background: #f4f8fb !important;
+    border: 1px solid #011A33 !important;
+    border-color: #011A33 !important;
+    box-shadow: none !important;
+    color: #011A33 !important;
 }
 
-div[data-testid="stPills"] button:not([aria-pressed="true"]):not([aria-checked="true"]):hover *,
-div[data-testid="stSegmentedControl"] button:not([aria-pressed="true"]):hover * {
-    color: #D7D8D9 !important;
+div[class*="st-key-nc_tipo_"] button[kind="pillsActive"]:hover *,
+div[class*="st-key-nc_tipo_"] button[data-testid*="pillsActive"]:hover *,
+div[class*="st-key-nc_tipo_"] button[aria-checked="true"]:hover *,
+div[class*="st-key-nc_desc_"] button[kind="pillsActive"]:hover *,
+div[class*="st-key-nc_desc_"] button[data-testid*="pillsActive"]:hover *,
+div[class*="st-key-nc_desc_"] button[aria-checked="true"]:hover *,
+div[class*="st-key-pa_desc_"] button[kind="pillsActive"]:hover *,
+div[class*="st-key-pa_desc_"] button[data-testid*="pillsActive"]:hover *,
+div[class*="st-key-pa_desc_"] button[aria-checked="true"]:hover *,
+div[data-testid="stButtonGroup"] button[kind="pillsActive"]:hover *,
+div[data-testid="stButtonGroup"] button[data-testid*="pillsActive"]:hover *,
+div[data-testid="stButtonGroup"] button[aria-checked="true"]:hover *,
+div.stButtonGroup button[kind="pillsActive"]:hover *,
+div.stButtonGroup button[data-testid*="pillsActive"]:hover *,
+div.stButtonGroup button[aria-checked="true"]:hover *,
+button[kind="pillsActive"]:hover *,
+button[kind="pillsActive"]:focus-visible *,
+button[data-testid="stBaseButton-pillsActive"]:hover *,
+button[data-testid="stBaseButton-pillsActive"]:focus-visible * {
+    color: #011A33 !important;
+    fill: #011A33 !important;
     background-color: transparent !important;
 }
 
@@ -896,45 +941,62 @@ div[class*="st-key-gal_card"]:hover {
     background: #D7D8D9 !important;
 }
 
-/* Fotos que JÁ FORAM ADICIONADAS EM NC */
-div[class*="st-key-gal_card_nc_"],
-div[class*="st-key-gal_card_curr_nc_"] {
-    border: 2px solid #2F5173 !important;
-    background: #D7D8D9 !important;
-    box-shadow: 0 2px 8px rgba(47, 81, 115, 0.20) !important;
+/* Fotos que JÁ FORAM ADICIONADAS EM NC (Aparência APAGADA / Faded / Muted) */
+div[class*="st-key-gal_card_nc_"] {
+    border: 1.5px dashed #9aa8b5 !important;
+    background: #cfd8df !important;
+    opacity: 0.70 !important;
+    filter: grayscale(75%) !important;
+    box-shadow: none !important;
+    transition: opacity 0.5s ease, filter 0.5s ease, transform 0.5s ease !important;
 }
 
-/* Foto um pouco transparente quando está em NC */
-div[class*="st-key-gal_card_nc_"] img,
-div[class*="st-key-gal_card_curr_nc_"] img {
-    opacity: 0.70 !important;
+/* Imagem da foto em NC bem esmaecida e desbotada */
+div[class*="st-key-gal_card_nc_"] img {
+    opacity: 0.55 !important;
+    filter: grayscale(85%) contrast(0.85) !important;
     transition: opacity 0.2s ease, filter 0.2s ease !important;
 }
 
-div[class*="st-key-gal_card_nc_"]:hover img,
-div[class*="st-key-gal_card_curr_nc_"]:hover img {
+div[class*="st-key-gal_card_nc_"]:hover {
+    opacity: 0.85 !important;
+    filter: grayscale(20%) !important;
+    border-color: #2F5173 !important;
+    background: #d8e1e8 !important;
+    box-shadow: 0 4px 12px rgba(1, 26, 51, 0.15) !important;
+}
+
+div[class*="st-key-gal_card_nc_"]:hover img {
     opacity: 0.90 !important;
-    filter: brightness(1.03) !important;
+    filter: grayscale(15%) !important;
 }
 
-div[class*="st-key-gal_card_nc_"]:hover,
-div[class*="st-key-gal_card_curr_nc_"]:hover {
-    border-color: #0D2740 !important;
-    background: #D7D8D9 !important;
-    box-shadow: 0 4px 14px rgba(13, 39, 64, 0.28) !important;
-}
-
-/* Foto atualmente ativa no carrossel e que NÃO está em NC */
+/* Foto atualmente ativa no carrossel (fundo escuro #061f38 com borda branca quando NÃO está em NC) */
 div[class*="st-key-gal_card_curr_"] {
-    border: 2px solid #0D2740 !important;
-    background: #D7D8D9 !important;
-    box-shadow: 0 2px 10px rgba(13, 39, 64, 0.25) !important;
+    border: 2px solid #ffffff !important;
+    background: #061f38 !important;
+    box-shadow: 0 4px 14px rgba(1, 26, 51, 0.35) !important;
 }
 
-/* Foto atualmente ativa no carrossel e que TAMBÉM está em NC */
+div[class*="st-key-gal_card_curr_"]:hover {
+    border-color: #ffffff !important;
+    background: #061f38 !important;
+    box-shadow: 0 8px 24px rgba(1, 26, 51, 0.50) !important;
+    transform: translateY(-3px) scale(1.02) !important;
+}
+
+/* Foto que já foi adicionada em NC e ESTÁ SELECIONADA (fundo escuro com borda vermelha de alerta) */
 div[class*="st-key-gal_card_curr_nc_"] {
-    border: 2.5px solid #011A33 !important;
-    box-shadow: 0 3px 12px rgba(1, 26, 51, 0.35) !important;
+    border: 2px solid #ff4b4b !important;
+    background: #061f38 !important;
+    box-shadow: 0 4px 16px rgba(255, 75, 75, 0.40) !important;
+}
+
+div[class*="st-key-gal_card_curr_nc_"]:hover {
+    border-color: #ff4b4b !important;
+    background: #061f38 !important;
+    box-shadow: 0 8px 24px rgba(255, 75, 75, 0.55) !important;
+    transform: translateY(-3px) scale(1.02) !important;
 }
 
 /* Imagem dentro do card da galeria */
@@ -952,12 +1014,54 @@ div[class*="st-key-gal_card"] div[data-testid="stVerticalBlock"] {
     gap: 4px !important;
 }
 
-/* Legenda da foto dentro do card */
-div[class*="st-key-gal_card"] [data-testid="stImageCaption"] {
+/* Legenda padrão dos cards */
+div[class*="st-key-gal_card"] [data-testid="stCaptionContainer"],
+div[class*="st-key-gal_card"] [data-testid="stCaptionContainer"] *,
+div[class*="st-key-gal_card"] [data-testid="stImageCaption"],
+div[class*="st-key-gal_card"] p,
+div[class*="st-key-gal_card"] span {
     margin-top: 4px !important;
     font-size: 0.82rem !important;
     color: #011A33 !important;
     text-align: center !important;
+}
+
+/* Legenda suave e apagada para fotos em NC */
+div[class*="st-key-gal_card_nc_"] [data-testid="stCaptionContainer"],
+div[class*="st-key-gal_card_nc_"] [data-testid="stCaptionContainer"] *,
+div[class*="st-key-gal_card_nc_"] p,
+div[class*="st-key-gal_card_nc_"] span,
+div[class*="st-key-gal_card_nc_"] strong {
+    color: #556677 !important;
+    font-weight: 500 !important;
+    opacity: 0.90 !important;
+}
+
+/* Legenda e ícones com fonte clara para a foto atual (sem NC) */
+div[class*="st-key-gal_card_curr_"] [data-testid="stCaptionContainer"],
+div[class*="st-key-gal_card_curr_"] [data-testid="stCaptionContainer"] *,
+div[class*="st-key-gal_card_curr_"] [data-testid="stImageCaption"],
+div[class*="st-key-gal_card_curr_"] p,
+div[class*="st-key-gal_card_curr_"] span,
+div[class*="st-key-gal_card_curr_"] strong,
+div[class*="st-key-gal_card_curr_"] [data-testid="stIconMaterial"] {
+    color: #D7D8D9 !important;
+    fill: #D7D8D9 !important;
+}
+
+/* Legenda da foto em NC selecionada: texto claro e ícone de alerta em vermelho */
+div[class*="st-key-gal_card_curr_nc_"] [data-testid="stCaptionContainer"],
+div[class*="st-key-gal_card_curr_nc_"] [data-testid="stCaptionContainer"] *,
+div[class*="st-key-gal_card_curr_nc_"] [data-testid="stImageCaption"],
+div[class*="st-key-gal_card_curr_nc_"] p,
+div[class*="st-key-gal_card_curr_nc_"] span,
+div[class*="st-key-gal_card_curr_nc_"] strong {
+    color: #D7D8D9 !important;
+}
+
+div[class*="st-key-gal_card_curr_nc_"] [data-testid="stIconMaterial"] {
+    color: #ff4b4b !important;
+    fill: #ff4b4b !important;
 }
 
 /* Botão invisível sobreposto em toda a área do card para capturar o clique */
