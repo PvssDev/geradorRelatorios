@@ -1,7 +1,33 @@
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from reports.base import BaseReport
-import pandas as pd
+def _obter_terminal_rodoviario_nome(local_val):
+    l_str = str(local_val).strip()
+    l_lower = l_str.lower()
+    if l_lower.startswith("terminal rodoviário"):
+        return l_str
+    elif l_lower.startswith("terminal de ") or l_lower.startswith("terminal do ") or l_lower.startswith("terminal da "):
+        return "Terminal Rodoviário " + l_str[len("Terminal "):].strip()
+    elif l_lower.startswith("terminal"):
+        return "Terminal Rodoviário " + l_str[len("Terminal"):].strip()
+    return f"Terminal Rodoviário de {l_str}"
+
+def _obter_terminal_de_nome(local_val):
+    l_str = str(local_val).strip()
+    l_lower = l_str.lower()
+    if l_lower.startswith("terminal rodoviário de "):
+        return "Terminal de " + l_str[len("Terminal Rodoviário de "):].strip()
+    elif l_lower.startswith("terminal rodoviário do "):
+        return "Terminal do " + l_str[len("Terminal Rodoviário do "):].strip()
+    elif l_lower.startswith("terminal rodoviário da "):
+        return "Terminal da " + l_str[len("Terminal Rodoviário da "):].strip()
+    elif l_lower.startswith("terminal rodoviário "):
+        return "Terminal de " + l_str[len("Terminal Rodoviário "):].strip()
+    elif l_lower.startswith("terminal de ") or l_lower.startswith("terminal do ") or l_lower.startswith("terminal da "):
+        return l_str
+    elif l_lower.startswith("terminal "):
+        return l_str
+    return f"Terminal de {l_str}"
 
 class SocicamReport(BaseReport):
     @property
@@ -89,52 +115,25 @@ class SocicamReport(BaseReport):
 
     def get_intro_paragraphs(self, row, ano, data_extenso) -> list:
         local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        text = (
-            f"A Coordenadoria de Transportes e Rodovias da Arpe realiza vistorias no {local_val} com o objetivo de "
-            f"verificar as condições operacionais, de conservação, de manutenção e de segurança e da qualidade do "
-            f"serviço prestado nos referidos terminais, conforme Contrato de Concessão de Serviço Público No 1.041.080/08, "
-            f"firmado entre o Governo do Estado, atualmente representado pela Empresa Pernambucana de Transportes "
-            f"Intermunicipal (EPTI) e a SOCICAM - Administração, Projetos e Representações Ltda (SOCICAM) visando a "
-            f"operação, manutenção e administração de terminais rodoviários no Estado de Pernambuco, com execução de obras "
-            f"de reforma e construção, incluindo, ainda, a cessão de uso de espaços para a exploração comercial através de "
-            f"locação e publicidade."
-        )
-        if local_val in text:
-            parts = text.split(local_val, 1)
-            return [
-                [
-                    (parts[0], False, False, None),
-                    (local_val, True, False, None),
-                    (parts[1], False, False, None)
-                ]
+        terminal_nome = _obter_terminal_rodoviario_nome(local_val)
+        return [
+            [
+                ("A Coordenadoria de Transportes e Rodovias da Arpe realizou vistorias no ", False, False, None),
+                (terminal_nome, True, False, None),
+                (" com o objetivo de verificar as condições operacionais, de conservação, de manutenção e de segurança e da qualidade do serviço prestado no referido terminal, conforme Contrato de Concessão de Serviço Público No 1.041.080/08, firmado entre o Governo do Estado, atualmente representado pela Empresa Pernambucana de Transportes Intermunicipal (EPTI) e a SOCICAM - Administração, Projetos e Representações Ltda (SOCICAM) visando a operação, manutenção e administração de terminais rodoviários no Estado de Pernambuco, com execução de obras de reforma e construção, incluindo, ainda, a cessão de uso de espaços para a exploração comercial através de locação e publicidade.", False, False, None)
             ]
-        return [[(text, False, False, None)]]
+        ]
 
     def get_objective_paragraphs(self, row) -> list:
         local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        if "RECIFE" in local_val.upper() or "TIP" in local_val.upper():
-            nome_negrito = "Terminal Rodoviário do Recife"
-        else:
-            nome_negrito = local_val.split("(")[0].strip()
-        text = (
-            f"A fiscalização direta e periódica dos Terminais Rodoviários de Passageiros concedidos à SOCICAM, tem por "
-            f"objetivo verificar as condições de conservação, limpeza e higiene das áreas de embarque e desembarque, dos "
-            f"sanitários, as condições do pavimento das vias de circulação interna, a infraestrutura oferecida, a segurança "
-            f"e o atendimento ao usuário, bem como toda estrutura para funcionamento desses terminais. Dessa forma a ação de "
-            f"fiscalização no {nome_negrito}, realizada pela ARPE verificou o grau de conformidade dessas instalações com o "
-            f"Contrato de Concessão, bem como com a legislação e normas vigentes de modo a determinar e/ou recomendar "
-            f"medidas corretivas, com foco na qualidade dos serviços prestados."
-        )
-        if nome_negrito in text:
-            parts = text.split(nome_negrito, 1)
-            return [
-                [
-                    (parts[0], False, False, None),
-                    (nome_negrito, True, False, None),
-                    (parts[1], False, False, None)
-                ]
+        terminal_nome = _obter_terminal_rodoviario_nome(local_val)
+        return [
+            [
+                ("A fiscalização direta e periódica dos Terminais Rodoviários de Passageiros concedidos à SOCICAM, tem por objetivo verificar as condições de conservação, limpeza e higiene das áreas de embarque e desembarque, dos sanitários, as condições do pavimento das vias de circulação interna, a infraestrutura oferecida, a segurança e o atendimento ao usuário, bem como toda estrutura para funcionamento desses terminais. Dessa forma, a ação de fiscalização no ", False, False, None),
+                (terminal_nome, True, False, None),
+                (", realizada pela ARPE verificou o grau de conformidade dessas instalações com o Contrato de Concessão, bem como com a legislação e normas vigentes de modo a determinar e/ou recomendar medidas corretivas, com foco na qualidade dos serviços prestados.", False, False, None)
             ]
-        return [[(text, False, False, None)]]
+        ]
 
     def get_general_info_rows(self, row, responsaveis_formatted, periodo_val) -> list:
         return [
@@ -397,10 +396,18 @@ class SocicamReport(BaseReport):
             6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
         }
         extenso_ncs = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
+        if total_ncs == 1:
+            nc_str = f"{extenso_ncs} nova Não Conformidade"
+        elif total_ncs == 0:
+            nc_str = "nenhuma nova Não Conformidade"
+        else:
+            nc_str = f"{extenso_ncs} novas Não Conformidades"
+
+        terminal_curto = _obter_terminal_de_nome(local_val)
         return [
             [
                 ("Tendo em vista as ações de fiscalização realizadas pela ARPE foram constatadas ", False, False, None),
-                (f"{extenso_ncs} novas Não Conformidades no {local_val}", True, False, None),
+                (f"{nc_str} no {terminal_curto}", True, False, None),
                 (", que devem ser solucionadas pela SOCICAM de acordo com as Determinações desta Agência de Regulação (v. Quadro 1).", False, False, None)
             ],
             [("Por fim, solicita-se o encaminhamento deste Processo de Fiscalização para conhecimento e acompanhamento da EPTI, na qualidade de Poder Concedente do Contrato de Concessão e gestora do Sistema de Transporte Coletivo Intermunicipal de Passageiros (STCIP-PE).", False, False, None)]
@@ -445,5 +452,5 @@ class SocicamReport(BaseReport):
             mes_ano = extrair_mes_ano_numerico(data_val)
         return [
             f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
-            f"SEI Nº 0030200023.002186/{ano}-99"
+            "SEI Nº xxxxxxxx-xxx"
         ]

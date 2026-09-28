@@ -80,6 +80,15 @@ inject_custom_theme_css()
 # Inicialização centralizada do estado e opções da aplicação
 inicializar_estado_sessao()
 
+if "pending_toast" in st.session_state and st.session_state.pending_toast:
+    toast_data = st.session_state.pending_toast
+    if isinstance(toast_data, dict):
+        st.toast(toast_data.get("msg", ""), icon=toast_data.get("icon", ":material/check_circle:"))
+    else:
+        st.toast(toast_data, icon=":material/check_circle:")
+    del st.session_state.pending_toast
+
+
 is_monitoring = st.session_state.categoria_relatorio == "Monitoramento"
 
 terms = obter_termos_ui(is_monitoring)
@@ -280,7 +289,7 @@ with st.container():
     with st.container(border=True, key="top_fisc_container"):
         st.markdown(f"### :material/location_on: {term_fisc}")
         if st.session_state.get("last_added_fisc_msg"):
-            st.success(st.session_state.last_added_fisc_msg)
+            st.toast(st.session_state.last_added_fisc_msg, icon=":material/check_circle:")
             del st.session_state.last_added_fisc_msg
             
         col1, col2 = st.columns(2)
@@ -354,11 +363,11 @@ with st.container():
                 local_limpo = "Rota do Atlântico"
 
             if not id_fisc:
-                st.error(f"O ID {term_fisc_prep} é obrigatório.")
+                st.toast(f"O ID {term_fisc_prep} é obrigatório.", icon=":material/error:")
             elif not local_limpo:
-                st.error("O campo 'Local' é obrigatório.")
+                st.toast("O campo 'Local' é obrigatório.", icon=":material/error:")
             elif id_fisc.strip() in ids_existentes:
-                st.error(f"O ID {term_fisc_prep} '{id_fisc}' já está cadastrado. Por favor, utilize um ID único.")
+                st.toast(f"O ID {term_fisc_prep} '{id_fisc}' já está cadastrado. Por favor, utilize um ID único.", icon=":material/error:")
             else:
                 st.session_state.temp_fiscalizacoes.append({
                     "ID da Fiscalização": id_fisc,
@@ -411,12 +420,17 @@ with st.container():
         if not st.session_state.get("old_photos_to_match") and not st.session_state.get("last_parsed_file"):
             uploads_pendentes = True
             mensagem_pendencias.append("o arquivo do monitoramento anterior")
+            
+    show_stage2 = len(st.session_state.temp_fiscalizacoes) > 0
+    if not show_stage2:
+        uploads_pendentes = True
         
     if uploads_pendentes:
-        registros_container = st.container(border=True, key="registros_main_container")
-        with registros_container:
-            st.markdown("### :material/edit_note: Cadastro de Registros")
-            st.info(f"**Cadastro de Registros Suspenso:** Por favor, faça o upload de pendências no topo da página para liberar este painel: **{', e '.join(mensagem_pendencias)}**.")
+        if show_stage2:
+            registros_container = st.container(border=True, key="registros_main_container")
+            with registros_container:
+                st.markdown("### :material/edit_note: Cadastro de Registros")
+                st.info(f"**Cadastro de Registros Suspenso:** Por favor, faça o upload de pendências no topo da página para liberar este painel: **{', e '.join(mensagem_pendencias)}**.")
     else:
         # Preparar fotos antigas de monitoramento (filtrando as que já foram comparadas)
         if is_monitoring and st.session_state.old_photos_to_match:
@@ -506,7 +520,7 @@ with st.container():
                         help="Avança para a próxima foto do carrossel ao adicionar o Registro"
                     )
                 else:
-                    st.success("Todas as Não Conformidades do monitoramento anterior foram comparadas!")
+                    st.toast("Todas as Não Conformidades do monitoramento anterior foram comparadas!", icon=":material/check_circle:")
                     if st.session_state.fill_photos:
                         idx_single = min(st.session_state.carousel_index, len(st.session_state.fill_photos) - 1)
                         current_photo = st.session_state.fill_photos[idx_single]
@@ -761,9 +775,9 @@ with st.container():
                         with col_save_direct:
                             if st.button("Salvar e Continuar", icon=":material/save:", type="primary", use_container_width=True, key=f"btn_save_crc_mon_step1_{st.session_state.nc_form_counter}"):
                                 if id_vinculo == "Nenhum ID cadastrado":
-                                    st.error(f"Adicione uma {term_fisc_lower} primeiro.")
+                                    st.toast(f"Adicione uma {term_fisc_lower} primeiro.", icon=":material/error:")
                                 elif not foto_default:
-                                    st.error("É obrigatório ter uma foto selecionada no carrossel para continuar.")
+                                    st.toast("É obrigatório ter uma foto selecionada no carrossel para continuar.", icon=":material/error:")
                                 else:
                                     # Validação para Monitoramento
                                     is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
@@ -784,7 +798,7 @@ with st.container():
                                         campos_vazios.append("ANÁLISE ARPE")
                                     
                                     if campos_vazios:
-                                        st.error(f"Não foi possível salvar. Os seguintes campos estão em branco: {', '.join(campos_vazios)}")
+                                        st.toast(f"Não foi possível salvar. Os seguintes campos estão em branco: {', '.join(campos_vazios)}", icon=":material/error:")
                                     else:
                                         # 1. Tentar encontrar registro com a mesma foto anterior
                                         rec = next((r for r in st.session_state.temp_nc 
@@ -850,7 +864,7 @@ with st.container():
                                             st.session_state.carousel_index += 1
                                         
                                         st.session_state.nc_form_counter += 1
-                                        st.success("Registro salvo com sucesso!")
+                                        st.session_state.pending_toast = {"msg": "Registro salvo com sucesso!", "icon": ":material/check_circle:"}
                                         st.rerun()
                     else:
                         # Definir largura das colunas baseadas no tipo de relatório (sem col_rel para monitoramento)
@@ -862,12 +876,12 @@ with st.container():
                         with col_nxt:
                             if st.button("Próximo", icon=":material/arrow_forward:", type="primary", use_container_width=True):
                                 if id_vinculo == "Nenhum ID cadastrado":
-                                    st.error(f"Adicione um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
+                                    st.toast(f"Adicione um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.", icon=":material/error:")
                                 elif not nc_descricao and not ponto_atencao:
                                     msg_erro = "O campo 'Não Conformidade' é obrigatório." if st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"] else "O campo 'Não Conformidade' ou 'Ponto de Atenção' é obrigatório."
-                                    st.error(msg_erro)
+                                    st.toast(msg_erro, icon=":material/error:")
                                 elif not foto_default:
-                                    st.error("É obrigatório ter uma foto selecionada no carrossel para continuar.")
+                                    st.toast("É obrigatório ter uma foto selecionada no carrossel para continuar.", icon=":material/error:")
                                 else:
                                     st.session_state.step1_id_vinculo = id_vinculo
                                     st.session_state.step1_pista = pista
@@ -896,7 +910,7 @@ with st.container():
                                 disable_rel = len(st.session_state.temp_nc) == 0
                                 if st.button("Relacionar", icon=":material/link:", type="secondary", disabled=disable_rel, use_container_width=True):
                                     if not foto_default:
-                                        st.error("É obrigatório ter uma foto selecionada no carrossel para relacionar.")
+                                        st.toast("É obrigatório ter uma foto selecionada no carrossel para relacionar.", icon=":material/error:")
                                     else:
                                         last_nc = st.session_state.temp_nc[-1]
                                         target_id = last_nc["ID da Fiscalização"]
@@ -917,7 +931,7 @@ with st.container():
                                         st.session_state.trecho_persistido = new_nc.get("Trecho", "")
                                     
                                         st.session_state.nc_form_counter += 1
-                                        st.success("Informações da última foto relacionadas com sucesso!")
+                                        st.session_state.pending_toast = {"msg": "Informações da última foto relacionadas com sucesso!", "icon": ":material/check_circle:"}
                                         st.rerun()
             else:
                 if is_monitoring and st.session_state.get("step1_identificacao"):
@@ -1065,13 +1079,19 @@ with st.container():
                     
                         st.session_state.nc_form_counter += 1
                         st.session_state.nc_form_step = 1
-                        st.success(f"Adicionado com sucesso ao ID {st.session_state.step1_id_vinculo}!")
+                        st.session_state.pending_toast = {"msg": f"Adicionado com sucesso ao ID {st.session_state.step1_id_vinculo}!", "icon": ":material/check_circle:"}
                         st.rerun()
 
 
 
     
     st.write("")
+    
+    # Etapa 3: Mostrar painel de ações apenas se houver registros adicionados
+    show_stage3 = len(st.session_state.temp_nc) > 0
+    if not show_stage3:
+        st.stop()
+        
     acoes_container = st.container(border=True, key="acoes_panel_container")
     with acoes_container:
         col_hdr_title, col_hdr_gear = st.columns([11, 1])
@@ -1290,7 +1310,7 @@ with st.container():
     with col_relatorio:
         if st.button("Gerar Relatório Automático", icon=":material/bolt:", type="primary", use_container_width=True, key="btn_run_report_main"):
             if not st.session_state.temp_fiscalizacoes:
-                st.error(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.")
+                st.toast(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.", icon=":material/error:")
             else:
                 with st.spinner("Gerando relatórios automaticamente..."):
                     st.session_state.relatorios_preenchimento_data = []
@@ -1338,7 +1358,7 @@ with st.container():
                                 tipo_key = f"{tipo_key}_MONITORAMENTO"
 
                             if tipo_key == "CRC_MONITORAMENTO" and not uploaded_mon_anterior:
-                                st.error("Por favor, faça o upload do arquivo do monitoramento anterior (.docx) para gerar o relatório CRC Monitoramento.")
+                                st.toast("Por favor, faça o upload do arquivo do monitoramento anterior (.docx) para gerar o relatório CRC Monitoramento.", icon=":material/error:")
                                 st.stop()
 
                             arquivos_gerados, _ = gerar_relatorio(
@@ -1360,9 +1380,9 @@ with st.container():
                                             "nome": nome_base,
                                             "bytes": f.read()
                                         })
-                                st.success(f"{len(arquivos_gerados)} relatório(s) gerado(s) com sucesso!")
+                                st.toast(f"{len(arquivos_gerados)} relatório(s) gerado(s) com sucesso!", icon=":material/check_circle:")
                         except Exception as e:
-                            st.error(f"Erro ao gerar relatórios: {e}")
+                            st.toast(f"Erro ao gerar relatórios: {e}", icon=":material/error:")
                             st.exception(e)
                         finally:
                             import gc
@@ -1372,7 +1392,7 @@ with st.container():
         disable_auto_fill = uploads_pendentes
         if st.button("Auto Preenchimento", icon=":material/flash_on:", disabled=disable_auto_fill, use_container_width=True, key="btn_auto_fill"):
             if uploads_pendentes:
-                st.error(f"Não é possível realizar o auto preenchimento. Pendências: {', e '.join(mensagem_pendencias)}.")
+                st.toast(f"Não é possível realizar o auto preenchimento. Pendências: {', e '.join(mensagem_pendencias)}.", icon=":material/error:")
             else:
                 tipo_rel = st.session_state.get("tipo_relatorio", "CRA")
                 is_mon = st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento"
@@ -1489,7 +1509,7 @@ with st.container():
 
                 st.session_state.nc_form_counter += 1
                 st.session_state.nc_form_step = 1
-                st.success("Auto preenchimento realizado com sucesso!")
+                st.session_state.pending_toast = {"msg": "Auto preenchimento realizado com sucesso!", "icon": ":material/check_circle:"}
                 st.rerun()
             
     with col_limpar:

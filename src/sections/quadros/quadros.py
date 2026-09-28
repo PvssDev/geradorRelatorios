@@ -109,7 +109,26 @@ def set_table_borders(table):
         
     tblPr.append(tblBorders)
 
-def agrupar_registros(df):
+def _limpar_valor_campo(val):
+    if val is None or pd.isna(val):
+        return ""
+    s = str(val).strip()
+    return "" if s.lower() in ["nan", "none", "null"] else s
+
+def _formatar_num_foto(n):
+    if n is None or pd.isna(n):
+        return ""
+    try:
+        n_float = float(n)
+        n_int = int(n_float)
+        if n_float == n_int:
+            return f"{n_int:02d}"
+        return str(n).strip()
+    except (ValueError, TypeError):
+        s = str(n).strip()
+        return "" if s.lower() in ["nan", "none", "null"] else s
+
+def agrupar_registros(df, report_config=None):
     """
     Agrupa registros que possuem as mesmas características de infração,
     combinando seus números de fotos na mesma linha.
@@ -117,22 +136,30 @@ def agrupar_registros(df):
     if df.empty:
         return []
         
+    is_cra = False
+    if isinstance(report_config, str):
+        is_cra = (report_config.upper() == "CRA")
+    elif report_config is not None:
+        is_cra = (getattr(report_config, "key", "").upper() == "CRA")
+
     records = df.to_dict('records')
     grouped = []
+    
+    chaves = [
+        "Não Conformidade", "Ponto de Atenção",
+        "Pista", "Trecho", "Observações",
+        "Fundamento da infração", "Determinação"
+    ]
+    if is_cra:
+        chaves.append("Direção (faixa)")
     
     for rec in records:
         found = False
         for g_rec in grouped:
-            chaves = [
-                "Não Conformidade", "Ponto de Atenção",
-                "Direção (faixa)", "Pista", "Trecho", "Observações",
-                "Fundamento da infração", "Determinação"
-            ]
-            
             match = True
             for key in chaves:
-                val1 = str(rec.get(key, "")).strip()
-                val2 = str(g_rec.get(key, "")).strip()
+                val1 = _limpar_valor_campo(rec.get(key, ""))
+                val2 = _limpar_valor_campo(g_rec.get(key, ""))
                 if val1 != val2:
                     match = False
                     break
@@ -151,24 +178,40 @@ def agrupar_registros(df):
             
     # Formatar o texto de localização/foto de cada grupo
     for g_rec in grouped:
-        faixa = str(g_rec.get("Direção (faixa)", "")).strip()
-        nums = sorted(g_rec["foto_numeros"])
+        raw_nums = g_rec.get("foto_numeros", [])
+        valid_nums = []
+        for n in raw_nums:
+            if n is not None and not pd.isna(n):
+                s = str(n).strip()
+                if s and s.lower() not in ["nan", "none", "null"]:
+                    valid_nums.append(n)
         
-        nums_formatted = [str(n).zfill(2) for n in nums]
-        if len(nums_formatted) == 1:
+        try:
+            sorted_nums = sorted(valid_nums, key=lambda x: (float(x) if str(x).replace('.', '', 1).isdigit() else 999999, str(x)))
+        except Exception:
+            sorted_nums = valid_nums
+            
+        nums_formatted = [_formatar_num_foto(n) for n in sorted_nums if _formatar_num_foto(n)]
+        if not nums_formatted:
+            fotos_str = ""
+        elif len(nums_formatted) == 1:
             fotos_str = f"Foto {nums_formatted[0]}"
         elif len(nums_formatted) == 2:
             fotos_str = f"Fotos {nums_formatted[0]} e {nums_formatted[1]}"
         else:
             fotos_str = f"Fotos {', '.join(nums_formatted[:-1])} e {nums_formatted[-1]}"
             
-        g_rec["localizacao_formatada"] = f"{faixa}/ {fotos_str}" if faixa else fotos_str
+        if is_cra:
+            faixa = _limpar_valor_campo(g_rec.get("Direção (faixa)", ""))
+            g_rec["localizacao_formatada"] = f"{faixa}/ {fotos_str}" if (faixa and fotos_str) else (faixa or fotos_str)
+        else:
+            g_rec["localizacao_formatada"] = fotos_str
         
     return grouped
 
 def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
     """Cria a tabela formatada de acordo com o padrão do documento de referência."""
-    grouped_records = agrupar_registros(df_dados)
+    grouped_records = agrupar_registros(df_dados, report_config=report_config)
     num_rows = len(grouped_records)
     if num_rows == 0:
         p = doc.add_paragraph()
@@ -262,25 +305,29 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         r_idx = idx + start_r_idx
         row = table.rows[r_idx]
         
-        ident = str(rec.get("Identificação", "")).strip()
+        ident = _limpar_valor_campo(rec.get("Identificação", ""))
         
         siglas_col = "Não Conformidade" if not is_pa else "Ponto de Atenção"
-        siglas_str = rec.get(siglas_col, "")
+        siglas_str = _limpar_valor_campo(rec.get(siglas_col, ""))
         if not siglas_str and not is_pa:
-            siglas_str = rec.get("Não conformidade", "") or rec.get("Observações", "") or rec.get("Legenda da Foto", "")
+            siglas_str = (
+                _limpar_valor_campo(rec.get("Não conformidade", "")) 
+                or _limpar_valor_campo(rec.get("Observações", "")) 
+                or _limpar_valor_campo(rec.get("Legenda da Foto", ""))
+            )
         desc = expandir_siglas(siglas_str)
         
-        localizacao = rec["localizacao_formatada"]
+        localizacao = _limpar_valor_campo(rec.get("localizacao_formatada", ""))
         
-        fund = str(rec.get("Fundamento da infração", "")).strip()
-        det = str(rec.get("Determinação", "")).strip()
+        fund = _limpar_valor_campo(rec.get("Fundamento da infração", ""))
+        det = _limpar_valor_campo(rec.get("Determinação", ""))
         
         # A coluna IDENTIFICAÇÃO do quadro exibe diretamente as siglas da NC/PA
-        row.cells[0].text = siglas_str if siglas_str else ident
-        row.cells[1].text = desc
-        row.cells[2].text = localizacao
-        row.cells[3].text = fund
-        row.cells[4].text = det
+        row.cells[0].text = str(siglas_str if siglas_str else ident)
+        row.cells[1].text = str(desc)
+        row.cells[2].text = str(localizacao)
+        row.cells[3].text = str(fund)
+        row.cells[4].text = str(det)
         
         for c_idx, cell in enumerate(row.cells):
             set_cell_margins(cell, top=100, bottom=100, left=150, right=150)

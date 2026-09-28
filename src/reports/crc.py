@@ -78,7 +78,7 @@ class CrcReport(BaseReport):
 
     def get_intro_paragraphs(self, row, ano, data_extenso) -> list:
         return [
-            [(f"A Coordenadoria de Transportes e Rodovias da ARPE, em cumprimento ao cronograma de fiscalização de {ano}, realizou fiscalização na Concessão Patrocinada da Ponte de Acesso e Sistema Viário da Praia do Paiva, sob responsabilidade da Concessionária Rota dos Coqueiros (CRC). A ação foi comunicada à concessionária por meio do Ofício ARPE/DTO nº 145/2026, de 26/05/2026 (Doc. SEI nº 86328395), e à Secretaria Executiva de Parcerias e Projetos Estratégicos (SEPPE) por meio do Ofício ARPE/DTO nº 146/2026, de 26/05/2026 (Doc. SEI nº 86328735).", False, False, None)],
+            [(f"A Coordenadoria de Transportes e Rodovias da ARPE, em cumprimento ao cronograma de fiscalização de {ano}, realizou fiscalização na Concessão Patrocinada da Ponte de Acesso e Sistema Viário da Praia do Paiva, sob responsabilidade da Concessionária Rota dos Coqueiros (CRC). A ação foi comunicada à concessionária por meio do Ofício ARPE/DTO nº 145/2026, de 26/05/2026 (Doc. SEI nº xxxxxxxx-xxx), e à Secretaria Executiva de Parcerias e Projetos Estratégicos (SEPPE) por meio do Ofício ARPE/DTO nº 146/2026, de 26/05/2026 (Doc. SEI nº xxxxxxxx-xxx).", False, False, None)],
             [("As ações de fiscalização registradas neste Relatório se referem à Rodovia Estadual PE-024, trecho Barra de Jangada – Itapuama, medindo 6,5 Km de extensão, compreendendo duas praças de pedágio, pela Ponte sobre o Rio Jaboatão e a via principal do Destino de Turismo e Lazer Praia do Paiva.", False, False, None)],
             [("Este relatório apresenta as observações realizadas pela equipe da Coordenadoria de Transportes e Rodovias da ARPE, sob a perspectiva técnico-operacional, com o objetivo de verificar as condições de operação, conservação, manutenção e segurança del trecho rodoviário concedido, bem como o cumprimento da legislação aplicável e a eficiência dos serviços prestados.", False, False, None)],
             [("As fiscalizações realizadas pela ARPE possuem, prioritariamente, caráter orientativo e corretivo, visando contribuir para o aperfeiçoamento dos procedimentos e para a correção de não conformidades identificadas na infraestrutura disponibilizada e nos serviços concedidos pelo Estado.", False, False, None)]
@@ -374,5 +374,5 @@ class CrcReport(BaseReport):
             mes_ano = extrair_mes_ano_numerico(data_val)
         return [
             f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
-            "SEI Nº xxxxxxxxxxxxxxxxxxxxxxx"
+            "SEI Nº xxxxxxxx-xxx"
         ]

@@ -92,7 +92,7 @@ class CraReport(BaseReport):
             [("Destaca-se preliminarmente que as ações de fiscalização registradas neste Relatório foram concentradas na Rodovia PE-009, do Entroncamento BR-101 ao Entroncamento PE-038, que abrange os subtrechos concedidos, especificamente, o Contorno do Cabo, TDR Norte, TDR Sul e a Ligação Rótula Curva do Boi a Nossa Senhora do Ó; e Rodovia Estadual VPE-034.", False, False, None)],
             [
                 (f"É importante observar que foram realizadas ações de fiscalização, no dia {data_extenso}, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº ", False, False, None),
-                ("302 (Doc. SEI 75605952)", False, False, (255, 0, 0)),
+                ("xxx (Doc. SEI nº xxxxxxxx-xxx)", False, False, (255, 0, 0)),
                 (".", False, False, None)
             ],
             [("Destaca-se que as fiscalizações realizadas pela Arpe são tratadas com caráter educativo, preferencialmente, e contributivo para correção de procedimentos e solução de Não Conformidades evidenciados por defeitos e/ou problemas na infraestrutura disponibilizada e respectivos serviços concedidos pelo Estado.", False, False, None)]
@@ -590,5 +590,5 @@ class CraReport(BaseReport):
             mes_ano = extrair_mes_ano_numerico(data_val)
         return [
             f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº {mes_ano} - CTR",
-            f"SEI Nº xxxxxxxxxxxx/{ano}-XX"
+            "SEI Nº xxxxxxxx-xxx"
         ]

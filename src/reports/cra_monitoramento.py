@@ -60,7 +60,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
             mes_ano = extrair_mes_ano_numerico(data_val)
         return [
             f"RELATÓRIO DO 1° MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}",
-            f"SEI Nº 0030200023.009194/{ano}-85"
+            "SEI Nº xxxxxxxx-xxx"
         ]
 
     def get_objective_paragraphs(self, row) -> list:
@@ -92,7 +92,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         self.N_prev = meta["N_prev"]
         self.N_curr = meta["N_curr"]
         self.ctr_num = meta["ctr_num"] if meta["ctr_num"] != "XX/XXXX" else "07/2025"
-        self.processo_sei_prev = meta["processo_sei_prev"] if meta["processo_sei_prev"] != "XXXXXXXX" else "0030200023.009194/2025-85"
+        self.processo_sei_prev = meta["processo_sei_prev"] if meta["processo_sei_prev"] not in ("XXXXXXXX", "xxxxxxxx", "xxxxxxxx-xxx", "") else "xxxxxxxx-xxx"
 
         n_curr_str = f"{self.N_curr}º" if self.N_curr != "X" else "1º"
 

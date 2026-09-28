@@ -102,7 +102,7 @@ def confirmar_exclusao_lote_modal(ids, term_plural_lower="fiscalizações", term
             st.session_state.temp_fiscalizacoes = [f for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] not in ids]
             st.session_state.temp_nc = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] not in ids]
             st.session_state.relatorios_preenchimento_data = []
-            st.success(f"{term_plural} selecionadas excluídas com sucesso!")
+            st.session_state.pending_toast = f":green[:material/check_circle:] {term_plural} selecionadas excluídas com sucesso!"
             st.rerun()
     with col_nao:
         if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_cancel_bulk_del"):
@@ -141,7 +141,7 @@ def confirmar_exclusao_nc_modal(nc_keys):
             st.session_state.temp_nc = novas_ncs
             
             st.session_state.relatorios_preenchimento_data = []
-            st.success("Não Conformidades selecionadas excluídas com sucesso!")
+            st.session_state.pending_toast = ":green[:material/check_circle:] Não Conformidades selecionadas excluídas com sucesso!"
             st.rerun()
     with col_nao:
         if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_cancel_nc_del"):
@@ -159,11 +159,11 @@ def gerenciar_responsaveis_modal(term_pessoal="pela fiscalização"):
     
     if st.button("Adicionar Responsável", icon=":material/add:", type="primary", use_container_width=True):
         if not novo_resp.strip():
-            st.error("O nome do responsável é obrigatório.")
+            st.toast(":red[:material/error:] O nome do responsável é obrigatório.")
         elif not nova_matricula.strip():
-            st.error("O número de matrícula é obrigatório.")
+            st.toast(":red[:material/error:] O número de matrícula é obrigatório.")
         elif not nova_funcao.strip():
-            st.error("A função / cargo é obrigatória.")
+            st.toast(":red[:material/error:] A função / cargo é obrigatória.")
         else:
             nomes_existentes = [r["nome"].strip().lower() for r in st.session_state.pessoal_responsaveis]
             if novo_resp.strip().lower() not in nomes_existentes:
@@ -173,7 +173,7 @@ def gerenciar_responsaveis_modal(term_pessoal="pela fiscalização"):
                     "funcao": nova_funcao.strip()
                 })
                 salvar_responsaveis(st.session_state.pessoal_responsaveis)
-                st.success(f"'{novo_resp.strip()}' adicionado!")
+                st.session_state.pending_toast = f":green[:material/check_circle:] '{novo_resp.strip()}' adicionado!"
                 st.rerun()
             else:
                 st.warning("Este nome já está cadastrado.")
@@ -207,11 +207,11 @@ def gerenciar_coordenadores_modal(term_prep_f="de fiscalização"):
     
     if st.button("Adicionar Coordenador", icon=":material/add:", type="primary", use_container_width=True):
         if not novo_coord.strip():
-            st.error("O nome do coordenador é obrigatório.")
+            st.toast(":red[:material/error:] O nome do coordenador é obrigatório.")
         elif not nova_matricula.strip():
-            st.error("O número de matrícula é obrigatório.")
+            st.toast(":red[:material/error:] O número de matrícula é obrigatório.")
         elif not nova_funcao.strip():
-            st.error("A função / cargo é obrigatória.")
+            st.toast(":red[:material/error:] A função / cargo é obrigatória.")
         else:
             nomes_existentes = [c["nome"].strip().lower() for c in st.session_state.coordenadores]
             if novo_coord.strip().lower() not in nomes_existentes:
@@ -221,7 +221,7 @@ def gerenciar_coordenadores_modal(term_prep_f="de fiscalização"):
                     "funcao": nova_funcao.strip()
                 })
                 salvar_coordenadores(st.session_state.coordenadores)
-                st.success(f"'{novo_coord.strip()}' adicionado!")
+                st.session_state.pending_toast = f":green[:material/check_circle:] '{novo_coord.strip()}' adicionado!"
                 st.rerun()
             else:
                 st.warning("Este nome já está cadastrado.")
@@ -255,7 +255,7 @@ def gerenciar_contratos_modal():
             if novo_contrato.strip() not in st.session_state.contratos:
                 st.session_state.contratos.append(novo_contrato.strip())
                 salvar_contratos(st.session_state.contratos)
-                st.success(f"'{novo_contrato.strip()}' adicionado!")
+                st.session_state.pending_toast = f":green[:material/check_circle:] '{novo_contrato.strip()}' adicionado!"
                 st.rerun()
             else:
                 st.warning("Este contrato já está na lista.")
@@ -326,7 +326,7 @@ def adicionar_nc_personalizada_modal(pills_key, is_socicam=False):
             sigla_strip = nova_sigla.strip().upper()
             
             if not desc_strip:
-                st.error("O campo 'Descrição' é obrigatório para cadastrar uma nova não conformidade.")
+                st.toast(":red[:material/error:] O campo 'Descrição' é obrigatório para cadastrar uma nova não conformidade.")
             else:
                 new_item = {"sigla": sigla_strip, "descricao": desc_strip}
                 if is_socicam:
@@ -346,7 +346,7 @@ def adicionar_nc_personalizada_modal(pills_key, is_socicam=False):
                 if val_to_select not in current_sel:
                     st.session_state[pills_key] = current_sel + [val_to_select]
                     
-                st.success("Nova não conformidade cadastrada e selecionada!")
+                st.session_state.pending_toast = ":green[:material/check_circle:] Nova não conformidade cadastrada e selecionada!"
                 st.rerun()
                     
     with col_cancelar:
@@ -456,13 +456,13 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         novo_local_clean = "Rota do Atlântico"
                     
                     if not novo_id_clean:
-                        st.error(f"O ID {term_fisc_prep} não pode ser vazio.")
+                        st.toast(f":red[:material/error:] O ID {term_fisc_prep} não pode ser vazio.")
                     elif tipo == "SOCICAM" and not novo_local_clean:
-                        st.error("O campo 'Local' é obrigatório.")
+                        st.toast(":red[:material/error:] O campo 'Local' é obrigatório.")
                     else:
                         outros_ids = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] != old_id]
                         if novo_id_clean in outros_ids:
-                            st.error(f"O ID '{novo_id_clean}' já existe em outro registro. Escolha um ID único.")
+                            st.toast(f":red[:material/error:] O ID '{novo_id_clean}' já existe em outro registro. Escolha um ID único.")
                         else:
                             fisc_data["ID da Fiscalização"] = novo_id_clean
                             fisc_data["Data"] = nova_data
@@ -483,7 +483,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                                 del st.session_state.planilha_download_bytes
                             
                             st.session_state["fisc_edit_version"] = fisc_version + 1
-                            st.success(f"Alterações salvas com sucesso para o ID '{novo_id_clean}'!")
+                            st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas com sucesso para o ID '{novo_id_clean}'!"
                             st.rerun()
 
     # -------------------------------------------------------------
@@ -551,7 +551,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
                             st.session_state["nc_edit_version"] = nc_version + 1
-                            st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
+                            st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
 
                     # 2. CRA em Monitoramento:
@@ -594,7 +594,12 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
                         edit_observacoes = st.text_area("Legenda da Foto Atual", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
-                        edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
+                        if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                            dir_val = nc_target.get("Direção (faixa)", "")
+                            dir_val_str = "" if (dir_val is None or str(dir_val).strip().lower() in ["nan", "none", "null"]) else str(dir_val).strip()
+                            edit_direcao = st.text_input("Direção (faixa)", value=dir_val_str, key=f"{nc_key_prefix}_direcao")
+                        else:
+                            edit_direcao = ""
 
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
@@ -616,7 +621,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
                             st.session_state["nc_edit_version"] = nc_version + 1
-                            st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
+                            st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
 
                     # 3. CRA em Fiscalização:
@@ -691,7 +696,12 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
                         edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
-                        edit_direcao = st.text_input("Direção (faixa)", value=str(nc_target.get("Direção (faixa)", "")), key=f"{nc_key_prefix}_direcao")
+                        if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                            dir_val = nc_target.get("Direção (faixa)", "")
+                            dir_val_str = "" if (dir_val is None or str(dir_val).strip().lower() in ["nan", "none", "null"]) else str(dir_val).strip()
+                            edit_direcao = st.text_input("Direção (faixa)", value=dir_val_str, key=f"{nc_key_prefix}_direcao")
+                        else:
+                            edit_direcao = ""
 
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
@@ -716,7 +726,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
                             st.session_state["nc_edit_version"] = nc_version + 1
-                            st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
+                            st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
 
                     # 4. CRC ou SOCICAM em Fiscalização:
@@ -764,7 +774,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
                             st.session_state["nc_edit_version"] = nc_version + 1
-                            st.success(f"Alterações salvas para o item nº {nc_target.get('Nº', 1)}!")
+                            st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
 
 

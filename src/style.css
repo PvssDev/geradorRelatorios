@@ -1,6 +1,36 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap');
 
-/* style.css - Folha de estilos personalizada do aplicativo */
+/* ==========================================
+   TIPOGRAFIA E GLOBAL SETTINGS
+   ========================================== */
+html, body, .stApp, [data-testid="stAppViewContainer"], p, h1, h2, h3, h4, h5, h6, label, button, input, textarea {
+    font-family: 'Outfit', 'Work Sans', sans-serif !important;
+}
+
+/* Foco Acessível (Keyboard Nav) */
+*:focus-visible {
+    outline: 2px solid #0D2740 !important;
+    outline-offset: 3px !important;
+    transition: outline-offset 0.2s ease !important;
+}
+
+/* Custom Scrollbar (Experiência Premium) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #D7D8D9;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+    background: #2F5173;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #0D2740;
+}/* style.css - Folha de estilos personalizada do aplicativo */
 
 /* ==========================================
    CORREÇÃO GLOBAL DE OVERFLOW
@@ -22,7 +52,11 @@ header[data-testid="stHeader"],
     right: 0 !important;
     width: 100% !important;
     z-index: 999999 !important;
-    background-color: #d7e6f0 !important;
+    background-color: rgba(215, 230, 240, 0.92) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border-bottom: 1px solid rgba(47, 81, 115, 0.1) !important;
+    transition: background-color 0.3s ease !important;
 }
 
 /* ==========================================
@@ -301,7 +335,8 @@ section[data-testid="stFileUploadDropzone"] button {
     border-radius: 6px !important;
     font-weight: 600 !important;
     box-shadow: 0 2px 6px rgba(1, 26, 51, 0.25) !important;
-    transition: background-color 0.2s ease, transform 0.1s ease !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease !important;
 }
 
 /* Forçar letras claras em todos os nós filhos dos botões principais */
@@ -335,6 +370,13 @@ section[data-testid="stFileUploadDropzone"] button:hover {
     background-color: #2F5173 !important;
     border-color: #0D2740 !important;
     color: #D7D8D9 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 10px rgba(1, 26, 51, 0.35) !important;
+}
+
+button[kind="primary"]:active,
+div.stButton>button[kind="primary"]:active {
+    transform: scale(0.98) !important;
 }
 
 button[kind="primary"]:hover *,
@@ -362,7 +404,8 @@ button[aria-haspopup="dialog"] {
     border: 1.5px solid #2F5173 !important;
     border-radius: 6px !important;
     font-weight: 500 !important;
-    transition: background-color 0.2s ease, transform 0.1s ease !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease !important;
 }
 
 div.stButton>button:not([kind="primary"]):not([data-testid="stPill"]) *,
@@ -386,6 +429,12 @@ button[aria-haspopup="dialog"]:hover {
     background-color: #2F5173 !important;
     color: #D7D8D9 !important;
     border-color: #0D2740 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(1, 26, 51, 0.15) !important;
+}
+
+div.stButton>button:not([kind="primary"]):not([data-testid="stPill"]):active {
+    transform: scale(0.98) !important;
 }
 
 div.stButton>button:not([kind="primary"]):not([data-testid="stPill"]):hover *,
@@ -423,7 +472,8 @@ div[class*="st-key-btn_view_"] button {
     justify-content: center !important;
     font-size: 16px !important;
     box-shadow: 0 1px 3px rgba(1, 26, 51, 0.08) !important;
-    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease !important;
 }
 
 div[class*="st-key-btn_swap_"] button *,
@@ -443,8 +493,16 @@ div[class*="st-key-btn_view_"] button:hover {
     background-color: #2F5173 !important;
     color: #D7D8D9 !important;
     border-color: #0D2740 !important;
-    box-shadow: 0 2px 5px rgba(1, 26, 51, 0.15) !important;
-    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(1, 26, 51, 0.20) !important;
+    transform: translateY(-2px);
+}
+
+div[class*="st-key-btn_swap_"] button:active,
+div[class*="st-key-btn_manage_"] button:active,
+div[class*="st-key-del_"] button:active,
+div[class*="st-key-btn_del_"] button:active,
+div[class*="st-key-btn_view_"] button:active {
+    transform: scale(0.95) !important;
 }
 
 div[class*="st-key-btn_swap_"] button:hover *,
@@ -475,6 +533,8 @@ div[data-testid="stWidgetLabel"] button,
     min-width: auto !important;
     width: auto !important;
     height: auto !important;
+    cursor: help !important;
+    transition: color 0.2s ease, transform 0.2s ease !important;
 }
 
 div[data-testid="stTooltipIcon"] button:hover,
@@ -626,6 +686,8 @@ button[data-testid="stBaseButton-pillsActive"]:focus-visible * {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
 }
 
 .green-btn-marker+div div.stButton button *,
@@ -1097,4 +1159,56 @@ div[class*="st-key-gal_card"] div[data-testid="stButton"]>button {
     margin: 0 !important;
     box-shadow: none !important;
     z-index: 10 !important;
+}
+
+/* ==========================================
+   ANIMAÇÕES DOS TOASTS (POPUPS)
+   Animação suave de entrada (bounce) e saída (slide out)
+   ========================================== */
+@keyframes toastSlideInOut {
+    0% {
+        transform: translateX(120%) scale(0.9);
+        opacity: 0;
+    }
+    8% {
+        transform: translateX(-5%) scale(1.02);
+        opacity: 1;
+    }
+    12% {
+        transform: translateX(0) scale(1);
+        opacity: 1;
+    }
+    90% {
+        transform: translateX(0) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(120%) scale(0.9);
+        opacity: 0;
+    }
+}
+
+div[data-testid="stToast"] {
+    animation: toastSlideInOut 4s cubic-bezier(0.215, 0.61, 0.355, 1) forwards !important;
+    border-radius: 8px !important;
+    border: 1px solid #2F5173 !important;
+    border-left: 6px solid #2F5173 !important;
+    box-shadow: 0 10px 30px rgba(1, 26, 51, 0.25) !important;
+    background-color: #D7D8D9 !important;
+    background: #D7D8D9 !important;
+    color: #011A33 !important;
+}
+
+div[data-testid="stToast"]:hover {
+    animation-play-state: paused !important;
+}
+
+div[data-testid="stToast"] div[data-testid="stMarkdownContainer"] p {
+    color: #011A33 !important;
+    font-weight: 500 !important;
+}
+
+/* Ocultar o botão (X) de fechar do popup */
+div[data-testid="stToast"] button {
+    display: none !important;
 }

@@ -59,8 +59,7 @@ class CrcMonitoramentoReport(CrcReport):
         meta = extrair_metadados_anterior(documento_anterior)
         self.N_prev = meta["N_prev"]
         self.N_curr = meta["N_curr"]
-        self.ctr_num = meta["ctr_num"]
-        self.processo_sei_prev = meta["processo_sei_prev"]
+        self.processo_sei_prev = meta["processo_sei_prev"] if meta["processo_sei_prev"] not in ("XXXXXXXX", "xxxxxxxx", "xxxxxxxx-xxx", "") else "xxxxxxxx-xxx"
         self.data_vistoria_prev = meta["data_vistoria_prev"]
         self.oficio_num_prev = meta["oficio_num_prev"]
         self.oficio_data_prev = meta["oficio_data_prev"]
@@ -164,7 +163,7 @@ class CrcMonitoramentoReport(CrcReport):
         add_cover_p("EXPLORAÇÃO DA PONTE DE ACESSO E SISTEMA VIÁRIO", bold=True, size_pt=11, space_after=4)
         add_cover_p("DO DESTINO DE TURISMO E LAZER PRAIA DO PAIVA", bold=True, size_pt=11, space_after=6)
         add_cover_p("", bold=False, size_pt=11, space_after=6)  # Parágrafo em branco P9
-        add_cover_p("PROCESSO SEI Nº 0030200023.004570/2025-45", bold=True, size_pt=11, space_after=6)
+        add_cover_p(f"PROCESSO SEI Nº {self.processo_sei_prev}", bold=True, size_pt=11, space_after=6)
         add_cover_p("", bold=False, size_pt=11, space_after=6)  # Parágrafo em branco P11
         add_cover_p("Recife, data da assinatura eletrônica", bold=False, size_pt=11, space_after=0)
 
@@ -326,7 +325,7 @@ class CrcMonitoramentoReport(CrcReport):
         ncs_pend_prev = getattr(self, "N_ncs_pendentes_prev", "X")
         data_vist_prev = getattr(self, "data_vistoria_prev", "XX/XX/XXXX")
         
-        processo_sei_prev = getattr(self, "processo_sei_prev", "XXXXXXXX")
+        processo_sei_prev = getattr(self, "processo_sei_prev", "xxxxxxxx-xxx")
         
         try:
             val_ncs = int(ncs_pend_prev)
@@ -344,7 +343,7 @@ class CrcMonitoramentoReport(CrcReport):
         oficio_data_prev = getattr(self, "oficio_data_prev", "xx/xx/xxxx")
         carta_num_prev = getattr(self, "carta_num_prev", "xxxx/xxxx")
         carta_data_prev = getattr(self, "carta_data_prev", "xx/xx/xxxx")
-        carta_sei_prev = getattr(self, "carta_sei_prev", "xxxxxxxx")
+        carta_sei_prev = getattr(self, "carta_sei_prev", "xxxxxxxx-xxx")
         
         if is_fiscalizacao:
             add_p(

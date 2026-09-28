@@ -31,13 +31,13 @@ def extrair_metadados_anterior(documento_anterior):
         "N_prev": "X",
         "N_curr": "X",
         "ctr_num": "XX/XXXX",
-        "processo_sei_prev": "XXXXXXXX",
+        "processo_sei_prev": "xxxxxxxx-xxx",
         "data_vistoria_prev": "XX/XX/XXXX",
         "oficio_num_prev": "xxx/xxxx",
         "oficio_data_prev": "xx/xx/xxxx",
         "carta_num_prev": "xxxx/xxxx",
         "carta_data_prev": "xx/xx/xxxx",
-        "carta_sei_prev": "xxxxxxxx",
+        "carta_sei_prev": "xxxxxxxx-xxx",
         "is_fiscalizacao": False
     }
     if not documento_anterior:

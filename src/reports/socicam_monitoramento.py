@@ -52,7 +52,7 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport):
             mes_ano = extrair_mes_ano_numerico(data_val)
         return [
             f"RELATÓRIO DE MONITORAMENTO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
-            f"SEI Nº 0030200023.002186/{ano}-99"
+            "SEI Nº xxxxxxxx-xxx"
         ]
 
     def get_sumario_linhas(self, row, nc_df=None) -> list:
