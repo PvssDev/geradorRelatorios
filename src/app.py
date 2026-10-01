@@ -1316,7 +1316,7 @@ with st.container():
                     
                 # 2. Tabela de Pontos de Atenção (apenas com coluna Ponto de Atenção)
                 pas_para_excluir = []
-                if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                if st.session_state.get("categoria_relatorio", "Fiscalização") != "Monitoramento":
                     st.write("") # Espaçamento
                     st.write("**:material/visibility: Pontos de Atenção:**")
                     if not df_nc.empty and "Ponto de Atenção" in df_nc.columns:

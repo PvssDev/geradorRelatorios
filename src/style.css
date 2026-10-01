@@ -447,47 +447,6 @@ button[aria-haspopup="dialog"]:hover * {
     color: #D7D8D9 !important;
     fill: #D7D8D9 !important;
     background-color: transparent !important;
-}
-
-/* ==========================================
-   ESTADO DESABILITADO NATIVO / BLOQUEADO
-   Garante visual cinza apagado e cursor de bloqueio
-   ========================================== */
-button:disabled,
-button[disabled],
-div.stButton>button:disabled,
-div.stButton>button[disabled],
-div.stDownloadButton>button:disabled,
-div.stDownloadButton>button[disabled] {
-    opacity: 0.45 !important;
-    cursor: not-allowed !important;
-    background-color: #c4ccd3 !important;
-    border: 1.5px solid #9aa8b5 !important;
-    color: #617385 !important;
-    box-shadow: none !important;
-    transform: none !important;
-    pointer-events: none !important;
-}
-
-button:disabled *,
-button[disabled] *,
-div.stButton>button:disabled *,
-div.stButton>button[disabled] *,
-div.stDownloadButton>button:disabled *,
-div.stDownloadButton>button[disabled] * {
-    color: #617385 !important;
-    fill: #617385 !important;
-    opacity: 0.75 !important;
-}
-
-button:disabled:hover,
-div.stButton>button:disabled:hover {
-    background-color: #c4ccd3 !important;
-    border-color: #9aa8b5 !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-
 /* ==========================================
    BOTÃO RELACIONAR (FISCALIZAÇÕES)
    Transição explícita entre Estado Disponível e Indisponível
