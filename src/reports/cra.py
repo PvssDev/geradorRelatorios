@@ -71,8 +71,8 @@ class CraReport(BaseReport):
             ("VI", "Verificador Independente contratado por SUAPE, atualmente o Consórcio formado pelas Empresas TPF e ECR")
         ]
 
-    def get_sumario_linhas(self, row) -> list:
-        return [
+    def get_sumario_linhas(self, row, nc_df=None) -> list:
+        linhas = [
             "1.\tINTRODUÇÃO\t4",
             "2.\tOBJETIVO\t4",
             "3.\tINFORMAÇÕES GERAIS\t4",
@@ -80,9 +80,43 @@ class CraReport(BaseReport):
             "5.\tFISCALIZAÇÃO\t7",
             "6.\tDETERMINAÇÕES GERAIS\t11",
             "7.\tRECOMENDAÇÕES\t11",
-            "8.\tCONCLUSÕES\t11",
-            "\tAPÊNDICE ÚNICO  – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12"
+            "8.\tCONCLUSÕES\t11"
         ]
+        
+        ambos_presentes = False
+        tem_nc = False
+        tem_pa = False
+        if nc_df is not None and not nc_df.empty:
+            id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
+            if "ID da Fiscalização" in nc_df.columns:
+                mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc
+                current_ncs = nc_df[mask_id].copy()
+                if current_ncs.empty:
+                    current_ncs = nc_df.copy()
+            else:
+                current_ncs = nc_df.copy()
+                
+            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
+            if col_nc:
+                mask_nc = current_ncs[col_nc].fillna("").astype(str).str.strip() != ""
+                if not current_ncs[mask_nc].empty:
+                    tem_nc = True
+
+            col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
+            if col_pa:
+                mask_pa = current_ncs[col_pa].fillna("").astype(str).str.strip() != ""
+                if not current_ncs[mask_pa].empty:
+                    tem_pa = True
+                    
+        ambos_presentes = tem_nc and tem_pa
+
+        if ambos_presentes:
+            linhas.append("\tAPÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES\t12")
+            linhas.append("\tAPÊNDICE B – REGISTROS FOTOGRÁFICOS DOS PONTOS DE ATENÇÃO\t12")
+        else:
+            linhas.append("\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO\t12")
+            
+        return linhas
 
     def get_intro_paragraphs(self, row, ano, data_extenso) -> list:
         return [
@@ -440,34 +474,54 @@ class CraReport(BaseReport):
                 if italic:
                     run.italic = True
                     
-        # 2. Quadro 2 title
-        p7 = doc.add_paragraph()
-        p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p7.paragraph_format.space_after = Pt(6)
-        r7_1 = p7.add_run("Quadro 2")
-        r7_1.bold = True
-        r7_1.font.name = 'Aptos'
-        r7_1.font.size = Pt(11)
-        r7_2 = p7.add_run(f" – Determinações para Não Conformidades Identificadas – {mes_ano}")
-        r7_2.font.name = 'Aptos'
-        r7_2.font.size = Pt(11)
-        
-        criar_tabela_quadros_fn(doc, ncs_reais, is_pa=False, report_config=self)
-        doc.add_paragraph()
-        
-        # 3. Quadro 3 title
-        p8 = doc.add_paragraph()
-        p8.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p8.paragraph_format.space_after = Pt(6)
-        r8_1 = p8.add_run("Quadro 3")
-        r8_1.bold = True
-        r8_1.font.name = 'Aptos'
-        r8_1.font.size = Pt(11)
-        r8_2 = p8.add_run(" – Pontos de Atenção por Rodovia/Sentido")
-        r8_2.font.name = 'Aptos'
-        r8_2.font.size = Pt(11)
-        
-        criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
+        ambos_presentes = not ncs_reais.empty and not pas_reais.empty
+        tem_nc = not ncs_reais.empty
+        tem_pa = not pas_reais.empty
+
+        if tem_nc or (not tem_nc and not tem_pa):
+            # 2. Quadro 2 title
+            p7 = doc.add_paragraph()
+            p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p7.paragraph_format.space_after = Pt(6)
+            r7_1 = p7.add_run("Quadro 2")
+            r7_1.bold = True
+            r7_1.font.name = 'Aptos'
+            r7_1.font.size = Pt(11)
+            r7_2 = p7.add_run(f" – Determinações para Não Conformidades Identificadas – {mes_ano}")
+            r7_2.font.name = 'Aptos'
+            r7_2.font.size = Pt(11)
+            
+            criar_tabela_quadros_fn(doc, ncs_reais, is_pa=False, report_config=self)
+            doc.add_paragraph()
+            
+            if ambos_presentes:
+                # 3. Quadro 3 title
+                p8 = doc.add_paragraph()
+                p8.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p8.paragraph_format.space_after = Pt(6)
+                r8_1 = p8.add_run("Quadro 3")
+                r8_1.bold = True
+                r8_1.font.name = 'Aptos'
+                r8_1.font.size = Pt(11)
+                r8_2 = p8.add_run(" – Pontos de Atenção por Rodovia/Sentido")
+                r8_2.font.name = 'Aptos'
+                r8_2.font.size = Pt(11)
+                
+                criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
+        elif tem_pa:
+            # 2. Quadro 2 title (but for PA)
+            p7 = doc.add_paragraph()
+            p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p7.paragraph_format.space_after = Pt(6)
+            r7_1 = p7.add_run("Quadro 2")
+            r7_1.bold = True
+            r7_1.font.name = 'Aptos'
+            r7_1.font.size = Pt(11)
+            r7_2 = p7.add_run(" – Pontos de Atenção por Rodovia/Sentido")
+            r7_2.font.name = 'Aptos'
+            r7_2.font.size = Pt(11)
+            
+            criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
         
         doc.add_paragraph()
         doc.add_paragraph()
@@ -549,31 +603,44 @@ class CraReport(BaseReport):
         from utils import adicionar_titulo_secao
         from docx.shared import Pt
         
-        p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
-        p_ap_a.paragraph_format.page_break_before = True
+        ambos_presentes = not ncs_reais.empty and not pas_reais.empty
+        tem_nc = not ncs_reais.empty
+        tem_pa = not pas_reais.empty
         
-        local_val = row.get("Local", "")
-        if not local_val or str(local_val).strip() in ("", "=Local="):
-            local_val = "Rota do Atlântico"
+        if ambos_presentes:
+            p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE A – REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES")
+            p_ap_a.paragraph_format.page_break_before = True
+            
+            local_val = row.get("Local", "")
+            if not local_val or str(local_val).strip() in ("", "=Local="):
+                local_val = "Rota do Atlântico"
 
-        if not ncs_reais.empty:
             criar_grade_fotos_fn(doc, ncs_reais, local_val, fotos_dir, data_fisc, self.key)
-        else:
-            p_empty = doc.add_paragraph()
-            r_empty = p_empty.add_run("Nenhum registro fotográfico de não conformidade cadastrado.")
-            r_empty.font.name = 'Aptos'
-            r_empty.font.size = Pt(11)
 
-        p_ap_b = adicionar_titulo_secao(doc, "APÊNDICE B – REGISTROS FOTOGRÁFICOS DAS PONTOS DE ATENÇÃO")
-        p_ap_b.paragraph_format.page_break_before = True
-        
-        if not pas_reais.empty:
+            p_ap_b = adicionar_titulo_secao(doc, "APÊNDICE B – REGISTROS FOTOGRÁFICOS DOS PONTOS DE ATENÇÃO")
+            p_ap_b.paragraph_format.page_break_before = True
+            
             criar_grade_fotos_fn(doc, pas_reais, local_val, fotos_dir, data_fisc, self.key)
         else:
-            p_empty = doc.add_paragraph()
-            r_empty = p_empty.add_run("Nenhum registro fotográfico de ponto de atenção cadastrado.")
-            r_empty.font.name = 'Aptos'
-            r_empty.font.size = Pt(11)
+            p_ap_a = adicionar_titulo_secao(doc, "APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO")
+            p_ap_a.paragraph_format.page_break_before = True
+            
+            local_val = row.get("Local", "")
+            if not local_val or str(local_val).strip() in ("", "=Local="):
+                local_val = "Rota do Atlântico"
+                
+            if tem_pa and not tem_nc:
+                df_render = pas_reais
+            else:
+                df_render = ncs_reais
+                
+            if not df_render.empty:
+                criar_grade_fotos_fn(doc, df_render, local_val, fotos_dir, data_fisc, self.key)
+            else:
+                p_empty = doc.add_paragraph()
+                r_empty = p_empty.add_run("Nenhum registro fotográfico cadastrado.")
+                r_empty.font.name = 'Aptos'
+                r_empty.font.size = Pt(11)
 
     @property
     def analyst_title(self) -> str:

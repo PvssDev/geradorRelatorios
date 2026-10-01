@@ -1,3 +1,4 @@
+import pandas as pd
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from reports.base import BaseReport
@@ -93,7 +94,7 @@ class SocicamReport(BaseReport):
             ("TIP", "Terminal Rodoviário de Passageiros do Recife")
         ]
 
-    def get_sumario_linhas(self, row) -> list:
+    def get_sumario_linhas(self, row, nc_df=None) -> list:
         local_val = str(row.get("Local", "TIP")).upper()
         local_sigla = "TIP"
         if "TIP" in local_val:
@@ -102,16 +103,51 @@ class SocicamReport(BaseReport):
             local_sigla = local_val.split("(")[0].strip()
         else:
             local_sigla = local_val
-        return [
+            
+        linhas = [
             "1.\tINTRODUÇÃO\t4",
             "2.\tOBJETIVO\t4",
             "3.\tMETODOLOGIA\t5",
             "4.\tFISCALIZAÇÃO\t5",
             "5.\tDETERMINAÇÕES GERAIS\t6",
             "6.\tRECOMENDAÇÕES\t6",
-            "7.\tCONCLUSÕES\t7",
-            f"\tAPÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}\t7"
+            "7.\tCONCLUSÕES\t7"
         ]
+        
+        ambos_presentes = False
+        tem_nc = False
+        tem_pa = False
+        if nc_df is not None and not nc_df.empty:
+            id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
+            if "ID da Fiscalização" in nc_df.columns:
+                mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc
+                current_ncs = nc_df[mask_id].copy()
+                if current_ncs.empty:
+                    current_ncs = nc_df.copy()
+            else:
+                current_ncs = nc_df.copy()
+                
+            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
+            if col_nc:
+                mask_nc = current_ncs[col_nc].fillna("").astype(str).str.strip() != ""
+                if not current_ncs[mask_nc].empty:
+                    tem_nc = True
+
+            col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
+            if col_pa:
+                mask_pa = current_ncs[col_pa].fillna("").astype(str).str.strip() != ""
+                if not current_ncs[mask_pa].empty:
+                    tem_pa = True
+                    
+        ambos_presentes = tem_nc and tem_pa
+
+        if ambos_presentes:
+            linhas.append(f"\tAPÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}\t7")
+            linhas.append(f"\tAPÊNDICE B - REGISTROS FOTOGRÁFICOS DOS PONTOS DE ATENÇÃO APONTADOS PARA O {local_sigla}\t7")
+        else:
+            linhas.append(f"\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO NO {local_sigla}\t7")
+            
+        return linhas
 
     def get_intro_paragraphs(self, row, ano, data_extenso) -> list:
         local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
@@ -244,13 +280,19 @@ class SocicamReport(BaseReport):
             current_ncs = pd.DataFrame()
 
         ncs_reais = pd.DataFrame()
+        pas_reais = pd.DataFrame()
         if not current_ncs.empty:
             col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
             if col_nc:
                 mask_nc = current_ncs[col_nc].fillna("").astype(str).str.strip() != ""
                 ncs_reais = current_ncs[mask_nc].copy()
+                
+            col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
+            if col_pa:
+                mask_pa = current_ncs[col_pa].fillna("").astype(str).str.strip() != ""
+                pas_reais = current_ncs[mask_pa].copy()
             
-            if ncs_reais.empty:
+            if ncs_reais.empty and pas_reais.empty:
                 cols_check = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Descrição da Evidência", "Descrição"] if c in current_ncs.columns]
                 if cols_check:
                     mask_any = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
@@ -260,21 +302,56 @@ class SocicamReport(BaseReport):
             
         local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
         
-        # 3. Quadro 1 title
-        p7 = doc.add_paragraph()
-        p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p7.paragraph_format.space_after = Pt(6)
-        r7_1 = p7.add_run("Quadro 1")
-        r7_1.bold = True
-        r7_1.font.name = 'Aptos'
-        r7_1.font.size = Pt(11)
-        r7_2 = p7.add_run(f" – Não Conformidades do {local_val}")
-        r7_2.font.name = 'Aptos'
-        r7_2.font.size = Pt(11)
-        
-        # 4. Render Table
-        criar_tabela_quadros_fn(doc, ncs_reais, is_pa=False, report_config=self)
-        doc.add_paragraph()
+        ambos_presentes = not ncs_reais.empty and not pas_reais.empty
+        tem_nc = not ncs_reais.empty
+        tem_pa = not pas_reais.empty
+
+        if tem_nc or (not tem_nc and not tem_pa):
+            # 3. Quadro 1 title
+            p7 = doc.add_paragraph()
+            p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p7.paragraph_format.space_after = Pt(6)
+            r7_1 = p7.add_run("Quadro 1")
+            r7_1.bold = True
+            r7_1.font.name = 'Aptos'
+            r7_1.font.size = Pt(11)
+            r7_2 = p7.add_run(f" – Não Conformidades do {local_val}")
+            r7_2.font.name = 'Aptos'
+            r7_2.font.size = Pt(11)
+            
+            # 4. Render Table NC
+            criar_tabela_quadros_fn(doc, ncs_reais, is_pa=False, report_config=self)
+            doc.add_paragraph()
+            
+            if ambos_presentes:
+                p_q2 = doc.add_paragraph()
+                p_q2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_q2.paragraph_format.space_after = Pt(6)
+                r_q2_1 = p_q2.add_run("Quadro 2")
+                r_q2_1.bold = True
+                r_q2_1.font.name = 'Aptos'
+                r_q2_1.font.size = Pt(11)
+                r_q2_2 = p_q2.add_run(f" – Pontos de Atenção do {local_val}")
+                r_q2_2.font.name = 'Aptos'
+                r_q2_2.font.size = Pt(11)
+                
+                criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
+                doc.add_paragraph()
+        elif tem_pa:
+            # 3. Quadro 1 title
+            p7 = doc.add_paragraph()
+            p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p7.paragraph_format.space_after = Pt(6)
+            r7_1 = p7.add_run("Quadro 1")
+            r7_1.bold = True
+            r7_1.font.name = 'Aptos'
+            r7_1.font.size = Pt(11)
+            r7_2 = p7.add_run(f" – Pontos de Atenção do {local_val}")
+            r7_2.font.name = 'Aptos'
+            r7_2.font.size = Pt(11)
+            
+            criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
+            doc.add_paragraph()
 
     @property
     def quadros_section_title(self) -> str:
@@ -426,16 +503,36 @@ class SocicamReport(BaseReport):
         else:
             local_sigla = local_val
             
-        p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}")
-        p_ap_a.paragraph_format.page_break_before = True
-        
-        if not ncs_reais.empty:
+        ambos_presentes = not ncs_reais.empty and not pas_reais.empty
+        tem_nc = not ncs_reais.empty
+        tem_pa = not pas_reais.empty
+
+        if ambos_presentes:
+            p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}")
+            p_ap_a.paragraph_format.page_break_before = True
+            
             criar_grade_fotos_fn(doc, ncs_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+
+            p_ap_b = adicionar_titulo_secao(doc, f"APÊNDICE B - REGISTROS FOTOGRÁFICOS DOS PONTOS DE ATENÇÃO APONTADOS PARA O {local_sigla}")
+            p_ap_b.paragraph_format.page_break_before = True
+            
+            criar_grade_fotos_fn(doc, pas_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
         else:
-            p_empty = doc.add_paragraph()
-            r_empty = p_empty.add_run("Nenhum registro fotográfico de não conformidade cadastrado.")
-            r_empty.font.name = 'Aptos'
-            r_empty.font.size = Pt(11)
+            p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO NO {local_sigla}")
+            p_ap_a.paragraph_format.page_break_before = True
+            
+            if tem_pa and not tem_nc:
+                df_render = pas_reais
+            else:
+                df_render = ncs_reais
+                
+            if not df_render.empty:
+                criar_grade_fotos_fn(doc, df_render, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+            else:
+                p_empty = doc.add_paragraph()
+                r_empty = p_empty.add_run("Nenhum registro fotográfico cadastrado.")
+                r_empty.font.name = 'Aptos'
+                r_empty.font.size = Pt(11)
 
     @property
     def analyst_title(self) -> str:

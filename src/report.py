@@ -205,7 +205,7 @@ def gerar_relatorio(
                     has_nc = len(current_ncs)
             has_pa = 0
             col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
-            if report_config.key == "CRA" and col_pa:
+            if col_pa:
                 has_pa = len(current_ncs[current_ncs[col_pa].fillna("").astype(str).str.strip() != ""])
             total_achados = has_nc + has_pa
 

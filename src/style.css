@@ -450,6 +450,115 @@ button[aria-haspopup="dialog"]:hover * {
 }
 
 /* ==========================================
+   ESTADO DESABILITADO NATIVO / BLOQUEADO
+   Garante visual cinza apagado e cursor de bloqueio
+   ========================================== */
+button:disabled,
+button[disabled],
+div.stButton>button:disabled,
+div.stButton>button[disabled],
+div.stDownloadButton>button:disabled,
+div.stDownloadButton>button[disabled] {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    background-color: #c4ccd3 !important;
+    border: 1.5px solid #9aa8b5 !important;
+    color: #617385 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    pointer-events: none !important;
+}
+
+button:disabled *,
+button[disabled] *,
+div.stButton>button:disabled *,
+div.stButton>button[disabled] *,
+div.stDownloadButton>button:disabled *,
+div.stDownloadButton>button[disabled] * {
+    color: #617385 !important;
+    fill: #617385 !important;
+    opacity: 0.75 !important;
+}
+
+button:disabled:hover,
+div.stButton>button:disabled:hover {
+    background-color: #c4ccd3 !important;
+    border-color: #9aa8b5 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* ==========================================
+   BOTÃO RELACIONAR (FISCALIZAÇÕES)
+   Transição explícita entre Estado Disponível e Indisponível
+   ========================================== */
+/* Estado DISPONÍVEL (Mesma estilização dos botões cinzas do sistema, com amplo respiro) */
+div[class*="st-key-btn_relacionar"] button:not(:disabled) {
+    background-color: #D7D8D9 !important;
+    color: #011A33 !important;
+    border: 1.5px solid #2F5173 !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    white-space: nowrap !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    gap: 8px !important;
+    box-shadow: 0 1px 3px rgba(1, 26, 51, 0.08) !important;
+    transition: background-color 0.2s ease, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease !important;
+}
+
+div[class*="st-key-btn_relacionar"] button:not(:disabled) * {
+    color: #011A33 !important;
+    fill: #011A33 !important;
+    opacity: 1 !important;
+    background-color: transparent !important;
+}
+
+div[class*="st-key-btn_relacionar"] button:not(:disabled):hover {
+    background-color: #2F5173 !important;
+    border-color: #0D2740 !important;
+    color: #D7D8D9 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(1, 26, 51, 0.15) !important;
+}
+
+div[class*="st-key-btn_relacionar"] button:not(:disabled):hover * {
+    color: #D7D8D9 !important;
+    fill: #D7D8D9 !important;
+}
+
+div[class*="st-key-btn_relacionar"] button:not(:disabled):active {
+    transform: scale(0.98) !important;
+}
+
+/* Estado INDISPONÍVEL (Cinza apagado, inativo, desabilitado) */
+div[class*="st-key-btn_relacionar"] button:disabled,
+div[class*="st-key-btn_relacionar"] button[disabled] {
+    opacity: 0.38 !important;
+    cursor: not-allowed !important;
+    background-color: #cfd6dc !important;
+    border: 1.5px dashed #a0adb9 !important;
+    color: #758696 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    pointer-events: none !important;
+    white-space: nowrap !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    gap: 8px !important;
+}
+
+div[class*="st-key-btn_relacionar"] button:disabled *,
+div[class*="st-key-btn_relacionar"] button[disabled] * {
+    color: #758696 !important;
+    fill: #758696 !important;
+    opacity: 0.70 !important;
+}
+
+/* ==========================================
    BOTÕES QUADRADOS DE ÍCONES / CONFIGURAÇÃO / SWITCHES
    (⚙️, 🔄, 📋, 🗑️, 🔍, etc.)
    ========================================== */

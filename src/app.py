@@ -754,7 +754,7 @@ with st.container():
                         ncs_existentes = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == id_vinculo]
                         nc_num = len(ncs_existentes) + 1
                     
-                    if st.session_state.get("tipo_relatorio", "CRA") == "CRA" and not is_monitoring:
+                    if not is_monitoring:
                         tipo_registro = st.pills(
                             "Tipo de Registro",
                             ["Não Conformidade", "Ponto de Atenção"],
@@ -919,14 +919,14 @@ with st.container():
                         if is_monitoring:
                             col_nxt, _ = st.columns([3.0, 7.0], gap="small")
                         else:
-                            col_nxt, col_rel, _ = st.columns([3.0, 3.0, 4.0], gap="small")
+                            col_nxt, col_rel, _ = st.columns([2.5, 4.5, 3.0], gap="small")
                         
                         with col_nxt:
                             if st.button("Próximo", icon=":material/arrow_forward:", type="primary", use_container_width=True):
                                 if id_vinculo == "Nenhum ID cadastrado":
                                     st.toast(f"Adicione um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.", icon=":material/error:")
                                 elif not nc_descricao and not ponto_atencao:
-                                    msg_erro = "O campo 'Não Conformidade' é obrigatório." if st.session_state.get("tipo_relatorio", "CRA") in ["CRC", "SOCICAM"] else "O campo 'Não Conformidade' ou 'Ponto de Atenção' é obrigatório."
+                                    msg_erro = "O campo 'Não Conformidade' ou 'Ponto de Atenção' é obrigatório."
                                     st.toast(msg_erro, icon=":material/error:")
                                 elif not foto_default:
                                     st.toast("É obrigatório ter uma foto selecionada no carrossel para continuar.", icon=":material/error:")
@@ -955,8 +955,33 @@ with st.container():
                     
                         if not is_monitoring:
                             with col_rel:
-                                disable_rel = len(st.session_state.temp_nc) == 0
-                                if st.button("Relacionar", icon=":material/link:", type="secondary", disabled=disable_rel, use_container_width=True):
+                                pode_relacionar = False
+                                if st.session_state.temp_nc:
+                                    last_nc = st.session_state.temp_nc[-1]
+                                    if not last_nc.get("is_relacionado", False):
+                                        pode_relacionar = True
+                                
+                                disable_rel = not pode_relacionar
+                                
+                                help_text = (
+                                    "Adicione uma Não Conformidade primeiro para habilitar o relacionamento de fotos."
+                                    if len(st.session_state.temp_nc) == 0
+                                    else (
+                                        "A última NC adicionada já possui uma foto relacionada (máximo 2 fotos por registro)."
+                                        if disable_rel
+                                        else "Relacionar a foto selecionada à última Não Conformidade cadastrada."
+                                    )
+                                )
+                                
+                                if st.button(
+                                    "Relacionar",
+                                    icon=":material/link:",
+                                    type="secondary",
+                                    disabled=disable_rel,
+                                    help=help_text,
+                                    use_container_width=True,
+                                    key=f"btn_relacionar_{st.session_state.nc_form_counter}"
+                                ):
                                     if not foto_default:
                                         st.toast("É obrigatório ter uma foto selecionada no carrossel para relacionar.", icon=":material/error:")
                                     else:
@@ -969,6 +994,13 @@ with st.container():
                                         new_nc["Foto"] = foto_default
                                         new_nc["Nº"] = new_nc_num
                                         new_nc["Situação"] = situacao
+                                        new_nc["is_relacionado"] = True
+                                        
+                                        grp_id = last_nc.get("grupo_relacao")
+                                        if not grp_id:
+                                            grp_id = f"grp_{last_nc.get('ID da Fiscalização')}_{last_nc.get('Nº')}_{st.session_state.nc_form_counter}"
+                                            last_nc["grupo_relacao"] = grp_id
+                                        new_nc["grupo_relacao"] = grp_id
                                     
                                         st.session_state.temp_nc.append(new_nc)
                                     
@@ -979,7 +1011,7 @@ with st.container():
                                         st.session_state.trecho_persistido = new_nc.get("Trecho", "")
                                     
                                         st.session_state.nc_form_counter += 1
-                                        st.session_state.pending_toast = {"msg": "Informações da última foto relacionadas com sucesso!", "icon": ":material/check_circle:"}
+                                        st.session_state.pending_toast = {"msg": "Foto relacionada com sucesso à última NC!", "icon": ":material/check_circle:"}
                                         st.rerun()
             else:
                 if is_monitoring and st.session_state.get("step1_identificacao"):
@@ -1044,7 +1076,9 @@ with st.container():
                                 "Fundamento da infração": fundamento_infracao,
                                 "Determinação": determinacao,
                                 "Situação": situacao,
-                                "Análise ARPE": analise_arpe
+                                "Análise ARPE": analise_arpe,
+                                "is_relacionado": False,
+                                "grupo_relacao": f"grp_{st.session_state.step1_id_vinculo}_{novo_nc_num}_{st.session_state.nc_form_counter}"
                             }
                             st.session_state.temp_nc.append(rec)
                         else:

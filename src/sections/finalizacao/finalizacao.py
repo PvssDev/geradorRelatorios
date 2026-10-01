@@ -211,207 +211,241 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 doc.add_paragraph() # Espaço entre tabelas
         return
 
-    if str(tipo_relatorio).upper() in ["CRC", "SOCICAM"]:
-        # No CRC/SOCICAM cada foto é uma tabela de 1 coluna
-        for idx, rec in enumerate(records):
-            obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
+    # Nova lógica unificada para todas as Fiscalizações (CRA, CRC, SOCICAM)
+    from sections.quadros.quadros import _limpar_valor_campo
+    
+    records = df_fotos.to_dict('records')
+    grouped = []
+    
+    chaves = [
+        "Não Conformidade", "Ponto de Atenção",
+        "Pista", "Trecho", "Observações",
+        "Fundamento da infração", "Determinação", "Identificação"
+    ]
+    
+    for rec in records:
+        found = False
+        for g_rec in grouped:
+            rec_grupo = _limpar_valor_campo(rec.get("grupo_relacao", ""))
+            g_rec_grupo = _limpar_valor_campo(g_rec.get("grupo_relacao", ""))
             
-            if str(tipo_relatorio).upper() == "CRC":
-                p_nc_desc = doc.add_paragraph()
-                p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                p_nc_desc.paragraph_format.space_before = Pt(12)
-                p_nc_desc.paragraph_format.space_after = Pt(6)
-                p_nc_desc.paragraph_format.line_spacing = 1.15
+            if rec_grupo and g_rec_grupo:
+                if rec_grupo == g_rec_grupo:
+                    g_rec["related_records"].append(rec)
+                    found = True
+                    break
+            else:
+                match = True
+                for key in chaves:
+                    val1 = _limpar_valor_campo(rec.get(key, ""))
+                    val2 = _limpar_valor_campo(g_rec.get(key, ""))
+                    if val1 != val2:
+                        match = False
+                        break
+                if match:
+                    g_rec["related_records"].append(rec)
+                    found = True
+                    break
                 
-                ident = str(rec.get("Identificação", "")).strip()
-                nc_txt = str(rec.get("Não Conformidade", "")).strip()
-                label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or f"Item {idx+1}")
-                
-                run_nc_desc = p_nc_desc.add_run(label_item)
-                run_nc_desc.bold = True
-                run_nc_desc.font.name = 'Aptos'
-                run_nc_desc.font.size = Pt(11)
+        if not found:
+            new_g_rec = rec.copy()
+            new_g_rec["related_records"] = [rec]
+            grouped.append(new_g_rec)
             
-            # Tabela de 1 coluna com 2 linhas
-            table = doc.add_table(rows=2, cols=1)
-            table.style = 'Table Grid'
-            table.alignment = WD_TABLE_ALIGNMENT.CENTER
-            table.autofit = False
-            table.allow_autofit = False
+    def _limpar_pista_para_agrupamento(p_val):
+        if pd.isna(p_val):
+            return "Única"
+        s = str(p_val).strip()
+        if not s or s.lower() in ("nan", "none", "null"):
+            return "Única"
+        return s
+
+    pistas_unicas = []
+    for p in df_fotos["Pista"].tolist():
+        p_str = _limpar_pista_para_agrupamento(p)
+        if p_str not in pistas_unicas:
+            pistas_unicas.append(p_str)
             
-            # Largura de 3.12 polegadas para SOCICAM e 5.0 para CRC
-            tbl_width = Inches(3.12) if str(tipo_relatorio).upper() == "SOCICAM" else Inches(5.0)
-            table.rows[0].cells[0].width = tbl_width
-            table.rows[1].cells[0].width = tbl_width
+    for idx_pista, pista_val in enumerate(pistas_unicas):
+        grupos_pista = [g for g in grouped if _limpar_pista_para_agrupamento(g.get("Pista")) == pista_val]
+        if not grupos_pista:
+            continue
             
-            # Row 0: Foto
-            p_img = table.rows[0].cells[0].paragraphs[0]
-            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_img.paragraph_format.space_before = Pt(4)
-            p_img.paragraph_format.space_after = Pt(4)
-            foto = rec.get("Foto") or rec.get("Fotos") or rec.get("foto") or ""
-            foto_path = _obter_caminho_foto_valido(foto, fotos_dir)
-            if foto_path:
-                try:
-                    run_img = p_img.add_run()
-                    img_dim = Inches(2.96) if str(tipo_relatorio).upper() == "SOCICAM" else Inches(4.5)
-                    run_img.add_picture(foto_path, width=img_dim, height=img_dim)
-                except Exception as e:
-                    print(f"Erro ao adicionar foto no CRC/SOCICAM: {e}")
-                
-            # Row 1: Legenda
-            p_caption = table.rows[1].cells[0].paragraphs[0]
-            p_caption.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            p_caption.paragraph_format.space_before = Pt(4)
-            p_caption.paragraph_format.space_after = Pt(4)
-            num = str(rec.get("Nº", idx+1)).zfill(2)
-            data_str = f", em {data_fisc}" if data_fisc else ""
-            caption_text = f"Foto {num} – {obs_text}{data_str}."
-            run_caption = p_caption.add_run(caption_text)
-            run_caption.font.name = 'Aptos'
-            run_caption.font.size = Pt(10)
+        if pista_val != "Única":
+            table_h = doc.add_table(rows=1, cols=1)
+            table_h.style = 'Table Grid'
+            table_h.alignment = WD_TABLE_ALIGNMENT.CENTER
+            table_h.autofit = False
+            table_h.columns[0].width = Inches(7.27)
+            p_h = table_h.rows[0].cells[0].paragraphs[0]
+            p_h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_h.paragraph_format.space_before = Pt(6)
+            p_h.paragraph_format.space_after = Pt(6)
             
-            doc.add_paragraph() # Espaço entre tabelas
-    else:
-        # CRA (Fiscalização) - Agrupa por Pista mantendo ordem de inserção
-        pistas_unicas = []
-        for p in df_fotos["Pista"].tolist():
-            p_str = str(p).strip() if not pd.isna(p) else ""
-            if not p_str:
-                p_str = "Única"
-            if p_str not in pistas_unicas:
-                pistas_unicas.append(p_str)
-                
-        for idx_pista, pista_val in enumerate(pistas_unicas):
-            # Filtra os itens desta pista
-            mask = df_fotos["Pista"].apply(lambda x: (str(x).strip() if not pd.isna(x) else "") == (pista_val if pista_val != "Única" else ""))
-            df_pista = df_fotos[mask].copy()
-            if df_pista.empty:
-                continue
-                
-            # Adiciona a tabela de grade (2 colunas)
-            table = doc.add_table(rows=0, cols=2)
-            table.style = 'Table Grid'
-            table.alignment = WD_TABLE_ALIGNMENT.CENTER
-            table.autofit = False
-            table.columns[0].width = Inches(3.635)
-            table.columns[1].width = Inches(3.635)
-            
-            # Cabeçalho da Pista
             if pista_val.lower().startswith("pista"):
                 header_text = f"{terminal_nc}, {pista_val}"
             else:
                 header_text = f"{terminal_nc}, Pista sentido {pista_val}"
-                
-            row_h = table.add_row()
-            row_h.cells[0].width = Inches(3.635)
-            row_h.cells[1].width = Inches(3.635)
-            cell_merged = row_h.cells[0].merge(row_h.cells[1])
-            cell_merged.width = Inches(7.27)
-            p_h = cell_merged.paragraphs[0]
-            p_h.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_h.paragraph_format.space_before = Pt(6)
-            p_h.paragraph_format.space_after = Pt(6)
+            
             run_h = p_h.add_run(header_text)
             run_h.bold = True
             run_h.font.name = 'Aptos'
             run_h.font.size = Pt(11)
+            doc.add_paragraph()
+
+        for g in grupos_pista:
+            related = g["related_records"]
             
-            records_pista = df_pista.to_dict('records')
-            for i in range(0, len(records_pista), 2):
-                rec_left = records_pista[i]
-                rec_right = records_pista[i+1] if i+1 < len(records_pista) else None
+            if len(related) == 1:
+                rec = related[0]
+                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
+                ident = str(rec.get("Identificação", "")).strip()
+                nc_txt = str(rec.get("Não Conformidade", "")).strip()
                 
-                # Linha de Imagens
-                row_img = table.add_row()
-                row_img.cells[0].width = Inches(3.635)
-                row_img.cells[1].width = Inches(3.635)
+                if str(tipo_relatorio).upper() == "CRC":
+                    p_nc_desc = doc.add_paragraph()
+                    p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    p_nc_desc.paragraph_format.space_before = Pt(12)
+                    p_nc_desc.paragraph_format.space_after = Pt(6)
+                    p_nc_desc.paragraph_format.line_spacing = 1.15
+                    label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or "Item")
+                    run_nc_desc = p_nc_desc.add_run(label_item)
+                    run_nc_desc.bold = True
+                    run_nc_desc.font.name = 'Aptos'
+                    run_nc_desc.font.size = Pt(11)
+                    
+                table = doc.add_table(rows=2, cols=1)
+                table.style = 'Table Grid'
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                table.autofit = False
+                table.allow_autofit = False
                 
-                # Imagem Esquerda
-                p_img_left = row_img.cells[0].paragraphs[0]
-                p_img_left.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p_img_left.paragraph_format.left_indent = Inches(0)
-                p_img_left.paragraph_format.first_line_indent = Inches(0)
-                p_img_left.paragraph_format.space_before = Pt(4)
-                p_img_left.paragraph_format.space_after = Pt(4)
-                foto_left = rec_left.get("Foto") or rec_left.get("Fotos") or rec_left.get("foto") or ""
-                foto_path_left = _obter_caminho_foto_valido(foto_left, fotos_dir)
-                if foto_path_left:
+                tbl_width = Inches(3.635)
+                table.rows[0].cells[0].width = tbl_width
+                table.rows[1].cells[0].width = tbl_width
+                
+                p_img = table.rows[0].cells[0].paragraphs[0]
+                p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_img.paragraph_format.space_before = Pt(4)
+                p_img.paragraph_format.space_after = Pt(4)
+                foto = rec.get("Foto") or rec.get("Fotos") or rec.get("foto") or ""
+                foto_path = _obter_caminho_foto_valido(foto, fotos_dir)
+                if foto_path:
                     try:
-                        run_img_left = p_img_left.add_run()
-                        run_img_left.add_picture(foto_path_left, width=Inches(3.15), height=Inches(3.15))
+                        run_img = p_img.add_run()
+                        img_dim = Inches(3.15)
+                        run_img.add_picture(foto_path, width=img_dim, height=img_dim)
                     except Exception as e:
-                        print(f"Erro ao adicionar foto esquerda no CRA: {e}")
-                    
-                # Imagem Direita
-                p_img_right = row_img.cells[1].paragraphs[0]
-                p_img_right.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p_img_right.paragraph_format.left_indent = Inches(0)
-                p_img_right.paragraph_format.first_line_indent = Inches(0)
-                p_img_right.paragraph_format.space_before = Pt(4)
-                p_img_right.paragraph_format.space_after = Pt(4)
-                if rec_right:
-                    foto_right = rec_right.get("Foto") or rec_right.get("Fotos") or rec_right.get("foto") or ""
-                    foto_path_right = _obter_caminho_foto_valido(foto_right, fotos_dir)
-                    if foto_path_right:
-                        try:
-                            run_img_right = p_img_right.add_run()
-                            run_img_right.add_picture(foto_path_right, width=Inches(3.15), height=Inches(3.15))
-                        except Exception as e:
-                            print(f"Erro ao adicionar foto direita no CRA: {e}")
-                else:
-                    row_img.cells[1].width = Inches(3.635)
+                        print(f"Erro ao adicionar foto: {e}")
                         
-                # Linha de Descrições
-                row_desc = table.add_row()
-                row_desc.cells[0].width = Inches(3.635)
-                row_desc.cells[1].width = Inches(3.635)
+                p_caption = table.rows[1].cells[0].paragraphs[0]
+                p_caption.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_caption.paragraph_format.space_before = Pt(4)
+                p_caption.paragraph_format.space_after = Pt(4)
+                num = str(rec.get("Nº", "")).zfill(2)
+                if num == "00" or num == "":
+                    num_val = records.index(rec) + 1
+                    num = str(num_val).zfill(2)
+                data_str = f", em {data_fisc}" if data_fisc else ""
                 
-                # Descrição Esquerda
-                p_desc_left = row_desc.cells[0].paragraphs[0]
-                p_desc_left.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                p_desc_left.paragraph_format.left_indent = Inches(0)
-                p_desc_left.paragraph_format.first_line_indent = Inches(0)
-                p_desc_left.paragraph_format.space_before = Pt(4)
-                p_desc_left.paragraph_format.space_after = Pt(4)
+                trecho = str(rec.get("Trecho", "")).strip()
+                trecho_txt = f"Trecho {trecho} apresentando " if trecho and str(tipo_relatorio).upper() == "CRA" else ""
                 
-                num_left = str(rec_left.get("Nº", i+1)).zfill(2)
-                trecho_left = str(rec_left.get("Trecho", "")).strip()
-                obs_left = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip()
-                
-                trecho_txt_left = f"Trecho {trecho_left} apresentando " if trecho_left else ""
-                data_txt = f", ({data_fisc})" if data_fisc else ""
-                desc_text_left = f"Foto {num_left} – {trecho_txt_left}{obs_left}{data_txt}."
-                run_desc_left = p_desc_left.add_run(desc_text_left)
-                run_desc_left.font.name = 'Aptos'
-                run_desc_left.font.size = Pt(10)
-                
-                # Descrição Direita
-                p_desc_right = row_desc.cells[1].paragraphs[0]
-                p_desc_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                p_desc_right.paragraph_format.left_indent = Inches(0)
-                p_desc_right.paragraph_format.first_line_indent = Inches(0)
-                p_desc_right.paragraph_format.space_before = Pt(4)
-                p_desc_right.paragraph_format.space_after = Pt(4)
-                
-                if rec_right:
-                    num_right = str(rec_right.get("Nº", i+2)).zfill(2)
-                    trecho_right = str(rec_right.get("Trecho", "")).strip()
-                    obs_right = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip()
+                caption_text = f"Foto {num} – {trecho_txt}{obs_text}{data_str}."
+                if str(tipo_relatorio).upper() in ["CRC", "SOCICAM"] or not trecho_txt:
+                    caption_text = f"Foto {num} – {obs_text}{data_str}."
                     
-                    trecho_txt_right = f"Trecho {trecho_right} apresentando " if trecho_right else ""
-                    desc_text_right = f"Foto {num_right} – {trecho_txt_right}{obs_right}{data_txt}."
-                    run_desc_right = p_desc_right.add_run(desc_text_right)
-                    run_desc_right.font.name = 'Aptos'
-                    run_desc_right.font.size = Pt(10)
+                run_caption = p_caption.add_run(caption_text)
+                run_caption.font.name = 'Aptos'
+                run_caption.font.size = Pt(10)
                 
-                # Forçar a largura de todas as células das duas linhas para 3.635 polegadas (metade exata)
-                row_img.cells[0].width = Inches(3.635)
-                row_img.cells[1].width = Inches(3.635)
-                row_desc.cells[0].width = Inches(3.635)
-                row_desc.cells[1].width = Inches(3.635)
+                doc.add_paragraph()
+            else:
+                table = doc.add_table(rows=0, cols=2)
+                table.style = 'Table Grid'
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                table.autofit = False
+                table.columns[0].width = Inches(3.635)
+                table.columns[1].width = Inches(3.635)
+                
+                for i in range(0, len(related), 2):
+                    rec_left = related[i]
+                    rec_right = related[i+1] if i+1 < len(related) else None
                     
-            if idx_pista < len(pistas_unicas) - 1:
+                    row_img = table.add_row()
+                    row_img.cells[0].width = Inches(3.635)
+                    row_img.cells[1].width = Inches(3.635)
+                    
+                    p_img_left = row_img.cells[0].paragraphs[0]
+                    p_img_left.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p_img_left.paragraph_format.space_before = Pt(4)
+                    p_img_left.paragraph_format.space_after = Pt(4)
+                    foto_left = rec_left.get("Foto") or rec_left.get("Fotos") or rec_left.get("foto") or ""
+                    f_path_left = _obter_caminho_foto_valido(foto_left, fotos_dir)
+                    if f_path_left:
+                        try:
+                            p_img_left.add_run().add_picture(f_path_left, width=Inches(3.15), height=Inches(3.15))
+                        except Exception as e:
+                            print(f"Erro foto esquerda: {e}")
+                            
+                    p_img_right = row_img.cells[1].paragraphs[0]
+                    p_img_right.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p_img_right.paragraph_format.space_before = Pt(4)
+                    p_img_right.paragraph_format.space_after = Pt(4)
+                    if rec_right:
+                        foto_right = rec_right.get("Foto") or rec_right.get("Fotos") or rec_right.get("foto") or ""
+                        f_path_right = _obter_caminho_foto_valido(foto_right, fotos_dir)
+                        if f_path_right:
+                            try:
+                                p_img_right.add_run().add_picture(f_path_right, width=Inches(3.15), height=Inches(3.15))
+                            except Exception as e:
+                                print(f"Erro foto direita: {e}")
+                    else:
+                        row_img.cells[1].width = Inches(3.635)
+                        
+                    row_desc = table.add_row()
+                    row_desc.cells[0].width = Inches(3.635)
+                    row_desc.cells[1].width = Inches(3.635)
+                    
+                    p_desc_left = row_desc.cells[0].paragraphs[0]
+                    p_desc_left.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    p_desc_left.paragraph_format.space_before = Pt(4)
+                    p_desc_left.paragraph_format.space_after = Pt(4)
+                    num_l = str(rec_left.get("Nº", "")).zfill(2)
+                    if num_l == "00" or num_l == "":
+                        num_l_val = records.index(rec_left) + 1
+                        num_l = str(num_l_val).zfill(2)
+                    trecho_l = str(rec_left.get("Trecho", "")).strip()
+                    obs_l = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip()
+                    trecho_txt_l = f"Trecho {trecho_l} apresentando " if trecho_l and str(tipo_relatorio).upper() == "CRA" else ""
+                    data_txt = f", em {data_fisc}" if data_fisc else ""
+                    desc_text_l = f"Foto {num_l} – {trecho_txt_l}{obs_l}{data_txt}."
+                    run_l = p_desc_left.add_run(desc_text_l)
+                    run_l.font.name = 'Aptos'
+                    run_l.font.size = Pt(10)
+                    
+                    p_desc_right = row_desc.cells[1].paragraphs[0]
+                    p_desc_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    p_desc_right.paragraph_format.space_before = Pt(4)
+                    p_desc_right.paragraph_format.space_after = Pt(4)
+                    if rec_right:
+                        num_r = str(rec_right.get("Nº", "")).zfill(2)
+                        if num_r == "00" or num_r == "":
+                            num_r_val = records.index(rec_right) + 1
+                            num_r = str(num_r_val).zfill(2)
+                        trecho_r = str(rec_right.get("Trecho", "")).strip()
+                        obs_r = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip()
+                        trecho_txt_r = f"Trecho {trecho_r} apresentando " if trecho_r and str(tipo_relatorio).upper() == "CRA" else ""
+                        desc_text_r = f"Foto {num_r} – {trecho_txt_r}{obs_r}{data_txt}."
+                        run_r = p_desc_right.add_run(desc_text_r)
+                        run_r.font.name = 'Aptos'
+                        run_r.font.size = Pt(10)
+                        
+                    row_img.cells[0].width = Inches(3.635)
+                    row_img.cells[1].width = Inches(3.635)
+                    row_desc.cells[0].width = Inches(3.635)
+                    row_desc.cells[1].width = Inches(3.635)
+                    
                 doc.add_paragraph()
 
 
@@ -570,8 +604,8 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
                 cols_fisc = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Não Conformidade"] if c in current_ncs.columns]
                 if cols_fisc:
                     mask_any = current_ncs[cols_fisc].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
-                    # Não duplicar com pas_reais se for CRA
-                    if not pas_reais.empty and getattr(report_config, "key", "") == "CRA":
+                    # Não duplicar com pas_reais
+                    if not pas_reais.empty:
                         mask_any = mask_any & (~current_ncs.index.isin(pas_reais.index))
                     ncs_reais = current_ncs[mask_any].copy()
                 else:
