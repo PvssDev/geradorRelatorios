@@ -7,3 +7,35 @@ venv/
 .cursor/
 .agents/
 ref/
+
+# Testes e rascunhos locais
+scratch/
+scratch_*.py
+test_out.docx
+ref_paragraphs.txt
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+build/
+dist/
+
+# Ambientes virtuais
+.env
+.venv
+env/
+
+# IDE e Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

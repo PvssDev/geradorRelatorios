@@ -343,7 +343,8 @@ with st.container():
         col1, col2 = st.columns(2)
         with col1:
             id_fisc = st.text_input(f"ID {term_fisc_prep} (ex: 2026-001)", key="fisc_input_id", help="Identificador único para vincular as abas")
-            data_fisc = st.text_input("Data (ex: 15/06/2026)", key="fisc_input_data", placeholder="dd/mm/aaaa")
+            data_fisc_obj = st.date_input("Data", format="DD/MM/YYYY", key="fisc_input_data")
+            data_fisc = data_fisc_obj.strftime("%d/%m/%Y") if data_fisc_obj else ""
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                 hora = st.text_input("Hora (ex: 10:00)", key="fisc_input_hora", placeholder="Opcional")
                 cidade = st.text_input("Cidade (ex: Recife)", key="fisc_input_cidade", placeholder="Cidade do Terminal")

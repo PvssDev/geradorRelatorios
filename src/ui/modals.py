@@ -420,7 +420,14 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                 with col_id:
                     novo_id = st.text_input(f"ID {term_fisc_prep}", value=str(fisc_data.get("ID da Fiscalização", "")), key=f"{f_key}_id")
                 with col_data:
-                    nova_data = st.text_input("Data", value=str(fisc_data.get("Data", "")), key=f"{f_key}_data")
+                    import datetime
+                    val_str = str(fisc_data.get("Data", ""))
+                    try:
+                        d_obj = datetime.datetime.strptime(val_str, "%d/%m/%Y").date() if val_str else datetime.date.today()
+                    except ValueError:
+                        d_obj = datetime.date.today()
+                    nova_data_obj = st.date_input("Data", value=d_obj, format="DD/MM/YYYY", key=f"{f_key}_data")
+                    nova_data = nova_data_obj.strftime("%d/%m/%Y") if nova_data_obj else ""
                 
                 # Campos específicos por tipo
                 if tipo == "CRA":
