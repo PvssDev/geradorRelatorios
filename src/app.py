@@ -352,13 +352,14 @@ with st.container():
                 cidade = ""
                 
             if st.session_state.get("tipo_relatorio", "CRA") == "CRC":
-                local = "Sistema Viário do Paiva"
+                local = st.text_input("Local", value="Sistema Viário do Paiva", key="fisc_input_local_crc")
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_crc", placeholder="Opcional")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
-                local = st.text_input("Local (ex: TIP (RECIFE))", key="fisc_input_local_socicam", placeholder="Nome do Terminal")
+                opcoes_locais = ["Garanhuns", "Arcoverde", "Serra Talhada", "Petrolina", "Caruaru", "TIP Recife"]
+                local = st.selectbox("Local", options=opcoes_locais, key="fisc_input_local_socicam")
         with col2:
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
-                local = st.text_input("Local", key="fisc_input_local_cra", placeholder="Rota do Atlântico", help="Deixe em branco para usar o padrão 'Rota do Atlântico'")
+                local = st.text_input("Local", value="Rota do Atlântico", key="fisc_input_local_cra", help="Deixe em branco para usar o padrão 'Rota do Atlântico'")
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_cra", placeholder="Opcional")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_socicam", placeholder="Opcional")

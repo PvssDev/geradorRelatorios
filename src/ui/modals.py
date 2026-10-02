@@ -430,13 +430,18 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                     with col_c:
                         nova_cidade = st.text_input("Cidade", value=str(fisc_data.get("Cidade", "")), key=f"{f_key}_cidade")
                     with col_l:
-                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local", placeholder="Rota do Atlântico")
+                        val_l = str(fisc_data.get("Local", ""))
+                        novo_local = st.text_input("Local", value=val_l if val_l else "Rota do Atlântico", key=f"{f_key}_local")
                 elif tipo == "SOCICAM":
-                    novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
+                    opcoes_locais = ["Garanhuns", "Arcoverde", "Serra Talhada", "Petrolina", "Caruaru", "TIP Recife"]
+                    val_l = str(fisc_data.get("Local", ""))
+                    idx = opcoes_locais.index(val_l) if val_l in opcoes_locais else 0
+                    novo_local = st.selectbox("Local", options=opcoes_locais, index=idx, key=f"{f_key}_local")
                     nova_hora = ""
                     nova_cidade = ""
                 else:  # CRC
-                    novo_local = "Sistema Viário do Paiva"
+                    val_l = str(fisc_data.get("Local", ""))
+                    novo_local = st.text_input("Local", value=val_l if val_l else "Sistema Viário do Paiva", key=f"{f_key}_local")
                     nova_hora = ""
                     nova_cidade = ""
                 
