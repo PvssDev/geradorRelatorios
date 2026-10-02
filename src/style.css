@@ -1320,4 +1320,29 @@ div[data-testid="stToast"] div[data-testid="stMarkdownContainer"] p {
 /* Ocultar o botão (X) de fechar do popup */
 div[data-testid="stToast"] button {
     display: none !important;
+}/* FIX PARA INPUT DE DATA E CONTORNOS ADICIONAIS */
+div[data-testid="stDateInput"] > div,
+div[data-testid="stTimeInput"] > div {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+div[data-testid="stDateInput"] input,
+div[data-testid="stTimeInput"] input {
+    background-color: transparent !important;
+    border: none !important;
+    color: #011A33 !important;
+}
+
+/* FIX PARA TAGS DO MULTISELECT E PILLS QUE FICAM CINZAS */
+div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
+div[data-testid="stMultiSelect"] div[data-baseweb="tag"] {
+    background-color: #2F5173 !important;
+    color: #D7D8D9 !important;
+    border-radius: 4px !important;
+}
+div[data-testid="stMultiSelect"] span[data-baseweb="tag"] *,
+div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
+    color: #D7D8D9 !important;
+    fill: #D7D8D9 !important;
 }
