@@ -420,7 +420,16 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                 with col_id:
                     novo_id = st.text_input(f"ID {term_fisc_prep}", value=str(fisc_data.get("ID da Fiscalização", "")), key=f"{f_key}_id")
                 with col_data:
-                    nova_data = st.text_input("Data", value=str(fisc_data.get("Data", "")), key=f"{f_key}_data")
+                    from datetime import datetime
+                    data_str = str(fisc_data.get("Data", ""))
+                    try:
+                        data_val = datetime.strptime(data_str, "%d/%m/%Y").date() if data_str else None
+                    except ValueError:
+                        data_val = None
+                    if data_val is None:
+                        data_val = "today"
+                    nova_data_obj = st.date_input("Data", value=data_val, format="DD/MM/YYYY", key=f"{f_key}_data")
+                    nova_data = nova_data_obj.strftime("%d/%m/%Y") if nova_data_obj else ""
                 
                 # Campos específicos por tipo
                 if tipo == "CRA":
@@ -430,9 +439,18 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                     with col_c:
                         nova_cidade = st.text_input("Cidade", value=str(fisc_data.get("Cidade", "")), key=f"{f_key}_cidade")
                     with col_l:
-                        novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local", placeholder="Rota do Atlântico")
+                        val_cra = str(fisc_data.get("Local", ""))
+                        if not val_cra:
+                            val_cra = "Rota do Atlântico"
+                        novo_local = st.text_input("Local", value=val_cra, key=f"{f_key}_local")
                 elif tipo == "SOCICAM":
-                    novo_local = st.text_input("Local", value=str(fisc_data.get("Local", "")), key=f"{f_key}_local")
+                    opts = ["Garanhuns", "Arcoverde", "Serra Talhada", "Petrolina", "Caruaru", "TIP Recife"]
+                    val_socicam = str(fisc_data.get("Local", ""))
+                    if val_socicam not in opts:
+                        val_socicam = opts[0] if not val_socicam else val_socicam
+                        if val_socicam not in opts:
+                            opts.append(val_socicam)
+                    novo_local = st.selectbox("Local", options=opts, index=opts.index(val_socicam), key=f"{f_key}_local")
                     nova_hora = ""
                     nova_cidade = ""
                 else:  # CRC

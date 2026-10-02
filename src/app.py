@@ -343,7 +343,8 @@ with st.container():
         col1, col2 = st.columns(2)
         with col1:
             id_fisc = st.text_input(f"ID {term_fisc_prep} (ex: 2026-001)", key="fisc_input_id", help="Identificador único para vincular as abas")
-            data_fisc = st.text_input("Data (ex: 15/06/2026)", key="fisc_input_data", placeholder="dd/mm/aaaa")
+            data_fisc_obj = st.date_input("Data", format="DD/MM/YYYY", key="fisc_input_data")
+            data_fisc = data_fisc_obj.strftime("%d/%m/%Y") if data_fisc_obj else ""
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                 hora = st.text_input("Hora (ex: 10:00)", key="fisc_input_hora", placeholder="Opcional")
                 cidade = st.text_input("Cidade (ex: Recife)", key="fisc_input_cidade", placeholder="Cidade do Terminal")
@@ -355,10 +356,10 @@ with st.container():
                 local = "Sistema Viário do Paiva"
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_crc", placeholder="Opcional")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
-                local = st.text_input("Local (ex: TIP (RECIFE))", key="fisc_input_local_socicam", placeholder="Nome do Terminal")
+                local = st.selectbox("Local", options=["Garanhuns", "Arcoverde", "Serra Talhada", "Petrolina", "Caruaru", "TIP Recife"], key="fisc_input_local_socicam")
         with col2:
             if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
-                local = st.text_input("Local", key="fisc_input_local_cra", placeholder="Rota do Atlântico", help="Deixe em branco para usar o padrão 'Rota do Atlântico'")
+                local = st.text_input("Local", value="Rota do Atlântico", key="fisc_input_local_cra")
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_cra", placeholder="Opcional")
             elif st.session_state.get("tipo_relatorio", "CRA") == "SOCICAM":
                 periodo = st.text_input("Período (ex: 15 a 18/06/2026)", key="fisc_input_periodo_socicam", placeholder="Opcional")
