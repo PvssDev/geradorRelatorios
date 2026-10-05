@@ -137,6 +137,30 @@
       letter-spacing: 0.2px;
     }
 
+    .hide-labels .slide-overlay {
+      display: none !important;
+    }
+    
+    .carousel-wrapper.is-vertical {
+      height: 400px;
+    }
+    
+    .carousel-wrapper.is-vertical .swiper {
+      height: 100%;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .carousel-wrapper.is-vertical .swiper-slide {
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+
+    .carousel-wrapper.is-vertical .swiper-button-prev,
+    .carousel-wrapper.is-vertical .swiper-button-next {
+      display: none !important;
+    }
+
     .slide-badge-nc {
       position: absolute;
       top: 10px;
@@ -215,6 +239,14 @@
     .swiper-pagination {
       bottom: 0px !important;
     }
+    
+    .carousel-wrapper.is-vertical .swiper-pagination {
+      right: 5px !important;
+      padding-left: 20px; /* Aumenta a área de contato invisível para o mousewheel */
+      padding-right: 10px;
+      cursor: ns-resize;
+      z-index: 100;
+    }
 
     .swiper-pagination-bullet {
       width: 7px;
@@ -226,10 +258,17 @@
 
     .swiper-pagination-bullet-active {
       width: 22px;
-      border-radius: 5px;
+      height: 7px;
+      border-radius: 4px;
       background: #3b82f6;
       opacity: 1;
       box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+    }
+    
+    /* Elegant vertical pill for vertical mode - using margin to recenter if needed */
+    .carousel-wrapper.is-vertical .swiper-pagination-bullet-active {
+      width: 7px !important;
+      height: 22px !important;
     }
 
     /* Dark Mode Adjustments */
@@ -347,9 +386,21 @@
       isDestroying = false;
     }
 
-    function initOrUpdateSwiper(photos, activeIndex) {
+    function initOrUpdateSwiper(photos, activeIndex, direction, hideLabels) {
+      const carouselWrapper = document.getElementById("carouselWrapper");
+      if (hideLabels) {
+        carouselWrapper.classList.add("hide-labels");
+      } else {
+        carouselWrapper.classList.remove("hide-labels");
+      }
+      if (direction === "vertical") {
+        carouselWrapper.classList.add("is-vertical");
+      } else {
+        carouselWrapper.classList.remove("is-vertical");
+      }
+
       // Hash inclui a quantidade de fotos para detecção confiável de mudanças
-      const photosHash = photos.length + ":" + photos.map(p => p.name + "_" + (p.is_nc ? "1" : "0")).join("|");
+      const photosHash = photos.length + ":" + photos.map(p => p.name + "_" + (p.is_nc ? "1" : "0")).join("|") + "_" + direction + "_" + hideLabels;
       const slidesChanged = photosHash !== currentPhotosHash;
 
       if (slidesChanged || !swiperInstance) {
@@ -360,7 +411,10 @@
         destroySwiper();
         renderSlides(photos, activeIndex);
 
+        const isVert = direction === "vertical";
+        
         swiperInstance = new Swiper("#mySwiper", {
+          direction: isVert ? "vertical" : "horizontal",
           effect: "coverflow",
           grabCursor: true,
           centeredSlides: true,
@@ -375,12 +429,20 @@
             enabled: true,
             onlyInViewport: true,
           },
+          freeMode: {
+            enabled: true,
+            sticky: true,
+            momentumRatio: 0.8,
+            momentumVelocityRatio: 0.8,
+          },
           mousewheel: {
             forceToAxis: true,
-            thresholdDelta: 50,
+            sensitivity: 1.5,
+            releaseOnEdges: false,
+            eventsTarget: '.swiper-pagination',
           },
           coverflowEffect: {
-            rotate: 0,
+            rotate: isVert ? -15 : 0,
             stretch: 0,
             depth: 130,
             modifier: 1.25,
@@ -412,6 +474,15 @@
           }
         });
 
+        // Previne o scroll da página ao usar o mousewheel em cima da paginação
+        const paginationEl = document.querySelector("#mySwiper .swiper-pagination");
+        if (paginationEl) {
+          paginationEl.addEventListener("wheel", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }, { passive: false });
+        }
+
         lastReportedIndex = activeIndex;
       } else {
         // As fotos continuam as mesmas, apenas sincroniza a posição do slide se necessário
@@ -435,9 +506,11 @@
         const args = event.data.args || {};
         const photos = args.photos || [];
         const activeIndex = typeof args.currentIndex === "number" ? args.currentIndex : 0;
+        const direction = args.direction || "horizontal";
+        const hideLabels = args.hideLabels || false;
 
         if (photos.length > 0) {
-          initOrUpdateSwiper(photos, activeIndex);
+          initOrUpdateSwiper(photos, activeIndex, direction, hideLabels);
         }
       }
     });

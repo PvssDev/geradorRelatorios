@@ -80,11 +80,13 @@ def render_swiper_carousel(
     photos: list,
     current_index: int,
     nomes_em_nc: set = None,
-    key: str = "swiper_carousel"
+    key: str = "swiper_carousel",
+    direction: str = "horizontal",
+    hide_labels: bool = False
 ) -> int:
     """
     Renderiza o carrossel moderno baseado em Swiper.js com sincronismo bidirecional
-    perfeito e troca de fotos instantânea.
+    perfeito e troca de fotos instantânea. Suporta direção vertical/horizontal.
     """
     if not photos:
         return 0
@@ -124,12 +126,22 @@ def render_swiper_carousel(
     result = _swiper_component(
         photos=serialized_photos,
         currentIndex=current_index,
+        direction=direction,
+        hideLabels=hide_labels,
         default=current_index,
         key=key
     )
 
+    # Se a intenção do Python era mudar o índice (current_index mudou em relação ao last_synced),
+    # e o componente ainda reflete o valor antigo, nós confiamos no current_index (Python vence)
     if isinstance(result, int) and 0 <= result < total:
-        st.session_state[last_synced_key] = result
-        return result
+        if result == last_synced and current_index != last_synced:
+            # Python forçou a mudança, ignora o result (que está desatualizado)
+            st.session_state[last_synced_key] = current_index
+            return current_index
+        else:
+            # Frontend mudou ou estão sincronizados
+            st.session_state[last_synced_key] = result
+            return result
 
     return current_index
