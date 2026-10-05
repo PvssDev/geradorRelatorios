@@ -33,7 +33,8 @@ from ui.modals import (
     gerenciar_coordenadores_modal,
     gerenciar_contratos_modal,
     adicionar_nc_personalizada_modal,
-    editar_registros_relatorio_modal
+    editar_registros_relatorio_modal,
+    alerta_foto_duplicada_modal
 )
 from sections.quadros.quadros import MAP_SIGLAS
 from ui.components.swiper import render_swiper_carousel
@@ -501,6 +502,8 @@ with st.container():
                     (item for item in old_photos_disponiveis if item.get("display_label", item.get("trecho", "")) == selected_old_label),
                     old_photos_disponiveis[0]
                 )
+                
+                # Para manter compatibilidade de estado anterior caso mude o dropdown, mas usaremos carrossel tbm
                 idx = st.session_state.old_photos_to_match.index(current_item)
                 st.session_state.carousel_index = idx
             else:
@@ -519,47 +522,74 @@ with st.container():
         with col_preview:
             foto_default = ""
             if is_monitoring and st.session_state.old_photos_to_match:
-                st.markdown("### :material/photo_library: Carrossel de Fotos")
-                if current_item:
+                st.markdown("### :material/photo_library: Carrosséis de Comparação")
+                if current_item and old_photos_disponiveis:
                     st.markdown(f"**Trecho de Comparação {idx + 1} de {len(st.session_state.old_photos_to_match)}**")
-                    col_old, col_new = st.columns(2)
-                    with col_old:
-                        st.markdown(f"**Foto Anterior ({current_item['id_nc']} - {current_item['trecho']})**")
-                        preview_old = obter_foto_preview(current_item["old_photo_path"], max_size=(320, 240))
-                        st.image(preview_old, use_container_width=True)
-                        st.button("Ampliar Foto Anterior", icon=":material/zoom_in:", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{idx}_{st.session_state.nc_form_counter}")
                     
-                        st.selectbox(
-                            "Selecione a foto antiga para comparar",
-                            options_old,
-                            key=selected_old_key
+                    # Ensure indices exist in session state
+                    if "monitoring_old_photo_index" not in st.session_state:
+                        st.session_state.monitoring_old_photo_index = 0
+                    if "monitoring_new_photo_index" not in st.session_state:
+                        st.session_state.monitoring_new_photo_index = st.session_state.get("carousel_index", 0)
+
+                    # Normalize old index if list changed
+                    old_idx = min(st.session_state.monitoring_old_photo_index, len(old_photos_disponiveis) - 1)
+                    
+                    col_old, col_new = st.columns(2)
+                    
+                    with col_old:
+                        st.markdown("**Foto Anterior**")
+                        # Prepara lista de objetos emulando as fotos
+                        old_paths = [{"name": f"{item['id_nc']} - {item['trecho']}", "path": item["old_photo_path"], "size": 0} for item in old_photos_disponiveis]
+                        
+                        # Emula o arquivo pro preview (que aceita str path direto) - mas o carrossel usa a string
+                        old_paths_str = [item["old_photo_path"] for item in old_photos_disponiveis]
+                        
+                        new_old_idx = render_swiper_carousel(
+                            photos=old_paths_str,
+                            current_index=old_idx,
+                            key=f"swiper_mon_old_{st.session_state.nc_form_counter}",
+                            direction="vertical",
+                            hide_labels=True
                         )
+                        st.session_state.monitoring_old_photo_index = new_old_idx
+                        current_item = old_photos_disponiveis[new_old_idx]
+                        idx = st.session_state.old_photos_to_match.index(current_item)
+                        
+                        # Botoes juntinhos 2 e 2
+                        btn_col_old_1, btn_col_old_2 = st.columns(2, gap="small")
+                        with btn_col_old_1:
+                            st.button("Ampliar Foto", icon=":material/zoom_in:", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{st.session_state.nc_form_counter}", use_container_width=True)
+                        with btn_col_old_2:
+                            if st.button("Ver todas as fotos", icon=":material/photo_library:", key=f"btn_gal_old_{st.session_state.nc_form_counter}", use_container_width=True):
+                                galeria_fotos_modal(fotos=old_paths_str, target_index_key="monitoring_old_photo_index")
                     with col_new:
                         st.markdown("**Nova Foto (Atual)**")
                         if st.session_state.fill_photos:
-                            new_photo_names = [f.name for f in st.session_state.fill_photos]
-                            selected_key = f"sel_box_photo_{idx}_{st.session_state.nc_form_counter}"
-                            if selected_key not in st.session_state:
-                                st.session_state[selected_key] = st.session_state.fill_photos[min(idx, len(st.session_state.fill_photos)-1)].name
-                        
-                            current_sel_name = st.session_state[selected_key]
-                            if current_sel_name not in new_photo_names:
-                                current_sel_name = new_photo_names[0]
-                                st.session_state[selected_key] = current_sel_name
-                        
-                            img_path = next(f for f in st.session_state.fill_photos if f.name == current_sel_name)
-                            preview_new = obter_foto_preview(img_path, max_size=(320, 240))
-                            st.image(preview_new, use_container_width=True)
-                            st.button("Ampliar Nova Foto", icon=":material/zoom_in:", on_click=mostrar_foto_modal, args=(img_path,), key=f"btn_zoom_new_{idx}_{st.session_state.nc_form_counter}")
-                        
-                            sel_name = st.selectbox(
-                                "Selecione a foto correspondente",
-                                new_photo_names,
-                                key=selected_key
+                            new_idx = min(st.session_state.monitoring_new_photo_index, len(st.session_state.fill_photos) - 1)
+                            nomes_em_nc = obter_nomes_fotos_em_nc(st.session_state.get("temp_nc", []))
+                            
+                            new_new_idx = render_swiper_carousel(
+                                photos=st.session_state.fill_photos,
+                                current_index=new_idx,
+                                nomes_em_nc=nomes_em_nc,
+                                key=f"swiper_mon_new_{st.session_state.nc_form_counter}",
+                                direction="vertical",
+                                hide_labels=True
                             )
-                            foto_default = sel_name
+                            st.session_state.monitoring_new_photo_index = new_new_idx
+                            
+                            current_photo_new = st.session_state.fill_photos[new_new_idx]
+                            foto_default = current_photo_new.name
+                            
+                            btn_col_new_1, btn_col_new_2 = st.columns(2, gap="small")
+                            with btn_col_new_1:
+                                st.button("Ampliar Foto", icon=":material/zoom_in:", on_click=mostrar_foto_modal, args=(current_photo_new,), key=f"btn_zoom_new_{st.session_state.nc_form_counter}", use_container_width=True)
+                            with btn_col_new_2:
+                                if st.button("Ver todas as fotos", icon=":material/photo_library:", key=f"btn_gal_new_{st.session_state.nc_form_counter}", use_container_width=True):
+                                    galeria_fotos_modal(fotos=st.session_state.fill_photos, target_index_key="monitoring_new_photo_index")
                         else:
-                            st.info("Faça o upload de novas fotos para selecioná-las.")
+                            st.info("Faça o upload de novas fotos para compará-las.")
                             foto_default = ""
 
                     st.checkbox(
@@ -923,7 +953,9 @@ with st.container():
                             col_nxt, col_rel, _ = st.columns([2.5, 4.5, 3.0], gap="small")
                         
                         with col_nxt:
-                            if st.button("Próximo", icon=":material/arrow_forward:", type="primary", use_container_width=True):
+                            btn_proximo = st.button("Próximo", icon=":material/arrow_forward:", type="primary", use_container_width=True)
+                            if btn_proximo or st.session_state.get("force_proximo_modal"):
+                                st.session_state.force_proximo_modal = False
                                 if id_vinculo == "Nenhum ID cadastrado":
                                     st.toast(f"Adicione um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.", icon=":material/error:")
                                 elif not nc_descricao and not ponto_atencao:
@@ -931,7 +963,10 @@ with st.container():
                                     st.toast(msg_erro, icon=":material/error:")
                                 elif not foto_default:
                                     st.toast("É obrigatório ter uma foto selecionada no carrossel para continuar.", icon=":material/error:")
+                                elif foto_esta_em_nc(foto_default, nomes_em_nc) and not st.session_state.get("modal_confirmed_proximo"):
+                                    alerta_foto_duplicada_modal(foto_default, "Adicionar", st.session_state.fill_photos)
                                 else:
+                                    st.session_state.modal_confirmed_proximo = False
                                     st.session_state.step1_id_vinculo = id_vinculo
                                     st.session_state.step1_pista = pista
                                     st.session_state.step1_trecho = trecho
@@ -974,7 +1009,7 @@ with st.container():
                                     )
                                 )
                                 
-                                if st.button(
+                                btn_rel = st.button(
                                     "Relacionar",
                                     icon=":material/link:",
                                     type="secondary",
@@ -982,10 +1017,15 @@ with st.container():
                                     help=help_text,
                                     use_container_width=True,
                                     key=f"btn_relacionar_{st.session_state.nc_form_counter}"
-                                ):
+                                )
+                                if btn_rel or st.session_state.get("force_relacionar_modal"):
+                                    st.session_state.force_relacionar_modal = False
                                     if not foto_default:
                                         st.toast("É obrigatório ter uma foto selecionada no carrossel para relacionar.", icon=":material/error:")
+                                    elif foto_esta_em_nc(foto_default, nomes_em_nc) and not st.session_state.get("modal_confirmed_relacionar"):
+                                        alerta_foto_duplicada_modal(foto_default, "Relacionar", st.session_state.fill_photos)
                                     else:
+                                        st.session_state.modal_confirmed_relacionar = False
                                         last_nc = st.session_state.temp_nc[-1]
                                         target_id = last_nc["ID da Fiscalização"]
                                         ncs_existentes = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] == target_id]

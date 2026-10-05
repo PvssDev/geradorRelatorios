@@ -23,10 +23,12 @@ def mostrar_foto_modal(uploaded_file):
 
 
 @st.dialog("Galeria de Fotos do Levantamento", width="large", icon=":material/photo_library:")
-def galeria_fotos_modal():
+def galeria_fotos_modal(fotos=None, target_index_key="carousel_index"):
     from services.image_service import obter_foto_preview, obter_nomes_fotos_em_nc, foto_esta_em_nc
+    import os
     
-    fotos = st.session_state.get("fill_photos", [])
+    if fotos is None:
+        fotos = st.session_state.get("fill_photos", [])
     if not fotos:
         st.info("Nenhuma foto disponível no momento.")
         return
@@ -40,7 +42,7 @@ def galeria_fotos_modal():
     fotos_enumeradas = list(enumerate(fotos))
     if filtro.strip():
         filtro_lower = filtro.strip().lower()
-        fotos_enumeradas = [item for item in fotos_enumeradas if filtro_lower in getattr(item[1], "name", "").lower()]
+        fotos_enumeradas = [item for item in fotos_enumeradas if filtro_lower in (getattr(item[1], "name", os.path.basename(item[1]) if isinstance(item[1], str) else "")).lower()]
 
     if not fotos_enumeradas:
         st.warning("Nenhuma foto encontrada com o filtro informado.")
@@ -54,7 +56,7 @@ def galeria_fotos_modal():
             if item_idx < len(fotos_enumeradas):
                 orig_idx, photo = fotos_enumeradas[item_idx]
                 with cols[c_idx]:
-                    is_current = (orig_idx == st.session_state.get("carousel_index", 0))
+                    is_current = (orig_idx == st.session_state.get(target_index_key, 0))
                     in_nc = foto_esta_em_nc(photo, nomes_em_nc)
                     
                     if is_current and in_nc:
@@ -69,7 +71,13 @@ def galeria_fotos_modal():
                     with st.container(key=card_key):
                         thumb = obter_foto_preview(photo, max_size=(220, 165))
                         st.image(thumb, use_container_width=True)
-                        nome = getattr(photo, "name", f"Foto {orig_idx + 1}")
+                        
+                        nome = getattr(photo, "name", None)
+                        if not nome and isinstance(photo, str):
+                            nome = os.path.basename(photo)
+                        if not nome:
+                            nome = f"Foto {orig_idx + 1}"
+                            
                         nome_curto = nome[:16] + "..." if len(nome) > 19 else nome
                         
                         badges = []
@@ -83,10 +91,45 @@ def galeria_fotos_modal():
 
                         st.caption(f"**#{orig_idx + 1}** {nome_curto}{badge_str}")
                         
-                        if st.button("", key=f"btn_gal_pick_{orig_idx}"):
-                            st.session_state.carousel_index = orig_idx
+                        if st.button("", key=f"btn_gal_pick_{orig_idx}_{target_index_key}"):
+                            st.session_state[target_index_key] = orig_idx
                             st.rerun()
 
+
+@st.dialog("Atenção: Foto já utilizada", width="small")
+def alerta_foto_duplicada_modal(foto_name, acao_nome, fill_photos):
+    from services.image_service import obter_foto_preview
+    
+    st.markdown(
+        "<div style='text-align: center; color: #ef4444; font-size: 48px;'>"
+        "<span class='material-symbols-rounded'>warning</span></div>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f"<p style='text-align: center; font-size: 15px;'>Você está tentando <b>{acao_nome.lower()}</b> uma foto que já foi "
+        "adicionada ou relacionada a outra Não Conformidade anteriormente.</p>",
+        unsafe_allow_html=True
+    )
+    
+    photo_obj = next((p for p in fill_photos if getattr(p, "name", "") == foto_name or p == foto_name), None)
+    if photo_obj:
+        thumb = obter_foto_preview(photo_obj, max_size=(320, 240))
+        st.image(thumb, use_container_width=True)
+    
+    st.write("")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button(f"{acao_nome} mesmo", type="primary", use_container_width=True):
+            if acao_nome == "Adicionar":
+                st.session_state.modal_confirmed_proximo = True
+                st.session_state.force_proximo_modal = True
+            elif acao_nome == "Relacionar":
+                st.session_state.modal_confirmed_relacionar = True
+                st.session_state.force_relacionar_modal = True
+            st.rerun()
+    with col2:
+        if st.button("Cancelar", use_container_width=True):
+            st.rerun()
 
 @st.dialog("Confirmar Exclusão em Lote", icon=":material/delete:")
 def confirmar_exclusao_lote_modal(ids, term_plural_lower="fiscalizações", term_plural="Fiscalizações"):
