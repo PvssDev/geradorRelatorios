@@ -86,7 +86,7 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
         cell = row.cells[0].merge(row.cells[1])
         cell.text = text
         p = cell.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         p.paragraph_format.space_before = Pt(4)
         p.paragraph_format.space_after = Pt(4)
         for run in p.runs:

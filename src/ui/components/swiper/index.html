@@ -38,6 +38,8 @@
       padding-top: 14px;
       padding-bottom: 28px;
       overflow: visible !important;
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
     }
 
     /* Fix: Força o hit-testing correto em efeito coverflow 3D.
@@ -149,6 +151,8 @@
       height: 100%;
       padding-top: 0;
       padding-bottom: 0;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
     }
 
     .carousel-wrapper.is-vertical .swiper-slide {
@@ -158,7 +162,29 @@
 
     .carousel-wrapper.is-vertical .swiper-button-prev,
     .carousel-wrapper.is-vertical .swiper-button-next {
-      display: none !important;
+      left: 50%;
+      margin-left: -20px;
+      margin-top: 0;
+      transform: rotate(90deg);
+      z-index: 20;
+      opacity: 0.35;
+    }
+
+    .carousel-wrapper.is-vertical .swiper-button-prev:hover,
+    .carousel-wrapper.is-vertical .swiper-button-next:hover {
+      transform: rotate(90deg) scale(1.1);
+      opacity: 1;
+    }
+
+    .carousel-wrapper.is-vertical .swiper-button-prev {
+      top: 5px;
+      right: auto;
+    }
+
+    .carousel-wrapper.is-vertical .swiper-button-next {
+      bottom: 25px;
+      top: auto;
+      right: auto;
     }
 
     .slide-badge-nc {
@@ -235,25 +261,64 @@
       right: 10px;
     }
 
-    /* Custom Pagination Bullets */
-    .swiper-pagination {
-      bottom: 0px !important;
-    }
-    
-    .carousel-wrapper.is-vertical .swiper-pagination {
-      right: 5px !important;
-      padding-left: 20px; /* Aumenta a área de contato invisível para o mousewheel */
-      padding-right: 10px;
-      cursor: ns-resize;
+    /* Custom Pagination Bullets (renderizadas manualmente — ver renderDots) */
+    .swiper-pagination.custom-dots {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       z-index: 100;
+      touch-action: none; /* Arraste (scrub) na barra de paginação */
+    }
+
+    .carousel-wrapper:not(.is-vertical) .swiper-pagination.custom-dots {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: auto;
+      flex-direction: row;
+      padding: 8px 0;
+      cursor: ew-resize;
+    }
+
+    .carousel-wrapper.is-vertical .swiper-pagination.custom-dots {
+      top: 50%;
+      right: 5px;
+      left: auto;
+      bottom: auto;
+      transform: translateY(-50%);
+      flex-direction: column;
+      padding: 12px 10px 12px 20px; /* Aumenta a área de contato invisível para o mousewheel/arraste */
+      cursor: ns-resize;
+    }
+
+    .swiper-pagination.is-scrubbing,
+    .swiper-pagination.is-scrubbing .swiper-pagination-bullet {
+      cursor: grabbing !important;
     }
 
     .swiper-pagination-bullet {
+      display: inline-block;
+      flex: 0 0 auto;
       width: 7px;
       height: 7px;
+      margin: 0 !important;
+      border-radius: 50%;
       background: #94a3b8;
       opacity: 0.45;
+      cursor: pointer;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .swiper-pagination-bullet.is-small {
+      transform: scale(0.75);
+      opacity: 0.35;
+    }
+
+    .swiper-pagination-bullet.is-tiny {
+      transform: scale(0.5);
+      opacity: 0.25;
     }
 
     .swiper-pagination-bullet-active {
@@ -265,7 +330,7 @@
       box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
     }
     
-    /* Elegant vertical pill for vertical mode - using margin to recenter if needed */
+    /* Elegant vertical pill for vertical mode */
     .carousel-wrapper.is-vertical .swiper-pagination-bullet-active {
       width: 7px !important;
       height: 22px !important;
@@ -300,12 +365,12 @@
       <div class="swiper-wrapper" id="swiperSlidesContainer">
         <!-- Slides gerados dinamicamente via Streamlit -->
       </div>
-      <!-- Botões de navegação -->
-      <div class="swiper-button-prev" title="Foto anterior"></div>
-      <div class="swiper-button-next" title="Próxima foto"></div>
-      <!-- Paginação moderna -->
-      <div class="swiper-pagination"></div>
     </div>
+    <!-- Botões de navegação (fora do swiper para não serem apagados pela máscara) -->
+    <div class="swiper-button-prev" title="Foto anterior"></div>
+    <div class="swiper-button-next" title="Próxima foto"></div>
+    <!-- Paginação moderna -->
+    <div class="swiper-pagination custom-dots" id="customDots"></div>
   </div>
 
   <script src="./static/swiper-bundle.min.js"></script>
@@ -340,38 +405,203 @@
     let isInternalUpdate = false;
     let lastReportedIndex = -1;
     let isDestroying = false;
+    let isScrubbing = false;
+    let photoCount = 0;   // quantidade de fotos reais
+    let slideCount = 0;   // quantidade de slides renderizados (fotos reais + cópias do loop)
 
-    function renderSlides(photos, activeIndex) {
+    // Mínimo de slides para o loop do coverflow sempre ter fotos dos dois lados
+    const MIN_LOOP_SLIDES = 12;
+
+    /** Índice do slide (incluindo cópias) atualmente centralizado. */
+    function getSlideIndex() {
+      if (!swiperInstance) return 0;
+      return typeof swiperInstance.realIndex === "number" ? swiperInstance.realIndex : swiperInstance.activeIndex;
+    }
+
+    /** Índice da foto real (0..photoCount-1) atualmente centralizada. */
+    function getRealIndex() {
+      if (!photoCount) return 0;
+      return ((getSlideIndex() % photoCount) + photoCount) % photoCount;
+    }
+
+    /** Navega até a foto real pelo caminho mais curto (considerando o loop). */
+    function goToPhoto(photoIdx, speed) {
+      if (!swiperInstance || !photoCount) return;
+      const cur = getSlideIndex();
+      let best = photoIdx;
+      let bestDist = Infinity;
+      for (let k = photoIdx; k < slideCount; k += photoCount) {
+        const diff = Math.abs(k - cur);
+        const dist = Math.min(diff, slideCount - diff);
+        if (dist < bestDist) { bestDist = dist; best = k; }
+      }
+      if (best !== cur) swiperInstance.slideToLoop(best, speed);
+    }
+
+    function reportActiveIndex() {
+      if (!swiperInstance || isDestroying) return;
+      const newIndex = getRealIndex();
+      if (newIndex !== lastReportedIndex) {
+        lastReportedIndex = newIndex;
+        Streamlit.setComponentValue(newIndex);
+      }
+    }
+
+    /**
+     * Renderiza as bolinhas de paginação representando apenas as fotos reais.
+     * Mostra uma janela circular de até 7 bolinhas ao redor da ativa,
+     * reforçando a sensação de carrossel infinito.
+     */
+    function renderDots() {
+      const dotsEl = document.getElementById("customDots");
+      if (!dotsEl) return;
+      if (photoCount <= 1) { dotsEl.innerHTML = ""; return; }
+
+      const active = getRealIndex();
+      const half = Math.min(3, Math.floor((photoCount - 1) / 2));
+      const offsets = [];
+      for (let o = -half; o <= half; o++) offsets.push(o);
+      // Número par de fotos (≤ 7): inclui a bolinha restante à direita/abaixo
+      if (photoCount <= 7 && offsets.length < photoCount) offsets.push(half + 1);
+
+      dotsEl.innerHTML = offsets.map((o) => {
+        const idx = ((active + o) % photoCount + photoCount) % photoCount;
+        const dist = Math.abs(o);
+        let cls = "swiper-pagination-bullet";
+        if (dist === 0) cls += " swiper-pagination-bullet-active";
+        else if (photoCount > 7 && dist === 2) cls += " is-small";
+        else if (photoCount > 7 && dist >= 3) cls += " is-tiny";
+        return `<span class="${cls}" data-idx="${idx}" title="Foto ${idx + 1}"></span>`;
+      }).join("");
+    }
+
+    /**
+     * Permite arrastar a barra de paginação (bolinhas) para trocar de foto.
+     * Vertical: arrastar para baixo avança / para cima volta.
+     * Horizontal: arrastar para a direita avança / para a esquerda volta.
+     * Configurado uma única vez, pois o elemento de paginação fica fora do
+     * #mySwiper e sobrevive às recriações do Swiper.
+     */
+    function setupPaginationScrub() {
+      const paginationEl = document.querySelector("#carouselWrapper .swiper-pagination");
+      if (!paginationEl || paginationEl.dataset.scrubReady) return;
+      paginationEl.dataset.scrubReady = "1";
+
+      const STEP_PX = 16; // distância de arraste necessária para trocar 1 foto
+      let lastPos = 0;
+      let accumulated = 0;
+      let moved = false;
+      let suppressClick = false;
+      let activePointer = null;
+
+      const isVertical = () =>
+        document.getElementById("carouselWrapper").classList.contains("is-vertical");
+      const getPos = (e) => (isVertical() ? e.clientY : e.clientX);
+
+      paginationEl.addEventListener("pointerdown", (e) => {
+        if (!swiperInstance || (e.pointerType === "mouse" && e.button !== 0)) return;
+        activePointer = e.pointerId;
+        isScrubbing = true;
+        moved = false;
+        accumulated = 0;
+        lastPos = getPos(e);
+        paginationEl.classList.add("is-scrubbing");
+        e.preventDefault();
+      });
+
+      // Move/solta na janela inteira: o arraste continua mesmo saindo da barra
+      window.addEventListener("pointermove", (e) => {
+        if (!isScrubbing || e.pointerId !== activePointer || !swiperInstance) return;
+        const pos = getPos(e);
+        accumulated += pos - lastPos;
+        lastPos = pos;
+
+        // Sem final: o loop/rewind do Swiper leva da última para a primeira (e vice-versa)
+        while (accumulated >= STEP_PX) {
+          accumulated -= STEP_PX;
+          swiperInstance.slideNext(180); moved = true;
+        }
+        while (accumulated <= -STEP_PX) {
+          accumulated += STEP_PX;
+          swiperInstance.slidePrev(180); moved = true;
+        }
+        e.preventDefault();
+      });
+
+      const endScrub = (e) => {
+        if (!isScrubbing || (e && e.pointerId !== activePointer)) return;
+        isScrubbing = false;
+        activePointer = null;
+        paginationEl.classList.remove("is-scrubbing");
+        if (moved) {
+          // Evita que o "click" do fim do arraste acione o clique na bolinha
+          suppressClick = true;
+          setTimeout(() => { suppressClick = false; }, 0);
+        }
+        // Reporta apenas o índice final ao Streamlit (um único rerun)
+        reportActiveIndex();
+      };
+
+      window.addEventListener("pointerup", endScrub);
+      window.addEventListener("pointercancel", endScrub);
+
+      paginationEl.addEventListener("click", (e) => {
+        if (suppressClick) {
+          e.stopPropagation();
+          e.preventDefault();
+          suppressClick = false;
+        }
+      }, true);
+
+      // Clique em uma bolinha: vai direto para a foto correspondente
+      paginationEl.addEventListener("click", (e) => {
+        const bullet = e.target.closest(".swiper-pagination-bullet");
+        if (!bullet || !swiperInstance) return;
+        const idx = parseInt(bullet.dataset.idx, 10);
+        if (!isNaN(idx)) goToPhoto(idx);
+      });
+
+      // Previne o scroll da página ao usar o mousewheel em cima da paginação
+      paginationEl.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, { passive: false });
+    }
+
+    function renderSlides(photos, copies) {
       const container = document.getElementById("swiperSlidesContainer");
       container.innerHTML = "";
 
-      photos.forEach((photo, idx) => {
-        const slide = document.createElement("div");
-        slide.className = "swiper-slide" + (photo.is_nc ? " is-nc" : "");
+      for (let c = 0; c < copies; c++) {
+        photos.forEach((photo, idx) => {
+          const slideIdx = c * photos.length + idx;
+          const slide = document.createElement("div");
+          slide.className = "swiper-slide" + (photo.is_nc ? " is-nc" : "");
 
-        const badgeCounter = `<div class="slide-badge-counter">${idx + 1} / ${photos.length}</div>`;
-        const badgeNc = photo.is_nc ? `<div class="slide-badge-nc">⚠️ Em NC</div>` : "";
+          const badgeCounter = `<div class="slide-badge-counter">${idx + 1} / ${photos.length}</div>`;
+          const badgeNc = photo.is_nc ? `<div class="slide-badge-nc">⚠️ Em NC</div>` : "";
 
-        slide.innerHTML = `
-          <div class="slide-img-container">
-            ${badgeCounter}
-            ${badgeNc}
-            <img src="${photo.src}" class="slide-img" alt="${photo.name}" loading="lazy" />
-            <div class="slide-overlay">
-              <span class="slide-title" title="${photo.name}">${photo.name}</span>
+          slide.innerHTML = `
+            <div class="slide-img-container">
+              ${badgeCounter}
+              ${badgeNc}
+              <img src="${photo.src}" class="slide-img" alt="${photo.name}" loading="lazy" />
+              <div class="slide-overlay">
+                <span class="slide-title" title="${photo.name}">${photo.name}</span>
+              </div>
             </div>
-          </div>
-        `;
+          `;
 
-        // Garante que o clique em qualquer foto (inclusive 1, 2 e 3) deslize para ela diretamente
-        slide.addEventListener("click", () => {
-          if (swiperInstance && !isDestroying && swiperInstance.activeIndex !== idx) {
-            swiperInstance.slideTo(idx);
-          }
+          // Clique em qualquer foto (inclusive cópias do loop) desliza até ela
+          slide.addEventListener("click", () => {
+            if (swiperInstance && !isDestroying && getSlideIndex() !== slideIdx) {
+              swiperInstance.slideToLoop(slideIdx);
+            }
+          });
+
+          container.appendChild(slide);
         });
-
-        container.appendChild(slide);
-      });
+      }
     }
 
     function destroySwiper() {
@@ -409,13 +639,22 @@
         // IMPORTANTE: Destruir o Swiper ANTES de trocar o DOM para evitar
         // referências órfãs a elementos que serão removidos pelo renderSlides
         destroySwiper();
-        renderSlides(photos, activeIndex);
+
+        // Loop infinito visual: replica as fotos até haver slides suficientes para que
+        // sempre exista uma foto antes e depois da central (… 5 1 2 3 4 5 1 …).
+        const useLoop = photos.length >= 2;
+        const copies = useLoop ? Math.max(1, Math.ceil(MIN_LOOP_SLIDES / photos.length)) : 1;
+        photoCount = photos.length;
+        slideCount = photos.length * copies;
+        renderSlides(photos, copies);
 
         const isVert = direction === "vertical";
         
         swiperInstance = new Swiper("#mySwiper", {
           direction: isVert ? "vertical" : "horizontal",
           effect: "coverflow",
+          loop: useLoop,
+          loopAdditionalSlides: useLoop ? 2 : 0,
           grabCursor: true,
           centeredSlides: true,
           slidesPerView: "auto",
@@ -423,7 +662,7 @@
           speed: 500,
           touchRatio: 0.9,
           resistanceRatio: 0.85,
-          slideToClickedSlide: true,
+          slideToClickedSlide: false, // tratado pelo handler de clique próprio (compatível com loop)
           watchSlidesProgress: true,
           keyboard: {
             enabled: true,
@@ -453,43 +692,35 @@
             nextEl: ".swiper-button-next",
             prevEl: ".swiper-button-prev",
           },
-          pagination: {
-            el: ".swiper-pagination",
-            clickable: true,
-            dynamicBullets: true,
-          },
+          // Paginação do Swiper desativada: as bolinhas são renderizadas por renderDots()
+          // para representar apenas as fotos reais (e não as cópias do loop).
           on: {
+            realIndexChange: function () {
+              renderDots();
+            },
             slideChangeTransitionEnd: function () {
               // Não reporta durante destruição ou recriação do Swiper
               if (isInternalUpdate || isDestroying || !swiperInstance) {
                 isInternalUpdate = false;
                 return;
               }
-              const newIndex = swiperInstance.activeIndex;
-              if (newIndex !== lastReportedIndex) {
-                lastReportedIndex = newIndex;
-                Streamlit.setComponentValue(newIndex);
-              }
+              // Durante o arraste da paginação, o índice final é reportado ao soltar
+              if (isScrubbing) return;
+              reportActiveIndex();
             }
           }
         });
 
-        // Previne o scroll da página ao usar o mousewheel em cima da paginação
-        const paginationEl = document.querySelector("#mySwiper .swiper-pagination");
-        if (paginationEl) {
-          paginationEl.addEventListener("wheel", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-          }, { passive: false });
-        }
+        setupPaginationScrub();
+        renderDots();
 
         lastReportedIndex = activeIndex;
       } else {
         // As fotos continuam as mesmas, apenas sincroniza a posição do slide se necessário
-        if (swiperInstance && swiperInstance.activeIndex !== activeIndex) {
+        if (!isScrubbing && swiperInstance && getRealIndex() !== activeIndex) {
           isInternalUpdate = true;
           lastReportedIndex = activeIndex;
-          swiperInstance.slideTo(activeIndex, swiperInstance.params.speed || 500);
+          goToPhoto(activeIndex, swiperInstance.params.speed || 500);
         }
       }
 

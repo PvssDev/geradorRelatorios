@@ -1346,3 +1346,159 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
     color: #D7D8D9 !important;
     fill: #D7D8D9 !important;
 }
+/* ==========================================
+   NAVEGAÇÃO PRINCIPAL (TIPO DE RELATÓRIO E CATEGORIA)
+   Design moderno, animado, com cores adaptativas por tipo
+   ========================================== */
+
+/* Container de botões da navegação */
+.stApp div[class*="st-key-widget_menu_tipo"] {
+    display: flex !important;
+    justify-content: flex-end !important;
+}
+.stApp div[class*="st-key-widget_menu_categoria"] {
+    display: flex !important;
+    justify-content: flex-start !important;
+}
+
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"],
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] {
+    display: flex !important;
+    flex-direction: row !important; /* FORÇA LINHA HORIZONTAL */
+    flex-wrap: nowrap !important; /* BLOQUEIO TOTAL DE QUEBRA DE LINHA */
+    min-width: max-content !important; /* IMPEDE COMPRESSÃO DO CONTAINER */
+    gap: 12px !important;
+    background: rgba(255, 255, 255, 0.45) !important;
+    padding: 8px !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(47, 81, 115, 0.15) !important;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    position: relative !important;
+    z-index: 1 !important;
+    width: fit-content !important; /* Evita que ocupe 100% da coluna */
+}
+
+/* Pseudo-elemento que funcionará como o fundo deslizante */
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]::before,
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 8px !important;
+    bottom: 8px !important;
+    background: linear-gradient(135deg, #2F5173, #0D2740) !important;
+    border-radius: 8px !important;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    z-index: 0 !important;
+    box-shadow: 0 4px 14px rgba(13, 39, 64, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Estado normal de todos os botões na navegação principal */
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button,
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button {
+    position: relative !important;
+    z-index: 2 !important; /* Fica acima do slider */
+    border-radius: 8px !important;
+    border: none !important;
+    background: transparent !important;
+    color: #2F5173 !important;
+    font-weight: 600 !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    padding: 8px 18px !important;
+    box-shadow: none !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    /* Centraliza o texto dentro do botão perfeitamente */
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+/* Força os botões de Tipo a terem espaço suficiente para 'SOCICAM' e NÃO REDIMENSIONAR NUNCA */
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button {
+    flex: 0 0 105px !important; /* Não cresce, não encolhe, base 105px */
+    width: 105px !important;
+    min-width: 105px !important; 
+    max-width: 105px !important;
+}
+
+/* Força os botões de Categoria a terem espaço suficiente para 'Monitoramento' e NÃO REDIMENSIONAR NUNCA */
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button {
+    flex: 0 0 155px !important; /* Não cresce, não encolhe, base 155px */
+    width: 155px !important;
+    min-width: 155px !important; 
+    max-width: 155px !important;
+}
+
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button *,
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button * {
+    color: #2F5173 !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    white-space: nowrap !important;
+}
+
+/* Efeito de hover em botões inativos */
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button:hover:not([aria-checked="true"]):not([kind="pillsActive"]),
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button:hover:not([aria-checked="true"]):not([kind="pillsActive"]) {
+    background: rgba(255, 255, 255, 0.7) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+}
+
+/* Botão Ativo (texto e remoção do fundo nativo) */
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button[aria-checked="true"],
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button[kind="pillsActive"],
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button[aria-checked="true"],
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button[kind="pillsActive"] {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    transform: translateY(-2px) !important; /* Leve elevação do texto */
+}
+
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button[aria-checked="true"] *,
+.stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button[kind="pillsActive"] *,
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button[aria-checked="true"] *,
+.stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button[kind="pillsActive"] * {
+    color: #ffffff !important;
+}
+
+/* ============================
+   ANIMAÇÃO DE DESLIZAMENTO - TIPO (3 ITENS)
+   ============================ */
+div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]::before {
+    width: calc((100% - 16px - 24px) / 3) !important; /* (100% do container - padding laterais - 2 gaps) / 3 */
+    left: 8px !important;
+}
+div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button:nth-child(1)[aria-checked="true"])::before,
+div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(1))::before {
+    transform: translateX(0) !important;
+}
+div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button:nth-child(2)[aria-checked="true"])::before,
+div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(2))::before {
+    transform: translateX(calc(100% + 12px)) !important;
+}
+div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button:nth-child(3)[aria-checked="true"])::before,
+div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(3))::before {
+    transform: translateX(calc(200% + 24px)) !important;
+}
+
+/* ============================
+   ANIMAÇÃO DE DESLIZAMENTO - CATEGORIA (2 ITENS)
+   ============================ */
+div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]::before {
+    width: calc((100% - 16px - 12px) / 2) !important; /* (100% do container - padding laterais - 1 gap) / 2 */
+    left: 8px !important;
+}
+div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button:nth-child(1)[aria-checked="true"])::before,
+div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(1))::before {
+    transform: translateX(0) !important;
+}
+div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button:nth-child(2)[aria-checked="true"])::before,
+div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(2))::before {
+    transform: translateX(calc(100% + 12px)) !important;
+}
+

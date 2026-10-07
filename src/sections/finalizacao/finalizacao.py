@@ -114,12 +114,18 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 desc_nc = str(rec.get("Não Conformidade", "")).strip()
                 
                 parts = []
-                if ident:
-                    parts.append(ident)
-                if trecho_val:
-                    parts.append(trecho_val)
-                if desc_nc and desc_nc != ident:
-                    parts.append(desc_nc)
+                if "CRA" in str(tipo_relatorio).upper():
+                    if trecho_val:
+                        parts.append(trecho_val)
+                    else:
+                        parts.append("Trecho Não Informado")
+                else:
+                    if ident:
+                        parts.append(ident)
+                    if trecho_val:
+                        parts.append(trecho_val)
+                    if desc_nc and desc_nc != ident:
+                        parts.append(desc_nc)
                 
                 run_nc_desc = p_nc_desc.add_run(" – ".join(parts))
                 run_nc_desc.bold = True
@@ -295,24 +301,32 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
 
         for g in grupos_pista:
             related = g["related_records"]
+            rec_main = related[0]
+            
+            obs_text = str(rec_main.get("Observações") or rec_main.get("Legenda da Foto") or "").strip()
+            ident = str(rec_main.get("Identificação", "")).strip()
+            nc_txt = str(rec_main.get("Não Conformidade", "")).strip()
+            
+            if str(tipo_relatorio).upper() in ["CRC", "CRA"]:
+                p_nc_desc = doc.add_paragraph()
+                p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_nc_desc.paragraph_format.space_before = Pt(12)
+                p_nc_desc.paragraph_format.space_after = Pt(6)
+                p_nc_desc.paragraph_format.line_spacing = 1.15
+                
+                if str(tipo_relatorio).upper() == "CRA":
+                    trecho_val = str(rec_main.get("Trecho", "")).strip()
+                    label_item = trecho_val if trecho_val else "Trecho Não Informado"
+                else:
+                    label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or "Item")
+                    
+                run_nc_desc = p_nc_desc.add_run(label_item)
+                run_nc_desc.bold = True
+                run_nc_desc.font.name = 'Aptos'
+                run_nc_desc.font.size = Pt(11)
             
             if len(related) == 1:
                 rec = related[0]
-                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
-                ident = str(rec.get("Identificação", "")).strip()
-                nc_txt = str(rec.get("Não Conformidade", "")).strip()
-                
-                if str(tipo_relatorio).upper() == "CRC":
-                    p_nc_desc = doc.add_paragraph()
-                    p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                    p_nc_desc.paragraph_format.space_before = Pt(12)
-                    p_nc_desc.paragraph_format.space_after = Pt(6)
-                    p_nc_desc.paragraph_format.line_spacing = 1.15
-                    label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or "Item")
-                    run_nc_desc = p_nc_desc.add_run(label_item)
-                    run_nc_desc.bold = True
-                    run_nc_desc.font.name = 'Aptos'
-                    run_nc_desc.font.size = Pt(11)
                     
                 table = doc.add_table(rows=2, cols=1)
                 table.style = 'Table Grid'
