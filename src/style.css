@@ -1457,6 +1457,8 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
     box-shadow: none !important;
     border: none !important;
     transform: translateY(-2px) !important; /* Leve elevação do texto */
+    pointer-events: none !important; /* Impede clique no botão já selecionado, bloqueando a desmarcação */
+    cursor: default !important;
 }
 
 .stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button[aria-checked="true"] *,
