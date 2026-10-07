@@ -39,7 +39,14 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport):
         return True
 
     def get_abbreviations(self) -> list:
-        return []
+        return [
+            ("ABNT", "Associação Brasileira de Normas Técnicas"),
+            ("ARPE", "Agência de Regulação de Pernambuco"),
+            ("EPTI", "Empresa Pernambucana de Transporte Coletivo Intermunicipal"),
+            ("NC", "Não Conformidade"),
+            ("PCD", "Pessoa com Deficiência"),
+            ("TIP", "Terminal Rodoviário de Passageiros do Recife")
+        ]
 
     def get_process_sei_texts(self, row, ano=None) -> list:
         from utils import extrair_mes_ano_numerico, extrair_ano

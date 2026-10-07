@@ -153,28 +153,45 @@ term_fisc_pessoal = terms["term_fisc_pessoal"]
 
 _, col_center_group, _ = st.columns([1, 12, 1])
 with col_center_group:
-    c_space_l, c_title, c_b1, c_b2, c_space_r = st.columns([1, 15, 1.5, 1.5, 1], vertical_alignment="center", gap="small")
-    with c_title:
-        st.markdown(
-            f"<h1 class='app-main-title' style='text-align: right; margin: 0; padding-right: 6px; font-size: clamp(1.8rem, 4vw, 3.15rem); font-weight: 900; color: #fbfcfd !important; -webkit-text-fill-color: #fbfcfd !important; -webkit-text-stroke: 6px #011A33; paint-order: stroke fill; display: flex; align-items: center; justify-content: flex-end;'><span class='material-symbols-rounded'>description</span>Gerador {st.session_state.tipo_relatorio} ({st.session_state.categoria_relatorio})</h1>",
-            unsafe_allow_html=True
+    st.markdown(
+        "<h1 class='app-main-title' style='text-align: center; margin: 0; padding: 10px 0 20px 0; font-size: clamp(2rem, 5vw, 3.8rem); font-weight: 900; color: #fbfcfd !important; -webkit-text-fill-color: #fbfcfd !important; -webkit-text-stroke: 6px #011A33; paint-order: stroke fill; display: flex; align-items: center; justify-content: center; gap: 12px;'><span class='material-symbols-rounded' style='font-size: 1.1em;'>description</span>Gerador de Relatórios</h1>",
+        unsafe_allow_html=True
+    )
+    
+    st.markdown("<div id='main-nav-controls'></div>", unsafe_allow_html=True)
+    
+    nav_spacer1, nav_col1, nav_col2, nav_spacer2 = st.columns([2.5, 3.5, 3.5, 2.5], vertical_alignment="center")
+    with nav_col1:
+        tipo_sel = st.pills(
+            "Tipo de Relatório", 
+            ["CRA", "CRC", "SOCICAM"], 
+            selection_mode="single", 
+            default=st.session_state.tipo_relatorio, 
+            key="widget_menu_tipo",
+            label_visibility="collapsed"
         )
-    with c_b1:
-        if st.button("", icon=":material/sync:", key="btn_swap_tipo", help="Clique para alternar entre CRA, CRC e SOCICAM"):
-            if st.session_state.tipo_relatorio == "CRA":
-                st.session_state.tipo_relatorio = "CRC"
-            elif st.session_state.tipo_relatorio == "CRC":
-                st.session_state.tipo_relatorio = "SOCICAM"
-            else:
-                st.session_state.tipo_relatorio = "CRA"
+        if tipo_sel is None:
+            st.session_state.widget_menu_tipo = st.session_state.tipo_relatorio
+            st.rerun()
+        elif tipo_sel != st.session_state.tipo_relatorio:
+            st.session_state.tipo_relatorio = tipo_sel
             st.session_state.nc_form_step = 1
             st.rerun()
-    with c_b2:
-        if st.button("", icon=":material/swap_horiz:", key="btn_swap_categoria", help="Clique para alternar entre Fiscalização e Monitoramento"):
-            if st.session_state.categoria_relatorio == "Fiscalização":
-                st.session_state.categoria_relatorio = "Monitoramento"
-            else:
-                st.session_state.categoria_relatorio = "Fiscalização"
+            
+    with nav_col2:
+        cat_sel = st.pills(
+            "Categoria", 
+            ["Fiscalização", "Monitoramento"], 
+            selection_mode="single", 
+            default=st.session_state.categoria_relatorio, 
+            key="widget_menu_categoria",
+            label_visibility="collapsed"
+        )
+        if cat_sel is None:
+            st.session_state.widget_menu_categoria = st.session_state.categoria_relatorio
+            st.rerun()
+        elif cat_sel != st.session_state.categoria_relatorio:
+            st.session_state.categoria_relatorio = cat_sel
             st.session_state.nc_form_step = 1
             st.rerun()
 
@@ -198,9 +215,12 @@ with st.container():
                 key=f"fill_photos_uploader_{st.session_state.photos_uploader_version}"
             )
         with col_sort:
-            st.write("") # Alinhamento vertical discreto
-            st.write("**Ordenar Fotos por:**")
-            with st.popover(f"↕️ {st.session_state.fill_photos_sort_option}", use_container_width=True):
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Alinhamento vertical
+            st.markdown("<div style='white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; margin-bottom: 0.5rem;'>Ordenar Fotos por:</div>", unsafe_allow_html=True)
+            
+            # Versão curta para o botão não truncar a parte importante (A-Z)
+            display_sort = st.session_state.fill_photos_sort_option.replace("Nome ", "").replace("Ordem de ", "")
+            with st.popover(f":material/swap_vert: {display_sort}", use_container_width=True):
                 is_asc = st.session_state.fill_photos_sort_option == "Nome (A-Z / 0-9)"
                 is_desc = st.session_state.fill_photos_sort_option == "Nome (Z-A / 9-0)"
                 is_upload = st.session_state.fill_photos_sort_option == "Ordem de Upload"
@@ -235,10 +255,10 @@ with st.container():
                         st.session_state.fill_photos_sort_option = "Ordem de Upload"
                         st.rerun()
         with col_clear:
-            st.write("") # Alinhamento vertical discreto
-            st.write("**Limpar Fotos:**")
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Alinhamento vertical
+            st.markdown("<div style='white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; margin-bottom: 0.5rem;'>Limpar Fotos:</div>", unsafe_allow_html=True)
             has_photos = len(uploaded_nc_photos) > 0 if uploaded_nc_photos else False
-            if st.button("Limpar", icon=":material/delete:", disabled=not has_photos, key="btn_clear_uploads", use_container_width=True):
+            if st.button("Limpar", icon=":material/ink_eraser:", disabled=not has_photos, key="btn_clear_uploads", use_container_width=True):
                 st.session_state.photos_uploader_version += 1
                 st.session_state.fill_photos = []
                 if "carousel_index" in st.session_state:
@@ -378,7 +398,7 @@ with st.container():
                 responsaveis = ", ".join([r["nome"] for r in responsaveis_sel])
             with col_gear:
                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                if st.button("", icon=":material/settings:", help="Gerenciar Responsáveis", key="btn_manage_responsaveis"):
+                if st.button("", icon=":material/group:", help="Gerenciar Responsáveis", key="btn_manage_responsaveis"):
                     gerenciar_responsaveis_modal(term_fisc_pessoal)
             
             # Coordenador
@@ -394,7 +414,7 @@ with st.container():
                 coordenador = coordenador_sel["nome"] if coordenador_sel else ""
             with col_gear_coord:
                 st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                if st.button("", icon=":material/settings:", help="Gerenciar Coordenadores", key="btn_manage_coordenadores"):
+                if st.button("", icon=":material/shield_person:", help="Gerenciar Coordenadores", key="btn_manage_coordenadores"):
                     gerenciar_coordenadores_modal(term_fisc_prep_f)
             
             # Número do Contrato definido automaticamente por tipo de relatório
@@ -405,7 +425,7 @@ with st.container():
             else:
                 contrato = "CT. nº 1.041.080/08"
  
-        submit_fisc = st.button(f"Adicionar {term_fisc}", icon=":material/add:", type="primary")
+        submit_fisc = st.button(f"Adicionar {term_fisc}", icon=":material/add_circle:", type="primary")
         if submit_fisc:
             ids_existentes = [f["ID da Fiscalização"].strip() for f in st.session_state.temp_fiscalizacoes]
             local_limpo = local.strip() if local else ""
@@ -484,37 +504,20 @@ with st.container():
     else:
         # Preparar fotos antigas de monitoramento (filtrando as que já foram comparadas)
         if is_monitoring and st.session_state.old_photos_to_match:
-            fotos_comparadas = {nc["Foto Anterior"] for nc in st.session_state.temp_nc if nc.get("Foto Anterior")}
-            old_photos_disponiveis = [
-                item for item in st.session_state.old_photos_to_match
-                if item["old_photo_path"] not in fotos_comparadas
-            ]
+            old_photos_disponiveis = st.session_state.old_photos_to_match
         
-            if old_photos_disponiveis:
-                options_old = [item.get("display_label", item.get("trecho", "Sem Trecho")) for item in old_photos_disponiveis]
-                selected_old_key = f"sel_box_old_photo_{st.session_state.nc_form_counter}"
-            
-                if selected_old_key not in st.session_state or st.session_state[selected_old_key] not in options_old:
-                    st.session_state[selected_old_key] = options_old[0]
-                
-                selected_old_label = st.session_state[selected_old_key]
-                current_item = next(
-                    (item for item in old_photos_disponiveis if item.get("display_label", item.get("trecho", "")) == selected_old_label),
-                    old_photos_disponiveis[0]
-                )
-                
-                # Para manter compatibilidade de estado anterior caso mude o dropdown, mas usaremos carrossel tbm
-                idx = st.session_state.old_photos_to_match.index(current_item)
-                st.session_state.carousel_index = idx
-            else:
-                current_item = None
-                idx = 0
-                options_old = []
+            if "monitoring_old_photo_index" not in st.session_state:
+                st.session_state.monitoring_old_photo_index = 0
+            if "monitoring_new_photo_index" not in st.session_state:
+                st.session_state.monitoring_new_photo_index = st.session_state.get("carousel_index", 0)
+
+            old_idx_safe = min(st.session_state.monitoring_old_photo_index, len(old_photos_disponiveis) - 1)
+            current_item = old_photos_disponiveis[old_idx_safe]
+            idx = st.session_state.old_photos_to_match.index(current_item)
         else:
             old_photos_disponiveis = []
             current_item = None
             idx = 0
-            options_old = []
         
         registros_container = st.container(border=True, key="registros_main_container")
         col_inputs, col_preview = registros_container.columns([1.2, 1.0])
@@ -526,13 +529,7 @@ with st.container():
                 if current_item and old_photos_disponiveis:
                     st.markdown(f"**Trecho de Comparação {idx + 1} de {len(st.session_state.old_photos_to_match)}**")
                     
-                    # Ensure indices exist in session state
-                    if "monitoring_old_photo_index" not in st.session_state:
-                        st.session_state.monitoring_old_photo_index = 0
-                    if "monitoring_new_photo_index" not in st.session_state:
-                        st.session_state.monitoring_new_photo_index = st.session_state.get("carousel_index", 0)
-
-                    # Normalize old index if list changed
+                    # Normalize old index se houver
                     old_idx = min(st.session_state.monitoring_old_photo_index, len(old_photos_disponiveis) - 1)
                     
                     col_old, col_new = st.columns(2)
@@ -559,9 +556,9 @@ with st.container():
                         # Botoes juntinhos 2 e 2
                         btn_col_old_1, btn_col_old_2 = st.columns(2, gap="small")
                         with btn_col_old_1:
-                            st.button("Ampliar Foto", icon=":material/zoom_in:", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{st.session_state.nc_form_counter}", use_container_width=True)
+                            st.button("Ampliar Foto", icon=":material/fullscreen:", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{st.session_state.nc_form_counter}", use_container_width=True)
                         with btn_col_old_2:
-                            if st.button("Ver todas as fotos", icon=":material/photo_library:", key=f"btn_gal_old_{st.session_state.nc_form_counter}", use_container_width=True):
+                            if st.button("Ver todas as fotos", icon=":material/grid_view:", key=f"btn_gal_old_{st.session_state.nc_form_counter}", use_container_width=True):
                                 galeria_fotos_modal(fotos=old_paths_str, target_index_key="monitoring_old_photo_index")
                     with col_new:
                         st.markdown("**Nova Foto (Atual)**")
@@ -584,9 +581,9 @@ with st.container():
                             
                             btn_col_new_1, btn_col_new_2 = st.columns(2, gap="small")
                             with btn_col_new_1:
-                                st.button("Ampliar Foto", icon=":material/zoom_in:", on_click=mostrar_foto_modal, args=(current_photo_new,), key=f"btn_zoom_new_{st.session_state.nc_form_counter}", use_container_width=True)
+                                st.button("Ampliar Foto", icon=":material/fullscreen:", on_click=mostrar_foto_modal, args=(current_photo_new,), key=f"btn_zoom_new_{st.session_state.nc_form_counter}", use_container_width=True)
                             with btn_col_new_2:
-                                if st.button("Ver todas as fotos", icon=":material/photo_library:", key=f"btn_gal_new_{st.session_state.nc_form_counter}", use_container_width=True):
+                                if st.button("Ver todas as fotos", icon=":material/grid_view:", key=f"btn_gal_new_{st.session_state.nc_form_counter}", use_container_width=True):
                                     galeria_fotos_modal(fotos=st.session_state.fill_photos, target_index_key="monitoring_new_photo_index")
                         else:
                             st.info("Faça o upload de novas fotos para compará-las.")
@@ -639,7 +636,7 @@ with st.container():
                                 use_container_width=True
                             )
                         with ctrl_col2:
-                            if st.button("Ver todas as fotos", icon=":material/photo_library:", key="btn_ver_todas_fotos", use_container_width=True):
+                            if st.button("Ver todas as fotos", icon=":material/grid_view:", key="btn_ver_todas_fotos", use_container_width=True):
                                 galeria_fotos_modal()
 
                         st.checkbox(
@@ -704,7 +701,6 @@ with st.container():
                     )
                 
                     ponto_atencao = []
-                    nc_legenda = st.text_area("Legenda da Foto Atual", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva a legenda da foto atual...")
                 
                     if is_monitoring and current_item:
                         st.markdown("#### :material/article: Corpo do Relatório")
@@ -793,10 +789,10 @@ with st.container():
                             key=f"nc_tipo_{st.session_state.nc_form_counter}",
                             default="Não Conformidade"
                         )
+                        situacao = "Pendente"
                     else:
                         tipo_registro = "Não Conformidade"
-
-                    situacao = "Pendente"
+                        # situacao was already captured from the pills above in Monitoring mode
 
                     nc_key = f"nc_desc_{st.session_state.nc_form_counter}"
                     pa_key = f"pa_desc_{st.session_state.nc_form_counter}"
@@ -811,9 +807,9 @@ with st.container():
                         with col_pills:
                             if is_socicam and not options_nc:
                                 st.info("Nenhuma Não Conformidade cadastrada para a SOCICAM. Clique no botão (+) ao lado para cadastrar.")
-                                nc_descricao = []
+                                _nc_descricao_pills = []
                             else:
-                                nc_descricao = st.pills(
+                                _nc_descricao_pills = st.pills(
                                     label_nc,
                                     options_nc,
                                     selection_mode="multi",
@@ -821,17 +817,17 @@ with st.container():
                                 )
                         with col_plus:
                             st.markdown("<div style='height: 28px;' class='green-btn-marker'></div>", unsafe_allow_html=True)
-                            if st.button("", icon=":material/add:", key=f"btn_add_custom_nc_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
+                            if st.button("", icon=":material/add_circle:", key=f"btn_add_custom_nc_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
                                 adicionar_nc_personalizada_modal(nc_key, is_socicam=is_socicam)
-                        ponto_atencao = []
+                        _ponto_atencao_pills = []
                     else:
                         col_pills, col_plus = st.columns([11, 1])
                         with col_pills:
                             if is_socicam and not options_nc:
                                 st.info("Nenhuma Não Conformidade cadastrada para a SOCICAM. Clique no botão (+) ao lado para cadastrar.")
-                                ponto_atencao = []
+                                _ponto_atencao_pills = []
                             else:
-                                ponto_atencao = st.pills(
+                                _ponto_atencao_pills = st.pills(
                                     label_pa,
                                     options_nc,
                                     selection_mode="multi",
@@ -839,9 +835,16 @@ with st.container():
                                 )
                         with col_plus:
                             st.markdown("<div style='height: 28px;' class='green-btn-marker'></div>", unsafe_allow_html=True)
-                            if st.button("", icon=":material/add:", key=f"btn_add_custom_pa_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
+                            if st.button("", icon=":material/add_circle:", key=f"btn_add_custom_pa_{st.session_state.nc_form_counter}", help="Adicionar Não Conformidade Personalizada", use_container_width=True):
                                 adicionar_nc_personalizada_modal(pa_key, is_socicam=is_socicam)
-                        nc_descricao = []
+                        _nc_descricao_pills = []
+
+                    if is_monitoring:
+                        nc_descricao = _nc_descricao_pills if _nc_descricao_pills else ([current_item.get("constatacao", "")] if current_item else [])
+                        ponto_atencao = _ponto_atencao_pills
+                    else:
+                        nc_descricao = _nc_descricao_pills
+                        ponto_atencao = _ponto_atencao_pills
                 
                     nc_legenda = st.text_area("Observações", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva as observações/legenda correspondente...")
             
@@ -852,7 +855,7 @@ with st.container():
                     if is_monitoring and current_item:
                         col_save_direct, _ = st.columns([2.5, 7.5], gap="small")
                         with col_save_direct:
-                            if st.button("Salvar e Continuar", icon=":material/save:", type="primary", use_container_width=True, key=f"btn_save_crc_mon_step1_{st.session_state.nc_form_counter}"):
+                            if st.button("Salvar e Continuar", icon=":material/check_circle:", type="primary", use_container_width=True, key=f"btn_save_crc_mon_step1_{st.session_state.nc_form_counter}"):
                                 if id_vinculo == "Nenhum ID cadastrado":
                                     st.toast(f"Adicione uma {term_fisc_lower} primeiro.", icon=":material/error:")
                                 elif not foto_default:
@@ -953,7 +956,7 @@ with st.container():
                             col_nxt, col_rel, _ = st.columns([2.5, 4.5, 3.0], gap="small")
                         
                         with col_nxt:
-                            btn_proximo = st.button("Próximo", icon=":material/arrow_forward:", type="primary", use_container_width=True)
+                            btn_proximo = st.button("Próximo", icon=":material/east:", type="primary", use_container_width=True)
                             if btn_proximo or st.session_state.get("force_proximo_modal"):
                                 st.session_state.force_proximo_modal = False
                                 if id_vinculo == "Nenhum ID cadastrado":
@@ -1073,7 +1076,7 @@ with st.container():
             
                 col_back, col_add, _ = st.columns([1.1, 1.3, 7.6], gap="small")
                 with col_back:
-                    if st.button("Voltar", icon=":material/undo:", type="secondary", use_container_width=True):
+                    if st.button("Voltar", icon=":material/keyboard_backspace:", type="secondary", use_container_width=True):
                         st.session_state.nc_form_step = 1
                         st.rerun()
                 with col_add:
@@ -1190,8 +1193,11 @@ with st.container():
 
                         # Avançar carrossel automaticamente se houver próxima foto e a opção estiver ativada
                         if is_monitoring and st.session_state.old_photos_to_match:
-                            if st.session_state.carousel_index < len(st.session_state.old_photos_to_match) - 1:
-                                st.session_state.carousel_index += 1
+                            if st.session_state.get("auto_advance_active", True):
+                                if "monitoring_old_photo_index" in st.session_state and st.session_state.monitoring_old_photo_index < len(st.session_state.old_photos_to_match) - 1:
+                                    st.session_state.monitoring_old_photo_index += 1
+                                if "monitoring_new_photo_index" in st.session_state and st.session_state.fill_photos and st.session_state.monitoring_new_photo_index < len(st.session_state.fill_photos) - 1:
+                                    st.session_state.monitoring_new_photo_index += 1
                         else:
                             if st.session_state.get("auto_advance_active", True) and st.session_state.fill_photos and st.session_state.carousel_index < len(st.session_state.fill_photos) - 1:
                                 st.session_state.carousel_index += 1
@@ -1222,7 +1228,7 @@ with st.container():
             st.subheader(":material/tune: Painel de Ações do Relatório")
         with col_hdr_gear:
             st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-            if st.button("", icon=":material/settings:", help="Editar Fiscalizações e Não Conformidades cadastradas", key="btn_manage_edicao_relatorio"):
+            if st.button("", icon=":material/tune:", help="Editar Fiscalizações e Não Conformidades cadastradas", key="btn_manage_edicao_relatorio"):
                 editar_registros_relatorio_modal(
                     aba_inicial="fisc",
                     is_monitoring=is_monitoring,
@@ -1284,7 +1290,7 @@ with st.container():
                 
                 # Botão que fica habilitado se houver itens selecionados
                 disable_btn = len(ids_para_excluir) == 0
-                if st.button("Excluir Selecionadas", icon=":material/delete:", type="secondary", disabled=disable_btn, key="btn_bulk_delete"):
+                if st.button("Excluir Selecionadas", icon=":material/delete_sweep:", type="secondary", disabled=disable_btn, key="btn_bulk_delete"):
                     confirmar_exclusao_lote_modal(ids_para_excluir, term_fisc_plural_lower, term_fisc_plural)
                     
                 ncs_para_excluir = []
@@ -1419,7 +1425,7 @@ with st.container():
                 ncs_totais_para_excluir = ncs_para_excluir + pas_para_excluir
                 disable_nc_btn = len(ncs_totais_para_excluir) == 0
                 label_excluir = "Excluir Selecionadas (Não Conformidades)" if st.session_state.get("tipo_relatorio", "CRA") == "CRC" else "Excluir Selecionadas (Não Conformidades / Pontos de Atenção)"
-                if st.button(label_excluir, icon=":material/delete:", type="secondary", disabled=disable_nc_btn, key="btn_nc_bulk_delete"):
+                if st.button(label_excluir, icon=":material/delete_sweep:", type="secondary", disabled=disable_nc_btn, key="btn_nc_bulk_delete"):
                     confirmar_exclusao_nc_modal(ncs_totais_para_excluir)
                     
                 st.write("") # Espaçamento
@@ -1431,7 +1437,7 @@ with st.container():
         st.session_state.relatorios_preenchimento_data = []
         
     with col_relatorio:
-        if st.button("Gerar Relatório Automático", icon=":material/bolt:", type="primary", use_container_width=True, key="btn_run_report_main"):
+        if st.button("Gerar Relatório Automático", icon=":material/auto_awesome:", type="primary", use_container_width=True, key="btn_run_report_main"):
             if not st.session_state.temp_fiscalizacoes:
                 st.toast(f"Adicione pelo menos um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.", icon=":material/error:")
             else:
@@ -1513,7 +1519,7 @@ with st.container():
                             
     with col_planilha:
         disable_auto_fill = uploads_pendentes
-        if st.button("Auto Preenchimento", icon=":material/flash_on:", disabled=disable_auto_fill, use_container_width=True, key="btn_auto_fill"):
+        if st.button("Auto Preenchimento", icon=":material/magic_button:", disabled=disable_auto_fill, use_container_width=True, key="btn_auto_fill"):
             if uploads_pendentes:
                 st.toast(f"Não é possível realizar o auto preenchimento. Pendências: {', e '.join(mensagem_pendencias)}.", icon=":material/error:")
             else:
@@ -1636,7 +1642,7 @@ with st.container():
                 st.rerun()
             
     with col_limpar:
-        if st.button("Limpar Registros", icon=":material/delete:", type="secondary", use_container_width=True, key="btn_clear_all_data"):
+        if st.button("Limpar Registros", icon=":material/delete_forever:", type="secondary", use_container_width=True, key="btn_clear_all_data"):
             # Mantém st.session_state.temp_fiscalizacoes e os campos de preenchimento de ID intactos
             st.session_state.temp_nc = []
             st.session_state.relatorios_preenchimento_data = []

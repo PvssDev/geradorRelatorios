@@ -31,7 +31,15 @@ class CrcMonitoramentoReport(CrcReport):
         return True
 
     def get_abbreviations(self) -> list:
-        return []
+        return [
+            ("ABNT", "Associação Brasileira de Normas Técnicas"),
+            ("ARPE", "Agência de Regulação de Pernambuco"),
+            ("SEPPE", "Secretaria Executiva de Parcerias e Projetos Estratégicos"),
+            ("NC", "Não Conformidade"),
+            ("CRC", "Concessionária Rota dos Coqueiros S. A."),
+            ("PER", "Programa de Exploração da Rodovia, anexo ao Contrato de Concessão Patrocinada CGPE-001/2006"),
+            ("VI", "Verificador Independente, atualmente, o Consórcio formado pelas empresas Maciel Consultores S/S Ltda e Estratégica Serviços de Engenharia Consultiva Ltda")
+        ]
 
     # ------------------------------------------------------------------
     # Capa customizada exata do modelo de referência

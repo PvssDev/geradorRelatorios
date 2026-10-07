@@ -134,6 +134,14 @@ def obter_nomes_fotos_em_nc(temp_nc: list) -> set:
                 root, _ = os.path.splitext(base)
                 if root:
                     nomes.add(root)
+        f_old = nc.get("Foto Anterior")
+        if f_old:
+            base_old = os.path.basename(str(f_old)).strip().lower()
+            if base_old:
+                nomes.add(base_old)
+                root_old, _ = os.path.splitext(base_old)
+                if root_old:
+                    nomes.add(root_old)
     return nomes
 
 

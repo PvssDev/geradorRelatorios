@@ -47,7 +47,20 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         return True
 
     def get_abbreviations(self) -> list:
-        return []
+        return [
+            ("CRA", "Concessionária Rota do Atlântico"),
+            ("ECR", "ECR Engenharia Ltda"),
+            ("FD", "Faixa Direita"),
+            ("FE", "Faixa Esquerda"),
+            ("IGG", "Índice de Gravidade Global"),
+            ("IRI", "Índice Irregularidade Longitudinal"),
+            ("NC", "Não Conformidade"),
+            ("PDCL", "Programa de Desenvolvimento do Complexo Logístico, Anexo IV do Contrato de Concessão nº 043/2011"),
+            ("SUAPE", "Poder Concedente e Regulador do Contrato de Concessão firmado com a CRA"),
+            ("TPF", "TPF Engenharia Ltda"),
+            ("TDR", "Tronco Distribuidor Rodoviário"),
+            ("VI", "Verificador Independente contratado por SUAPE, atualmente o Consórcio formado pelas Empresas TPF e ECR")
+        ]
 
     def get_process_sei_texts(self, row, ano=None) -> list:
         from utils import extrair_mes_ano_numerico, extrair_ano
