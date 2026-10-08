@@ -21,7 +21,9 @@ from services.image_service import (
     obter_foto_preview,
     obter_nomes_fotos_em_nc,
     foto_esta_em_nc,
-    chave_ordenacao_natural
+    chave_ordenacao_natural,
+    foto_anterior_ja_adicionada,
+    obter_nomes_fotos_anteriores_concluidas
 )
 from ui.state import inicializar_estado_sessao, obter_termos_ui
 from ui.modals import (
@@ -258,7 +260,7 @@ with st.container():
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Alinhamento vertical
             st.markdown("<div style='white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; margin-bottom: 0.5rem;'>Limpar Fotos:</div>", unsafe_allow_html=True)
             has_photos = len(uploaded_nc_photos) > 0 if uploaded_nc_photos else False
-            if st.button("Limpar", icon=":material/ink_eraser:", disabled=not has_photos, key="btn_clear_uploads", use_container_width=True):
+            if st.button("Limpar", icon=":material/ink_eraser:", key="btn_clear_uploads", use_container_width=True):
                 st.session_state.photos_uploader_version += 1
                 st.session_state.fill_photos = []
                 if "carousel_index" in st.session_state:
@@ -542,9 +544,13 @@ with st.container():
                         # Emula o arquivo pro preview (que aceita str path direto) - mas o carrossel usa a string
                         old_paths_str = [item["old_photo_path"] for item in old_photos_disponiveis]
                         
+                        nomes_old_concluidas = obter_nomes_fotos_anteriores_concluidas(st.session_state.get("temp_nc", []))
+                        
                         new_old_idx = render_swiper_carousel(
                             photos=old_paths_str,
                             current_index=old_idx,
+                            nomes_em_nc=nomes_old_concluidas,
+                            carousel_type="monitoramento_old",
                             key=f"swiper_mon_old_{st.session_state.nc_form_counter}",
                             direction="vertical",
                             hide_labels=True
@@ -564,12 +570,11 @@ with st.container():
                         st.markdown("**Nova Foto (Atual)**")
                         if st.session_state.fill_photos:
                             new_idx = min(st.session_state.monitoring_new_photo_index, len(st.session_state.fill_photos) - 1)
-                            nomes_em_nc = obter_nomes_fotos_em_nc(st.session_state.get("temp_nc", []))
-                            
                             new_new_idx = render_swiper_carousel(
                                 photos=st.session_state.fill_photos,
                                 current_index=new_idx,
-                                nomes_em_nc=nomes_em_nc,
+                                nomes_em_nc={},
+                                carousel_type="monitoramento_new",
                                 key=f"swiper_mon_new_{st.session_state.nc_form_counter}",
                                 direction="vertical",
                                 hide_labels=True
@@ -617,6 +622,7 @@ with st.container():
                         photos=st.session_state.fill_photos,
                         current_index=idx,
                         nomes_em_nc=nomes_em_nc,
+                        carousel_type="normal",
                         key="fisc_swiper_carousel"
                     )
 
@@ -660,7 +666,7 @@ with st.container():
                     id_vinculo = st.selectbox(f"Vincular ao ID {term_fisc_prep}", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
                 
                     if st.session_state.old_photos_to_match:
-                        idx = st.session_state.carousel_index
+                        idx = st.session_state.monitoring_old_photo_index
                         if idx < len(st.session_state.old_photos_to_match):
                             current_item = st.session_state.old_photos_to_match[idx]
                             
@@ -860,6 +866,8 @@ with st.container():
                                     st.toast(f"Adicione uma {term_fisc_lower} primeiro.", icon=":material/error:")
                                 elif not foto_default:
                                     st.toast("É obrigatório ter uma foto selecionada no carrossel para continuar.", icon=":material/error:")
+                                elif foto_anterior_ja_adicionada(current_item["old_photo_path"], st.session_state.temp_nc):
+                                    st.toast("Não é possível adicionar uma foto anterior que já foi adicionada/concluída.", icon=":material/error:")
                                 else:
                                     # Validação para Monitoramento
                                     is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
@@ -882,55 +890,29 @@ with st.container():
                                     if campos_vazios:
                                         st.toast(f"Não foi possível salvar. Os seguintes campos estão em branco: {', '.join(campos_vazios)}", icon=":material/error:")
                                     else:
-                                        # 1. Tentar encontrar registro com a mesma foto anterior
-                                        rec = next((r for r in st.session_state.temp_nc 
-                                                    if r["Identificação"] == current_item["id_nc"] 
-                                                    and r["Foto Anterior"] == current_item["old_photo_path"] 
-                                                    and r["ID da Fiscalização"] == id_vinculo), None)
-                                    
-                                        # 2. Se não encontrou, tentar encontrar um registro com foto anterior vazia
-                                        if not rec:
-                                            rec = next((r for r in st.session_state.temp_nc 
-                                                        if r["Identificação"] == current_item["id_nc"] 
-                                                        and not r.get("Foto Anterior") 
-                                                        and r["ID da Fiscalização"] == id_vinculo), None)
-                                    
-                                        # 3. Se ainda assim não encontrou, cria um novo
-                                        if not rec:
-                                            rec = {
-                                                "ID da Fiscalização": id_vinculo,
-                                                "Nº": nc_num,
-                                                "Terminal": terminal_nc,
-                                                "Pista": pista,
-                                                "Trecho": trecho,
-                                                "Não Conformidade": ", ".join(nc_descricao) if nc_descricao else current_item.get("constatacao", ""),
-                                                "Ponto de Atenção": "",
-                                                "Foto": foto_default,
-                                                "Foto Anterior": current_item["old_photo_path"],
-                                                "Legenda Anterior": current_item["old_legend"],
-                                                "Observações": constatacao,
-                                                "Identificação": current_item["id_nc"],
-                                                "Direção (faixa)": "",
-                                                "Fundamento da infração": "",
-                                                "Determinação": pos_crc,
-                                                "Situação": situacao,
-                                                "Análise ARPE": analise_arpe
-                                            }
-                                            st.session_state.temp_nc.append(rec)
-                                        else:
-                                            # Atualiza registro existente
-                                            rec["Foto"] = foto_default
-                                            rec["Foto Anterior"] = current_item["old_photo_path"]
-                                            rec["Legenda Anterior"] = current_item["old_legend"]
-                                            if nc_descricao:
-                                                rec["Não Conformidade"] = ", ".join(nc_descricao)
-                                            rec["Observações"] = constatacao
-                                            rec["Determinação"] = pos_crc
-                                            rec["Situação"] = situacao
-                                            rec["Análise ARPE"] = analise_arpe
-                                            st.session_state.relatorios_preenchimento_data = []
-                                            if "planilha_download_bytes" in st.session_state:
-                                                del st.session_state.planilha_download_bytes
+                                        rec = {
+                                            "ID da Fiscalização": id_vinculo,
+                                            "Nº": nc_num,
+                                            "Terminal": terminal_nc,
+                                            "Pista": pista,
+                                            "Trecho": trecho,
+                                            "Não Conformidade": ", ".join(nc_descricao) if nc_descricao else current_item.get("constatacao", ""),
+                                            "Ponto de Atenção": "",
+                                            "Foto": foto_default,
+                                            "Foto Anterior": current_item["old_photo_path"],
+                                            "Legenda Anterior": current_item["old_legend"],
+                                            "Observações": constatacao,
+                                            "Identificação": current_item["id_nc"],
+                                            "Direção (faixa)": "",
+                                            "Fundamento da infração": "",
+                                            "Determinação": pos_crc,
+                                            "Situação": situacao,
+                                            "Análise ARPE": analise_arpe
+                                        }
+                                        st.session_state.temp_nc.append(rec)
+                                        st.session_state.relatorios_preenchimento_data = []
+                                        if "planilha_download_bytes" in st.session_state:
+                                            del st.session_state.planilha_download_bytes
 
                                         # Sincronizar textos para todas as ocorrências de foto para a mesma Identificação
                                         recs_same_ident = [r for r in st.session_state.temp_nc 
@@ -944,6 +926,12 @@ with st.container():
                                         # Avançar carrossel automaticamente se houver próxima foto e a opção estiver ativada
                                         if st.session_state.carousel_index < len(st.session_state.old_photos_to_match) - 1:
                                             st.session_state.carousel_index += 1
+                                        
+                                        if st.session_state.get("auto_advance_active", True):
+                                            if "monitoring_old_photo_index" in st.session_state and st.session_state.monitoring_old_photo_index < len(st.session_state.old_photos_to_match) - 1:
+                                                st.session_state.monitoring_old_photo_index += 1
+                                            if "monitoring_new_photo_index" in st.session_state and st.session_state.fill_photos and st.session_state.monitoring_new_photo_index < len(st.session_state.fill_photos) - 1:
+                                                st.session_state.monitoring_new_photo_index += 1
                                         
                                         st.session_state.nc_form_counter += 1
                                         st.session_state.pending_toast = {"msg": "Registro salvo com sucesso!", "icon": ":material/check_circle:"}
@@ -961,13 +949,13 @@ with st.container():
                                 st.session_state.force_proximo_modal = False
                                 if id_vinculo == "Nenhum ID cadastrado":
                                     st.toast(f"Adicione um{'' if is_monitoring else 'a'} {term_fisc_lower} primeiro.", icon=":material/error:")
-                                elif not nc_descricao and not ponto_atencao:
+                                elif not nc_descricao and not ponto_atencao and not (is_monitoring and tipo_relatorio in ["CRC", "SOCICAM"]):
                                     msg_erro = "O campo 'Não Conformidade' ou 'Ponto de Atenção' é obrigatório."
                                     st.toast(msg_erro, icon=":material/error:")
                                 elif not foto_default:
                                     st.toast("É obrigatório ter uma foto selecionada no carrossel para continuar.", icon=":material/error:")
-                                elif foto_esta_em_nc(foto_default, nomes_em_nc) and not st.session_state.get("modal_confirmed_proximo"):
-                                    alerta_foto_duplicada_modal(foto_default, "Adicionar", st.session_state.fill_photos)
+                                elif is_monitoring and st.session_state.old_photos_to_match and current_item and foto_anterior_ja_adicionada(current_item["old_photo_path"], st.session_state.temp_nc):
+                                    st.toast("Não é possível adicionar uma foto anterior que já foi adicionada/concluída.", icon=":material/error:")
                                 else:
                                     st.session_state.modal_confirmed_proximo = False
                                     st.session_state.step1_id_vinculo = id_vinculo
@@ -1025,8 +1013,6 @@ with st.container():
                                     st.session_state.force_relacionar_modal = False
                                     if not foto_default:
                                         st.toast("É obrigatório ter uma foto selecionada no carrossel para relacionar.", icon=":material/error:")
-                                    elif foto_esta_em_nc(foto_default, nomes_em_nc) and not st.session_state.get("modal_confirmed_relacionar"):
-                                        alerta_foto_duplicada_modal(foto_default, "Relacionar", st.session_state.fill_photos)
                                     else:
                                         st.session_state.modal_confirmed_relacionar = False
                                         last_nc = st.session_state.temp_nc[-1]
@@ -1126,19 +1112,10 @@ with st.container():
                             }
                             st.session_state.temp_nc.append(rec)
                         else:
-                            # No Monitoramento, busca registro correspondente para atualizar ou criar
-                            rec = next((r for r in st.session_state.temp_nc 
-                                        if r.get("Identificação") == identificacao 
-                                        and r.get("Foto Anterior") == st.session_state.get("step1_foto_anterior", "") 
-                                        and r.get("ID da Fiscalização") == st.session_state.step1_id_vinculo), None)
-                        
-                            if not rec:
-                                rec = next((r for r in st.session_state.temp_nc 
-                                            if r.get("Identificação") == identificacao 
-                                            and not r.get("Foto Anterior") 
-                                            and r.get("ID da Fiscalização") == st.session_state.step1_id_vinculo), None)
-                        
-                            if not rec:
+                            foto_ant = st.session_state.get("step1_foto_anterior", "")
+                            if foto_anterior_ja_adicionada(foto_ant, st.session_state.temp_nc):
+                                st.toast("Não é possível adicionar uma foto anterior que já foi adicionada/concluída.", icon=":material/error:")
+                            else:
                                 rec = {
                                     "ID da Fiscalização": st.session_state.step1_id_vinculo,
                                     "Nº": st.session_state.step1_nc_num,
@@ -1148,7 +1125,7 @@ with st.container():
                                     "Não Conformidade": st.session_state.step1_nc_desc_str,
                                     "Ponto de Atenção": st.session_state.step1_pa_desc_str,
                                     "Foto": st.session_state.step1_foto_default,
-                                    "Foto Anterior": st.session_state.get("step1_foto_anterior", ""),
+                                    "Foto Anterior": foto_ant,
                                     "Legenda Anterior": st.session_state.get("step1_legenda_anterior", ""),
                                     "Observações": observacoes_crc,
                                     "Identificação": identificacao,
@@ -1159,23 +1136,6 @@ with st.container():
                                     "Análise ARPE": analise_arpe
                                 }
                                 st.session_state.temp_nc.append(rec)
-                            else:
-                                # Atualiza registro existente no Monitoramento sem descartar dados
-                                rec["Foto"] = st.session_state.step1_foto_default
-                                rec["Foto Anterior"] = st.session_state.get("step1_foto_anterior", "")
-                                rec["Legenda Anterior"] = st.session_state.get("step1_legenda_anterior", "")
-                                if st.session_state.step1_nc_desc_str:
-                                    rec["Não Conformidade"] = st.session_state.step1_nc_desc_str
-                                if st.session_state.step1_pa_desc_str:
-                                    rec["Ponto de Atenção"] = st.session_state.step1_pa_desc_str
-                                if st.session_state.step1_pista:
-                                    rec["Pista"] = st.session_state.step1_pista
-                                if st.session_state.step1_trecho:
-                                    rec["Trecho"] = st.session_state.step1_trecho
-                                rec["Observações"] = observacoes_crc
-                                rec["Determinação"] = determinacao
-                                rec["Situação"] = situacao
-                                rec["Análise ARPE"] = analise_arpe
 
                         st.session_state.relatorios_preenchimento_data = []
                         if "planilha_download_bytes" in st.session_state:

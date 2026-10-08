@@ -90,7 +90,12 @@
 
     .swiper-slide-active.is-nc {
       border-color: #ef4444 !important;
-      box-shadow: 0 16px 36px rgba(239, 68, 68, 0.25), 0 4px 12px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 16px 36px rgba(239, 68, 68, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .swiper-slide-active.is-finished-border {
+      border-color: #10b981 !important;
+      box-shadow: 0 16px 36px rgba(16, 185, 129, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
     .slide-img-container {
@@ -191,21 +196,24 @@
       position: absolute;
       top: 10px;
       right: 10px;
-      background: rgba(239, 68, 68, 0.92);
+      background: rgba(239, 68, 68, 0.85); /* Vermelho translúcido suave */
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       color: #ffffff;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       padding: 4px 9px;
       border-radius: 20px;
       display: flex;
       align-items: center;
       gap: 4px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
       z-index: 10;
-      letter-spacing: 0.3px;
-      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }
+
+    .slide-badge-nc.is-finished {
+      background: rgba(16, 185, 129, 0.85); /* Verde esmeralda suave */
     }
 
     .slide-badge-counter {
@@ -576,10 +584,36 @@
         photos.forEach((photo, idx) => {
           const slideIdx = c * photos.length + idx;
           const slide = document.createElement("div");
-          slide.className = "swiper-slide" + (photo.is_nc ? " is-nc" : "");
+          
+          // Determine classes and badges
+          let isOldMon = photo.carousel_type === 'monitoramento_old';
+          let isNewMon = photo.carousel_type === 'monitoramento_new';
+          
+          let borderClass = "";
+          let badgeNc = "";
+          
+          if (isOldMon) {
+             if (photo.is_nc) {
+                borderClass = ' is-finished-border';
+                const checkIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                badgeNc = `<div class="slide-badge-nc is-finished" style="padding: 6px 7px; border-radius: 50%; right: 12px;">${checkIcon}</div>`;
+             }
+          } else if (isNewMon) {
+             // For new photos in monitoring, do not show NC or PA
+             badgeNc = "";
+             borderClass = "";
+          } else {
+             // Normal
+             borderClass = photo.is_nc ? ' is-nc' : "";
+             if (photo.is_nc) {
+                const svgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px; margin-right: 1px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                badgeNc = `<div class="slide-badge-nc">${svgIcon} ${photo.badge_text || 'NC'}</div>`;
+             }
+          }
+          
+          slide.className = "swiper-slide" + borderClass;
 
           const badgeCounter = `<div class="slide-badge-counter">${idx + 1} / ${photos.length}</div>`;
-          const badgeNc = photo.is_nc ? `<div class="slide-badge-nc">⚠️ Em NC</div>` : "";
 
           slide.innerHTML = `
             <div class="slide-img-container">

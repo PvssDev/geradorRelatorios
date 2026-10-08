@@ -736,9 +736,6 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         run_mat3.font.name = 'Aptos'
         run_mat3.font.size = Pt(11)
 
-    if getattr(report_config, "signatures_before_apendices", False):
-        render_assinaturas_fn()
-        render_apendices_fn()
-    else:
-        render_apendices_fn()
-        render_assinaturas_fn()
+    # Por definição padrão de design, as assinaturas sempre vêm antes dos apêndices de fotos
+    render_assinaturas_fn()
+    render_apendices_fn()
