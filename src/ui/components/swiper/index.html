@@ -697,16 +697,18 @@
           on: {
             realIndexChange: function () {
               renderDots();
+              // Reporta imediatamente a mudança (mesmo durante animação) para
+              // garantir que o Python veja a foto atual se o usuário clicar rápido em algum botão
+              if (isInternalUpdate || isDestroying || !swiperInstance) return;
+              if (isScrubbing) return;
+              reportActiveIndex();
             },
             slideChangeTransitionEnd: function () {
-              // Não reporta durante destruição ou recriação do Swiper
+              // Reseta a flag de atualização interna ao fim da transição
               if (isInternalUpdate || isDestroying || !swiperInstance) {
                 isInternalUpdate = false;
                 return;
               }
-              // Durante o arraste da paginação, o índice final é reportado ao soltar
-              if (isScrubbing) return;
-              reportActiveIndex();
             }
           }
         });
@@ -715,12 +717,14 @@
         renderDots();
 
         lastReportedIndex = activeIndex;
+        Streamlit.setComponentValue(activeIndex);
       } else {
         // As fotos continuam as mesmas, apenas sincroniza a posição do slide se necessário
         if (!isScrubbing && swiperInstance && getRealIndex() !== activeIndex) {
           isInternalUpdate = true;
           lastReportedIndex = activeIndex;
           goToPhoto(activeIndex, swiperInstance.params.speed || 500);
+          Streamlit.setComponentValue(activeIndex);
         }
       }
 
