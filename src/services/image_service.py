@@ -117,43 +117,101 @@ def obter_foto_preview(photo_source, max_size=(400, 300)):
     return photo_source
 
 
-def obter_nomes_fotos_em_nc(temp_nc: list) -> set:
+def obter_nomes_fotos_em_nc(temp_nc: list) -> dict:
     """
-    Retorna o conjunto de nomes/identificadores normalizados (minúsculos)
-    de todas as fotos que foram adicionadas aos registros de Não Conformidade.
+    Retorna um dicionário mapeando os nomes/identificadores normalizados (minúsculos)
+    de todas as fotos para o seu tipo (NC ou PA).
     """
     if not temp_nc:
-        return set()
-    nomes = set()
+        return {}
+    nomes = {}
     for nc in temp_nc:
-        f = nc.get("Foto")
-        if f:
-            base = os.path.basename(str(f)).strip().lower()
-            if base:
-                nomes.add(base)
-                root, _ = os.path.splitext(base)
-                if root:
-                    nomes.add(root)
-        f_old = nc.get("Foto Anterior")
-        if f_old:
-            base_old = os.path.basename(str(f_old)).strip().lower()
-            if base_old:
-                nomes.add(base_old)
-                root_old, _ = os.path.splitext(base_old)
-                if root_old:
-                    nomes.add(root_old)
+        # Determina o tipo (PA se tiver Ponto de Atenção preenchido e não NC, caso contrário NC)
+        is_pa = bool(nc.get("Ponto de Atenção")) and not bool(nc.get("Não Conformidade"))
+        tipo = "PA" if is_pa else "NC"
+
+        def _add_foto(f_val):
+            if f_val:
+                base = os.path.basename(str(f_val)).strip().lower()
+                if base:
+                    nomes[base] = tipo
+                    root, _ = os.path.splitext(base)
+                    if root:
+                        nomes[root] = tipo
+
+        _add_foto(nc.get("Foto"))
+        # No monitoramento, a foto anterior só é considerada "adicionada/concluída" se já tiver recebido uma foto nova
+        if nc.get("Foto") or nc.get("is_relacionado"):
+            _add_foto(nc.get("Foto Anterior"))
     return nomes
 
 
-def foto_esta_em_nc(photo, nomes_em_nc: set) -> bool:
+def foto_esta_em_nc(photo, nomes_em_nc: dict):
     """
     Verifica se um objeto de foto (UploadedFile, caminho ou string)
-    corresponde a alguma foto presente no conjunto de fotos em NC.
+    corresponde a alguma foto presente no dicionário de fotos em NC/PA.
+    Retorna a string 'NC', 'PA' se encontrado, caso contrário False.
     """
     if not photo or not nomes_em_nc:
         return False
     name = getattr(photo, "name", str(photo))
     base = os.path.basename(name).strip().lower()
     root, _ = os.path.splitext(base)
-    return base in nomes_em_nc or root in nomes_em_nc
+    
+    if base in nomes_em_nc:
+        return nomes_em_nc[base]
+    if root in nomes_em_nc:
+        return nomes_em_nc[root]
+    return False
+
+
+def foto_anterior_ja_adicionada(old_photo_ref, temp_nc: list) -> bool:
+    """
+    Verifica se uma foto anterior específica já foi adicionada/vinculada em temp_nc.
+    Regra estrita de negócio: considera APENAS a foto anterior (não seletiva por NC, ID ou foto nova).
+    Uma foto anterior é considerada adicionada/concluída se já existir um registro em temp_nc
+    com essa mesma foto anterior e com uma foto nova associada.
+    """
+    if not old_photo_ref or not temp_nc:
+        return False
+
+    ref_str = str(getattr(old_photo_ref, "name", old_photo_ref)).strip().lower()
+    ref_base = os.path.basename(ref_str)
+    ref_root, _ = os.path.splitext(ref_base)
+
+    for r in temp_nc:
+        rec_old = r.get("Foto Anterior")
+        # No monitoramento, só é adicionada se tiver recebido uma foto nova vinculada
+        if rec_old and r.get("Foto"):
+            old_str = str(rec_old).strip().lower()
+            old_base = os.path.basename(old_str)
+            old_root, _ = os.path.splitext(old_base)
+
+            if ref_str == old_str or ref_base == old_base or (ref_root and ref_root == old_root):
+                return True
+    return False
+
+
+def obter_nomes_fotos_anteriores_concluidas(temp_nc: list) -> dict:
+    """
+    Retorna um dicionário mapeando os identificadores normalizados
+    exclusivamente das fotos anteriores que já foram concluídas (vinculadas a uma foto nova) para 'NC'.
+    Usado para exibir o check de conclusão verde no carrossel de fotos antigas sem interferência de novas fotos.
+    """
+    if not temp_nc:
+        return {}
+    nomes = {}
+    for r in temp_nc:
+        rec_old = r.get("Foto Anterior")
+        if rec_old and r.get("Foto"):
+            old_str = str(rec_old).strip().lower()
+            old_base = os.path.basename(old_str)
+            old_root, _ = os.path.splitext(old_base)
+            if old_str:
+                nomes[old_str] = "NC"
+            if old_base:
+                nomes[old_base] = "NC"
+            if old_root:
+                nomes[old_root] = "NC"
+    return nomes
 

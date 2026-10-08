@@ -28,7 +28,7 @@ def _obter_foto_src_cached(f_key: str, _photo_source) -> str:
     return ""
 
 
-def _obter_payload_fotos(photos: list, nomes_em_nc_set: set) -> list:
+def _obter_payload_fotos(photos: list, nomes_em_nc_dict: dict, carousel_type: str) -> list:
     """
     Retorna a lista serializada de fotos para o Swiper com cache em memória
     instantâneo (sub-milissegundo). Se as fotos e os NCs não mudaram,
@@ -38,18 +38,21 @@ def _obter_payload_fotos(photos: list, nomes_em_nc_set: set) -> list:
         return []
 
     # Cria uma assinatura de verificação ultra leve
-    nc_sig = tuple(sorted(nomes_em_nc_set)) if nomes_em_nc_set else ()
+    nc_sig = tuple(sorted(nomes_em_nc_dict.items())) if nomes_em_nc_dict else ()
     photo_sig = []
     for p in photos:
         if isinstance(p, str):
             photo_sig.append(p)
         else:
             photo_sig.append((getattr(p, "name", ""), getattr(p, "size", 0)))
-    current_sig = (tuple(photo_sig), nc_sig)
+    current_sig = (tuple(photo_sig), nc_sig, carousel_type)
 
-    cached_sig = st.session_state.get("_swiper_cache_sig")
-    if cached_sig == current_sig and "_swiper_cached_photos" in st.session_state:
-        return st.session_state._swiper_cached_photos
+    cached_sig_key = f"_swiper_cache_sig_{carousel_type}"
+    cached_photos_key = f"_swiper_cached_photos_{carousel_type}"
+
+    cached_sig = st.session_state.get(cached_sig_key)
+    if cached_sig == current_sig and cached_photos_key in st.session_state:
+        return st.session_state[cached_photos_key]
 
     # Se a lista de fotos ou marcações de NC mudaram, gera o payload
     payload = []
@@ -64,22 +67,36 @@ def _obter_payload_fotos(photos: list, nomes_em_nc_set: set) -> list:
             f_key = f"up_{name}_{size}"
 
         src = _obter_foto_src_cached(f_key, p)
-        is_nc = (name in nomes_em_nc_set) if nomes_em_nc_set else False
+        name_lower = name.lower()
+        root_lower, _ = os.path.splitext(name_lower)
+        is_nc = False
+        badge_text = ""
+        if nomes_em_nc_dict:
+            if name_lower in nomes_em_nc_dict:
+                is_nc = True
+                badge_text = nomes_em_nc_dict[name_lower]
+            elif root_lower in nomes_em_nc_dict:
+                is_nc = True
+                badge_text = nomes_em_nc_dict[root_lower]
+            
         payload.append({
             "name": name,
             "is_nc": is_nc,
+            "badge_text": badge_text,
             "src": src,
+            "carousel_type": carousel_type,
         })
 
-    st.session_state._swiper_cache_sig = current_sig
-    st.session_state._swiper_cached_photos = payload
+    st.session_state[cached_sig_key] = current_sig
+    st.session_state[cached_photos_key] = payload
     return payload
 
 
 def render_swiper_carousel(
     photos: list,
     current_index: int,
-    nomes_em_nc: set = None,
+    nomes_em_nc: dict = None,
+    carousel_type: str = "normal",
     key: str = "swiper_carousel",
     direction: str = "horizontal",
     hide_labels: bool = False
@@ -93,7 +110,7 @@ def render_swiper_carousel(
 
     total = len(photos)
     current_index = max(0, min(current_index, total - 1))
-    nomes_em_nc_set = set(nomes_em_nc) if nomes_em_nc else set()
+    nomes_em_nc_dict = nomes_em_nc if nomes_em_nc else {}
 
     # Rastreamento de sincronismo para evitar saltos indesejados
     last_synced_key = f"{key}_last_synced"
@@ -120,7 +137,7 @@ def render_swiper_carousel(
     st.session_state[last_synced_key] = current_index
 
     # Recupera o payload de fotos instantâneo (com cache O(1))
-    serialized_photos = _obter_payload_fotos(photos, nomes_em_nc_set)
+    serialized_photos = _obter_payload_fotos(photos, nomes_em_nc_dict, carousel_type)
 
     # Executa o componente Streamlit Custom
     result = _swiper_component(

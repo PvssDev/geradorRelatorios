@@ -86,7 +86,7 @@ def galeria_fotos_modal(fotos=None, target_index_key="carousel_index"):
                         elif is_current:
                             badges.append(":material/push_pin:")
                         if in_nc:
-                            badges.append("**[NC]**")
+                            badges.append(f"**[{in_nc}]**")
                         badge_str = f" {' '.join(badges)}" if badges else ""
 
                         st.caption(f"**#{orig_idx + 1}** {nome_curto}{badge_str}")
@@ -107,14 +107,15 @@ def alerta_foto_duplicada_modal(foto_name, acao_nome, fill_photos):
     )
     st.markdown(
         f"<p style='text-align: center; font-size: 15px;'>Você está tentando <b>{acao_nome.lower()}</b> uma foto que já foi "
-        "adicionada ou relacionada a outra Não Conformidade anteriormente.</p>",
+        "adicionada ou relacionada a outro item/registro anteriormente.</p>",
         unsafe_allow_html=True
     )
     
     photo_obj = next((p for p in fill_photos if getattr(p, "name", "") == foto_name or p == foto_name), None)
     if photo_obj:
         thumb = obter_foto_preview(photo_obj, max_size=(320, 240))
-        st.image(thumb, use_container_width=True)
+        if thumb:
+            st.image(thumb, use_container_width=True)
     
     st.write("")
     col1, col2 = st.columns(2)
