@@ -1,0 +1,9 @@
+streamlit
+pandas
+openpyxl
+pillow
+python-docx
+lxml
+typing_extensions
+tzdata
+tqdm
