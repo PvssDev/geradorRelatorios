@@ -10,6 +10,7 @@ from sections.cabecalho.cabecalho import gerar_capa_primeira_pagina
 from sections.quadros.quadros import gerar_secao_quadros
 from sections.finalizacao.finalizacao import gerar_secao_finalizacao
 from utils import (
+    adicionar_metadados_geracao,
     ajustar_largura_colunas,
     arquivo_em_uso,
     normalizar_status_gerado,
@@ -225,6 +226,9 @@ def gerar_relatorio(
         gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df, documento_anterior=documento_anterior)
         gerar_secao_quadros(doc, row, nc_df, report_config)
         gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR, report_config=report_config)
+
+        # Injeção de metadados informativos de geração
+        adicionar_metadados_geracao(doc)
 
         # Sanitização e Salvamento
         id_safe = "".join([c if c not in r'\/:*?"<>|' else "_" for c in str(id_fisc)]).strip()

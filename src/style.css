@@ -1504,3 +1504,256 @@ div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(
     transform: translateX(calc(100% + 12px)) !important;
 }
 
+/* ==========================================
+   PROTEÇÃO TOTAL CONTRA QUEBRA DE LETRAS E PALAVRAS (ANTI-SPLIT)
+   Garante que nenhuma letra se separe de uma palavra em botões, tags e labels
+   ========================================== */
+button,
+div.stButton > button,
+div.stDownloadButton > button,
+[data-testid="stBaseButton-secondary"],
+[data-testid="stBaseButton-primary"],
+div[data-testid="stButtonGroup"] button {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    text-wrap: nowrap !important;
+}
+
+button *,
+div.stButton > button *,
+div.stDownloadButton > button *,
+[data-testid="stBaseButton-secondary"] *,
+[data-testid="stBaseButton-primary"] *,
+div[data-testid="stButtonGroup"] button * {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    text-wrap: nowrap !important;
+}
+
+div[data-testid="stWidgetLabel"] label,
+div[data-testid="stWidgetLabel"] p {
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+}
+
+/* ==========================================
+   BOTÕES DE NAVEGAÇÃO DO CADASTRO (VOLTAR & ADICIONAR)
+   Responsividade: lado a lado no desktop e um abaixo do outro em telas estreitas/celular
+   ========================================== */
+div[class*="st-key-step2_nav_actions"] {
+    max-width: 380px !important;
+    width: 100% !important;
+    margin-top: 8px !important;
+}
+
+div[class*="st-key-step2_nav_actions"] div[data-testid="stHorizontalBlock"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+}
+
+div[class*="st-key-step2_nav_actions"] div[data-testid="column"] {
+    flex: 1 1 130px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+div[class*="st-key-step2_nav_actions"] div.stButton {
+    width: 100% !important;
+}
+
+div[class*="st-key-step2_nav_actions"] button {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 8px 12px !important;
+    white-space: nowrap !important;
+    text-wrap: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    box-sizing: border-box !important;
+}
+
+div[class*="st-key-step2_nav_actions"] button p,
+div[class*="st-key-step2_nav_actions"] button span {
+    white-space: nowrap !important;
+    text-wrap: nowrap !important;
+    word-break: keep-all !important;
+}
+
+/* Em tela estreita / celular (<= 768px): Voltar e Adicionar um abaixo do outro */
+@media (max-width: 768px) {
+    div[class*="st-key-step2_nav_actions"] {
+        max-width: 100% !important;
+    }
+
+    div[class*="st-key-step2_nav_actions"] div[data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    div[class*="st-key-step2_nav_actions"] div[data-testid="column"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+
+    div[class*="st-key-step2_nav_actions"] button {
+        width: 100% !important;
+    }
+}
+
+/* ==========================================
+   BOTÕES DE FOTO (AMPLIAR E GALERIA)
+   Responsividade: lado a lado no desktop e um abaixo do outro em telas estreitas/celular
+   ========================================== */
+div[class*="st-key-mon_old_btn_row"] div[data-testid="stHorizontalBlock"],
+div[class*="st-key-mon_new_btn_row"] div[data-testid="stHorizontalBlock"],
+.st-key-fisc_carousel_controls div[data-testid="stHorizontalBlock"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+}
+
+div[class*="st-key-mon_old_btn_row"] div[data-testid="column"],
+div[class*="st-key-mon_new_btn_row"] div[data-testid="column"],
+.st-key-fisc_carousel_controls div[data-testid="column"] {
+    flex: 1 1 110px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+div[class*="st-key-mon_old_btn_row"] button,
+div[class*="st-key-mon_new_btn_row"] button,
+.st-key-fisc_carousel_controls div[data-testid="column"] button {
+    width: 100% !important;
+    white-space: nowrap !important;
+    text-wrap: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    padding: 6px 8px !important;
+    font-size: 0.88rem !important;
+}
+
+div[class*="st-key-mon_old_btn_row"] button p,
+div[class*="st-key-mon_old_btn_row"] button span,
+div[class*="st-key-mon_new_btn_row"] button p,
+div[class*="st-key-mon_new_btn_row"] button span,
+.st-key-fisc_carousel_controls div[data-testid="column"] button p,
+.st-key-fisc_carousel_controls div[data-testid="column"] button span {
+    white-space: nowrap !important;
+    text-wrap: nowrap !important;
+    word-break: keep-all !important;
+}
+
+/* Em tela estreita / celular (<= 768px): Ampliar e Galeria um abaixo do outro */
+@media (max-width: 768px) {
+    div[class*="st-key-mon_old_btn_row"] div[data-testid="stHorizontalBlock"],
+    div[class*="st-key-mon_new_btn_row"] div[data-testid="stHorizontalBlock"],
+    .st-key-fisc_carousel_controls div[data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: 6px !important;
+    }
+
+    div[class*="st-key-mon_old_btn_row"] div[data-testid="column"],
+    div[class*="st-key-mon_new_btn_row"] div[data-testid="column"],
+    .st-key-fisc_carousel_controls div[data-testid="column"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+
+    div[class*="st-key-mon_old_btn_row"] button,
+    div[class*="st-key-mon_new_btn_row"] button,
+    .st-key-fisc_carousel_controls div[data-testid="column"] button {
+        width: 100% !important;
+    }
+}
+
+/* ==========================================
+   CORPO DO RELATÓRIO RESPONSIVO
+   Em telas médias e pequenas, substitui títulos longos como "INFORMAÇÃO SOCICAM"
+   por "SOCICAM" para impedir que palavras fiquem uma abaixo da outra
+   ========================================== */
+div[class*="st-key-corpo_relatorio"] [data-testid="stWidgetLabel"] p {
+    white-space: nowrap !important;
+    text-wrap: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+}
+
+@media (max-width: 1200px) {
+    div[class*="st-key-corpo_relatorio_socicam"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p {
+        font-size: 0 !important;
+        line-height: 0 !important;
+        white-space: nowrap !important;
+    }
+    div[class*="st-key-corpo_relatorio_socicam"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p::after {
+        content: "SOCICAM" !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        font-weight: 600 !important;
+        color: #011A33 !important;
+        display: inline-block !important;
+        white-space: nowrap !important;
+        letter-spacing: normal !important;
+    }
+
+    div[class*="st-key-corpo_relatorio_crc"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p {
+        font-size: 0 !important;
+        line-height: 0 !important;
+        white-space: nowrap !important;
+    }
+    div[class*="st-key-corpo_relatorio_crc"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p::after {
+        content: "CRC" !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        font-weight: 600 !important;
+        color: #011A33 !important;
+        display: inline-block !important;
+        white-space: nowrap !important;
+        letter-spacing: normal !important;
+    }
+
+    div[class*="st-key-corpo_relatorio_cra"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p {
+        font-size: 0 !important;
+        line-height: 0 !important;
+        white-space: nowrap !important;
+    }
+    div[class*="st-key-corpo_relatorio_cra"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p::after {
+        content: "CRA" !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        font-weight: 600 !important;
+        color: #011A33 !important;
+        display: inline-block !important;
+        white-space: nowrap !important;
+        letter-spacing: normal !important;
+    }
+}
+
+@media (max-width: 768px) {
+    div[class*="st-key-corpo_relatorio"] div[data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+    }
+    div[class*="st-key-corpo_relatorio"] div[data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+}
+

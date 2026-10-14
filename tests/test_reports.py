@@ -220,6 +220,33 @@ def test_cra_fiscalizacao_quadros_total_rows():
     print("[PASS] test_cra_fiscalizacao_quadros_total_rows")
 
 
+def test_metadados_gerador_arpe():
+    from utils import adicionar_metadados_geracao
+    from docx import Document
+    import io
+
+    doc = Document()
+    adicionar_metadados_geracao(doc)
+
+    assert doc.core_properties.author == "geradorARPE"
+    assert doc.core_properties.last_modified_by == "geradorARPE"
+    assert doc.core_properties.keywords == "geradorARPE"
+    assert "geradorARPE" in doc.core_properties.comments
+    assert doc.core_properties.identifier.startswith("geradorARPE_")
+    assert doc.core_properties.created is not None
+
+    # Teste de persistência de metadados após salvamento
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    doc_reloaded = Document(buf)
+    assert doc_reloaded.core_properties.author == "geradorARPE"
+    assert doc_reloaded.core_properties.last_modified_by == "geradorARPE"
+    assert doc_reloaded.core_properties.keywords == "geradorARPE"
+    assert "geradorARPE" in doc_reloaded.core_properties.comments
+    print("[PASS] test_metadados_gerador_arpe")
+
+
 if __name__ == "__main__":
     test_factory_and_registry()
     test_cra_monitoramento_mixin_behavior()
@@ -227,4 +254,5 @@ if __name__ == "__main__":
     test_dynamic_header_and_footer_dates()
     test_crc_fiscalizacao_quadro1_non_conformities()
     test_cra_fiscalizacao_quadros_total_rows()
+    test_metadados_gerador_arpe()
     print("\nTodos os testes de relatórios passaram com sucesso!")
