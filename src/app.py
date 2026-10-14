@@ -560,12 +560,13 @@ with st.container():
                         idx = st.session_state.old_photos_to_match.index(current_item)
                         
                         # Botoes juntinhos 2 e 2
-                        btn_col_old_1, btn_col_old_2 = st.columns(2, gap="small")
-                        with btn_col_old_1:
-                            st.button("Ampliar Foto", icon=":material/fullscreen:", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{st.session_state.nc_form_counter}", use_container_width=True)
-                        with btn_col_old_2:
-                            if st.button("Ver todas as fotos", icon=":material/grid_view:", key=f"btn_gal_old_{st.session_state.nc_form_counter}", use_container_width=True):
-                                galeria_fotos_modal(fotos=old_paths_str, target_index_key="monitoring_old_photo_index")
+                        with st.container(key=f"mon_old_btn_row_{st.session_state.nc_form_counter}"):
+                            btn_col_old_1, btn_col_old_2 = st.columns(2, gap="small")
+                            with btn_col_old_1:
+                                st.button("Ampliar", icon=":material/fullscreen:", on_click=mostrar_foto_modal, args=(current_item["old_photo_path"],), key=f"btn_zoom_old_{st.session_state.nc_form_counter}", use_container_width=True)
+                            with btn_col_old_2:
+                                if st.button("Galeria", icon=":material/grid_view:", key=f"btn_gal_old_{st.session_state.nc_form_counter}", use_container_width=True):
+                                    galeria_fotos_modal(fotos=old_paths_str, target_index_key="monitoring_old_photo_index")
                     with col_new:
                         st.markdown("**Nova Foto (Atual)**")
                         if st.session_state.fill_photos:
@@ -584,12 +585,13 @@ with st.container():
                             current_photo_new = st.session_state.fill_photos[new_new_idx]
                             foto_default = current_photo_new.name
                             
-                            btn_col_new_1, btn_col_new_2 = st.columns(2, gap="small")
-                            with btn_col_new_1:
-                                st.button("Ampliar Foto", icon=":material/fullscreen:", on_click=mostrar_foto_modal, args=(current_photo_new,), key=f"btn_zoom_new_{st.session_state.nc_form_counter}", use_container_width=True)
-                            with btn_col_new_2:
-                                if st.button("Ver todas as fotos", icon=":material/grid_view:", key=f"btn_gal_new_{st.session_state.nc_form_counter}", use_container_width=True):
-                                    galeria_fotos_modal(fotos=st.session_state.fill_photos, target_index_key="monitoring_new_photo_index")
+                            with st.container(key=f"mon_new_btn_row_{st.session_state.nc_form_counter}"):
+                                btn_col_new_1, btn_col_new_2 = st.columns(2, gap="small")
+                                with btn_col_new_1:
+                                    st.button("Ampliar", icon=":material/fullscreen:", on_click=mostrar_foto_modal, args=(current_photo_new,), key=f"btn_zoom_new_{st.session_state.nc_form_counter}", use_container_width=True)
+                                with btn_col_new_2:
+                                    if st.button("Galeria", icon=":material/grid_view:", key=f"btn_gal_new_{st.session_state.nc_form_counter}", use_container_width=True):
+                                        galeria_fotos_modal(fotos=st.session_state.fill_photos, target_index_key="monitoring_new_photo_index")
                         else:
                             st.info("Faça o upload de novas fotos para compará-las.")
                             foto_default = ""
@@ -634,7 +636,7 @@ with st.container():
                         ctrl_col1, ctrl_col2 = st.columns(2)
                         with ctrl_col1:
                             st.button(
-                                "Ampliar Foto",
+                                "Ampliar",
                                 icon=":material/zoom_in:",
                                 on_click=mostrar_foto_modal,
                                 args=(current_photo,),
@@ -642,7 +644,7 @@ with st.container():
                                 use_container_width=True
                             )
                         with ctrl_col2:
-                            if st.button("Ver todas as fotos", icon=":material/grid_view:", key="btn_ver_todas_fotos", use_container_width=True):
+                            if st.button("Galeria", icon=":material/grid_view:", key="btn_ver_todas_fotos", use_container_width=True):
                                 galeria_fotos_modal()
 
                         st.checkbox(
@@ -734,31 +736,33 @@ with st.container():
                             pos_label = "POSICIONAMENTO CRC"
                             pos_placeholder = "Digite o posicionamento da CRC..."
 
-                        col_pos, col_const, col_analise = st.columns(3)
-                        with col_pos:
-                            pos_crc = st.text_area(
-                                pos_label,
-                                value=default_pos_crc,
-                                key=f"pos_crc_step1_{st.session_state.nc_form_counter}",
-                                placeholder=pos_placeholder,
-                                height=160
-                            )
-                        with col_const:
-                            constatacao = st.text_area(
-                                "CONSTATAÇÃO",
-                                value=default_constatacao,
-                                key=f"constatacao_step1_{st.session_state.nc_form_counter}",
-                                placeholder="Digite a constatação...",
-                                height=160
-                            )
-                        with col_analise:
-                            analise_arpe = st.text_area(
-                                "ANÁLISE ARPE",
-                                value=default_analise_arpe,
-                                key=f"analise_arpe_step1_{st.session_state.nc_form_counter}",
-                                placeholder="Digite a análise da ARPE...",
-                                height=160
-                            )
+                        corpo_key = "corpo_relatorio_socicam" if is_socicam else ("corpo_relatorio_cra" if is_cra else "corpo_relatorio_crc")
+                        with st.container(key=f"{corpo_key}_{st.session_state.nc_form_counter}"):
+                            col_pos, col_const, col_analise = st.columns(3)
+                            with col_pos:
+                                pos_crc = st.text_area(
+                                    pos_label,
+                                    value=default_pos_crc,
+                                    key=f"pos_crc_step1_{st.session_state.nc_form_counter}",
+                                    placeholder=pos_placeholder,
+                                    height=160
+                                )
+                            with col_const:
+                                constatacao = st.text_area(
+                                    "CONSTATAÇÃO",
+                                    value=default_constatacao,
+                                    key=f"constatacao_step1_{st.session_state.nc_form_counter}",
+                                    placeholder="Digite a constatação...",
+                                    height=160
+                                )
+                            with col_analise:
+                                analise_arpe = st.text_area(
+                                    "ANÁLISE ARPE",
+                                    value=default_analise_arpe,
+                                    key=f"analise_arpe_step1_{st.session_state.nc_form_counter}",
+                                    placeholder="Digite a análise da ARPE...",
+                                    height=160
+                                )
                 else:
                     id_vinculo = st.selectbox(f"Vincular ao ID {term_fisc_prep}", [f["ID da Fiscalização"] for f in st.session_state.temp_fiscalizacoes] if st.session_state.temp_fiscalizacoes else ["Nenhum ID cadastrado"])
                 
@@ -1060,116 +1064,117 @@ with st.container():
             
                 situacao = st.session_state.get("step1_situacao", "Pendente")
             
-                col_back, col_add, _ = st.columns([1.1, 1.3, 7.6], gap="small")
-                with col_back:
-                    if st.button("Voltar", icon=":material/keyboard_backspace:", type="secondary", use_container_width=True):
-                        st.session_state.nc_form_step = 1
-                        st.rerun()
-                with col_add:
-                    btn_label = "Salvar e Continuar" if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring else "Adicionar"
-                    btn_icon = ":material/save:" if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring else ":material/add:"
-                    if st.button(btn_label, icon=btn_icon, type="primary", use_container_width=True):
-                        if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
-                            campos_vazios = []
-                            _pos_crc = locals().get("pos_crc", "")
-                            _constatacao = locals().get("constatacao", "")
-                            _analise_arpe = locals().get("analise_arpe", "")
+                with st.container(key=f"step2_nav_actions_{st.session_state.nc_form_counter}"):
+                    col_back, col_add = st.columns(2, gap="small")
+                    with col_back:
+                        if st.button("Voltar", icon=":material/keyboard_backspace:", type="secondary", use_container_width=True, key=f"btn_step2_voltar_{st.session_state.nc_form_counter}"):
+                            st.session_state.nc_form_step = 1
+                            st.rerun()
+                    with col_add:
+                        btn_label = "Salvar e Continuar" if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring else "Adicionar"
+                        btn_icon = ":material/save:" if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring else ":material/add:"
+                        if st.button(btn_label, icon=btn_icon, type="primary", use_container_width=True, key=f"btn_step2_salvar_{st.session_state.nc_form_counter}"):
+                            if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
+                                campos_vazios = []
+                                _pos_crc = locals().get("pos_crc", "")
+                                _constatacao = locals().get("constatacao", "")
+                                _analise_arpe = locals().get("analise_arpe", "")
 
-                            if not _pos_crc.strip():
-                                campos_vazios.append("POSICIONAMENTO CRC")
-                            if not _constatacao.strip():
-                                campos_vazios.append("CONSTATAÇÃO")
-                            if not _analise_arpe.strip():
-                                campos_vazios.append("ANÁLISE ARPE")
-                            
-                            if campos_vazios:
-                                st.warning(f"Atenção: Os seguintes campos de texto da CRC estão vazios: {', '.join(campos_vazios)}.")
-                    
-                        if not is_monitoring:
-                            # Na Fiscalização, cada envio adiciona um novo registro independente com a NC selecionada
-                            ncs_existentes = [nc for nc in st.session_state.temp_nc if nc.get("ID da Fiscalização") == st.session_state.step1_id_vinculo]
-                            novo_nc_num = len(ncs_existentes) + 1
-                            rec = {
-                                "ID da Fiscalização": st.session_state.step1_id_vinculo,
-                                "Nº": novo_nc_num,
-                                "Terminal": st.session_state.step1_terminal_nc,
-                                "Pista": st.session_state.step1_pista,
-                                "Trecho": st.session_state.step1_trecho,
-                                "Não Conformidade": st.session_state.step1_nc_desc_str,
-                                "Ponto de Atenção": st.session_state.step1_pa_desc_str,
-                                "Foto": st.session_state.step1_foto_default,
-                                "Foto Anterior": "",
-                                "Legenda Anterior": "",
-                                "Observações": observacoes_crc,
-                                "Identificação": identificacao,
-                                "Direção (faixa)": direcao_faixa,
-                                "Fundamento da infração": fundamento_infracao,
-                                "Determinação": determinacao,
-                                "Situação": situacao,
-                                "Análise ARPE": analise_arpe,
-                                "is_relacionado": False,
-                                "grupo_relacao": f"grp_{st.session_state.step1_id_vinculo}_{novo_nc_num}_{st.session_state.nc_form_counter}"
-                            }
-                            st.session_state.temp_nc.append(rec)
-                        else:
-                            foto_ant = st.session_state.get("step1_foto_anterior", "")
-                            if foto_anterior_ja_adicionada(foto_ant, st.session_state.temp_nc):
-                                st.toast("Não é possível adicionar uma foto anterior que já foi adicionada/concluída.", icon=":material/error:")
-                            else:
+                                if not _pos_crc.strip():
+                                    campos_vazios.append("POSICIONAMENTO CRC")
+                                if not _constatacao.strip():
+                                    campos_vazios.append("CONSTATAÇÃO")
+                                if not _analise_arpe.strip():
+                                    campos_vazios.append("ANÁLISE ARPE")
+                                
+                                if campos_vazios:
+                                    st.warning(f"Atenção: Os seguintes campos de texto da CRC estão vazios: {', '.join(campos_vazios)}.")
+                        
+                            if not is_monitoring:
+                                # Na Fiscalização, cada envio adiciona um novo registro independente com a NC selecionada
+                                ncs_existentes = [nc for nc in st.session_state.temp_nc if nc.get("ID da Fiscalização") == st.session_state.step1_id_vinculo]
+                                novo_nc_num = len(ncs_existentes) + 1
                                 rec = {
                                     "ID da Fiscalização": st.session_state.step1_id_vinculo,
-                                    "Nº": st.session_state.step1_nc_num,
+                                    "Nº": novo_nc_num,
                                     "Terminal": st.session_state.step1_terminal_nc,
                                     "Pista": st.session_state.step1_pista,
                                     "Trecho": st.session_state.step1_trecho,
                                     "Não Conformidade": st.session_state.step1_nc_desc_str,
                                     "Ponto de Atenção": st.session_state.step1_pa_desc_str,
                                     "Foto": st.session_state.step1_foto_default,
-                                    "Foto Anterior": foto_ant,
-                                    "Legenda Anterior": st.session_state.get("step1_legenda_anterior", ""),
+                                    "Foto Anterior": "",
+                                    "Legenda Anterior": "",
                                     "Observações": observacoes_crc,
                                     "Identificação": identificacao,
                                     "Direção (faixa)": direcao_faixa,
                                     "Fundamento da infração": fundamento_infracao,
                                     "Determinação": determinacao,
                                     "Situação": situacao,
-                                    "Análise ARPE": analise_arpe
+                                    "Análise ARPE": analise_arpe,
+                                    "is_relacionado": False,
+                                    "grupo_relacao": f"grp_{st.session_state.step1_id_vinculo}_{novo_nc_num}_{st.session_state.nc_form_counter}"
                                 }
                                 st.session_state.temp_nc.append(rec)
+                            else:
+                                foto_ant = st.session_state.get("step1_foto_anterior", "")
+                                if foto_anterior_ja_adicionada(foto_ant, st.session_state.temp_nc):
+                                    st.toast("Não é possível adicionar uma foto anterior que já foi adicionada/concluída.", icon=":material/error:")
+                                else:
+                                    rec = {
+                                        "ID da Fiscalização": st.session_state.step1_id_vinculo,
+                                        "Nº": st.session_state.step1_nc_num,
+                                        "Terminal": st.session_state.step1_terminal_nc,
+                                        "Pista": st.session_state.step1_pista,
+                                        "Trecho": st.session_state.step1_trecho,
+                                        "Não Conformidade": st.session_state.step1_nc_desc_str,
+                                        "Ponto de Atenção": st.session_state.step1_pa_desc_str,
+                                        "Foto": st.session_state.step1_foto_default,
+                                        "Foto Anterior": foto_ant,
+                                        "Legenda Anterior": st.session_state.get("step1_legenda_anterior", ""),
+                                        "Observações": observacoes_crc,
+                                        "Identificação": identificacao,
+                                        "Direção (faixa)": direcao_faixa,
+                                        "Fundamento da infração": fundamento_infracao,
+                                        "Determinação": determinacao,
+                                        "Situação": situacao,
+                                        "Análise ARPE": analise_arpe
+                                    }
+                                    st.session_state.temp_nc.append(rec)
 
-                        st.session_state.relatorios_preenchimento_data = []
-                        if "planilha_download_bytes" in st.session_state:
-                            del st.session_state.planilha_download_bytes
+                            st.session_state.relatorios_preenchimento_data = []
+                            if "planilha_download_bytes" in st.session_state:
+                                del st.session_state.planilha_download_bytes
 
-                        # Sincronizar textos para todas as ocorrências de foto para a mesma Identificação (CRC)
-                        if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
-                            recs_same_ident = [r for r in st.session_state.temp_nc 
-                                               if r["Identificação"] == identificacao 
-                                               and r["ID da Fiscalização"] == st.session_state.step1_id_vinculo]
-                            for r_same in recs_same_ident:
-                                r_same["Determinação"] = determinacao
-                                r_same["Observações"] = observacoes_crc
-                                r_same["Análise ARPE"] = analise_arpe
+                            # Sincronizar textos para todas as ocorrências de foto para a mesma Identificação (CRC)
+                            if st.session_state.get("tipo_relatorio", "CRA") == "CRC" and is_monitoring:
+                                recs_same_ident = [r for r in st.session_state.temp_nc 
+                                                   if r["Identificação"] == identificacao 
+                                                   and r["ID da Fiscalização"] == st.session_state.step1_id_vinculo]
+                                for r_same in recs_same_ident:
+                                    r_same["Determinação"] = determinacao
+                                    r_same["Observações"] = observacoes_crc
+                                    r_same["Análise ARPE"] = analise_arpe
 
-                        # Avançar carrossel automaticamente se houver próxima foto e a opção estiver ativada
-                        if is_monitoring and st.session_state.old_photos_to_match:
-                            if st.session_state.get("auto_advance_active", True):
-                                if "monitoring_old_photo_index" in st.session_state and st.session_state.monitoring_old_photo_index < len(st.session_state.old_photos_to_match) - 1:
-                                    st.session_state.monitoring_old_photo_index += 1
-                                if "monitoring_new_photo_index" in st.session_state and st.session_state.fill_photos and st.session_state.monitoring_new_photo_index < len(st.session_state.fill_photos) - 1:
-                                    st.session_state.monitoring_new_photo_index += 1
-                        else:
-                            if st.session_state.get("auto_advance_active", True) and st.session_state.fill_photos and st.session_state.carousel_index < len(st.session_state.fill_photos) - 1:
-                                st.session_state.carousel_index += 1
+                            # Avançar carrossel automaticamente se houver próxima foto e a opção estiver ativada
+                            if is_monitoring and st.session_state.old_photos_to_match:
+                                if st.session_state.get("auto_advance_active", True):
+                                    if "monitoring_old_photo_index" in st.session_state and st.session_state.monitoring_old_photo_index < len(st.session_state.old_photos_to_match) - 1:
+                                        st.session_state.monitoring_old_photo_index += 1
+                                    if "monitoring_new_photo_index" in st.session_state and st.session_state.fill_photos and st.session_state.monitoring_new_photo_index < len(st.session_state.fill_photos) - 1:
+                                        st.session_state.monitoring_new_photo_index += 1
+                            else:
+                                if st.session_state.get("auto_advance_active", True) and st.session_state.fill_photos and st.session_state.carousel_index < len(st.session_state.fill_photos) - 1:
+                                    st.session_state.carousel_index += 1
+                            
+                            # Salvar valores atuais de pista e trecho para que persistam no formulário
+                            st.session_state.pista_persistida = st.session_state.step1_pista
+                            st.session_state.trecho_persistido = st.session_state.step1_trecho
                         
-                        # Salvar valores atuais de pista e trecho para que persistam no formulário
-                        st.session_state.pista_persistida = st.session_state.step1_pista
-                        st.session_state.trecho_persistido = st.session_state.step1_trecho
-                    
-                        st.session_state.nc_form_counter += 1
-                        st.session_state.nc_form_step = 1
-                        st.session_state.pending_toast = {"msg": f"Adicionado com sucesso ao ID {st.session_state.step1_id_vinculo}!", "icon": ":material/check_circle:"}
-                        st.rerun()
+                            st.session_state.nc_form_counter += 1
+                            st.session_state.nc_form_step = 1
+                            st.session_state.pending_toast = {"msg": f"Adicionado com sucesso ao ID {st.session_state.step1_id_vinculo}!", "icon": ":material/check_circle:"}
+                            st.rerun()
 
 
 

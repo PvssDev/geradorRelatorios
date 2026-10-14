@@ -265,3 +265,22 @@ def formatar_data_curta(data_val):
     except Exception:
         return str(data_val)
 
+
+def adicionar_metadados_geracao(doc):
+    """
+    Adiciona metadados informativos de autoria e carimbo de data/hora da geração
+    ao documento Word (.docx) sob a marca 'geradorARPE'.
+    Não altera visualmente o corpo do documento.
+    """
+    from datetime import datetime
+    agora = datetime.now()
+    props = doc.core_properties
+    props.author = "geradorARPE"
+    props.last_modified_by = "geradorARPE"
+    props.created = agora
+    props.modified = agora
+    props.keywords = "geradorARPE"
+    props.comments = f"Gerado pelo geradorARPE em {agora.strftime('%d/%m/%Y %H:%M:%S')}"
+    props.identifier = f"geradorARPE_{agora.strftime('%Y%m%d_%H%M%S')}"
+    return doc
+
