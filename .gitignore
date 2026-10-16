@@ -42,8 +42,22 @@ temp/
 # Testes automatizados locais
 tests/
 
+# Arquivos de lock e temporários do Microsoft Office
+~$*
+
 # Arquivos temporários e logs
 *.tmp
 *.log
+
+# Arquivos do Sistema Operacional (Windows / macOS)
+Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+ehthumbs.db
+.DS_Store
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
 
 
