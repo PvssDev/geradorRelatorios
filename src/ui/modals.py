@@ -7,8 +7,9 @@ from database.manager import (
     salvar_custom_ncs,
     salvar_custom_ncs_socicam
 )
-from sections.quadros.quadros import MAP_SIGLAS
+from sections.quadros.quadros import MAP_SIGLAS, expandir_siglas
 from ui.state import sincronizar_opcoes_nc, BASE_NC_OPTIONS
+from utils import calcular_codificacao_cra, obter_proximo_numero_sequencial_cra
 
 
 @st.dialog("Visualização Completa da Imagem", width="large", icon=":material/zoom_in:")
@@ -688,11 +689,11 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
 
                     # 3. CRA em Fiscalização:
                     elif tipo == "CRA" and not is_mon:
-                        c_pista, c_trecho = st.columns(2)
+                        c_pista, c_cod = st.columns(2)
                         with c_pista:
                             edit_pista = st.text_input("Pista", value=str(nc_target.get("Pista", "")), key=f"{nc_key_prefix}_pista")
-                        with c_trecho:
-                            edit_trecho = st.text_input("Trecho", value=str(nc_target.get("Trecho", "")), key=f"{nc_key_prefix}_trecho")
+                        with c_cod:
+                            edit_codificacao = st.text_input("Codificação", value=str(nc_target.get("Codificação") or nc_target.get("Trecho", "")), key=f"{nc_key_prefix}_codificacao")
 
                         init_is_pa = bool(nc_target.get("Ponto de Atenção")) and not bool(nc_target.get("Não Conformidade"))
                         tipo_reg_edit = st.radio(
@@ -755,8 +756,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             edit_nc_desc = ", ".join(edit_selected_siglas)
                             edit_pa_desc = ""
 
-                        obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
-                        edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
+                        edit_observacoes = ""
 
                         if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                             dir_val = nc_target.get("Direção (faixa)", "")
@@ -770,7 +770,8 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
 
                         if st.button("Salvar Alterações", icon=":material/save:", type="primary", use_container_width=True, key=f"{nc_key_prefix}_btn_save"):
                             nc_target["Pista"] = edit_pista
-                            nc_target["Trecho"] = edit_trecho
+                            nc_target["Trecho"] = edit_codificacao
+                            nc_target["Codificação"] = edit_codificacao
                             if edit_is_pa:
                                 nc_target["Ponto de Atenção"] = edit_pa_desc
                                 nc_target["Não Conformidade"] = ""
@@ -780,7 +781,8 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             nc_target["Observações"] = edit_observacoes
                             if "Legenda da Foto" in nc_target:
                                 nc_target["Legenda da Foto"] = edit_observacoes
-                            nc_target["Identificação"] = edit_pa_desc if edit_is_pa else edit_nc_desc
+                            ident = edit_codificacao if edit_codificacao else (edit_pa_desc if edit_is_pa else edit_nc_desc)
+                            nc_target["Identificação"] = ident
                             nc_target["Direção (faixa)"] = edit_direcao
                             nc_target["Fundamento da infração"] = edit_fundamento
                             nc_target["Determinação"] = edit_determinacao
@@ -819,7 +821,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         edit_nc_desc = ", ".join(edit_selected_siglas)
 
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
-                        edit_observacoes = st.text_area("Observações", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
+                        edit_observacoes = st.text_area("Legenda", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
                         edit_fundamento = st.text_area("Fundamento da Infração", value=str(nc_target.get("Fundamento da infração", "")), height=80, key=f"{nc_key_prefix}_fundamento")
                         edit_determinacao = st.text_area("Determinação", value=str(nc_target.get("Determinação", "")), height=80, key=f"{nc_key_prefix}_determinacao")
@@ -838,6 +840,322 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state["nc_edit_version"] = nc_version + 1
                             st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
+
+
+@st.dialog("Atenção: Codificação Obrigatória", icon=":material/warning:")
+def alerta_codificacao_obrigatoria_modal():
+    st.markdown(
+        """
+        <div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-left: 4px solid #e11d48; border-radius: 6px; padding: 14px 16px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="font-weight: 700; color: #9f1239; font-size: 15px;">
+                    Codificação Obrigatória
+                </span>
+            </div>
+            <p style="margin: 0; color: #475569; font-size: 13.5px; line-height: 1.5;">
+                O preenchimento do campo <b>Codificação</b> é obrigatório para cadastrar ou relacionar a ocorrência.
+            </p>
+            <p style="margin: 6px 0 0 0; color: #64748b; font-size: 12.5px;">
+                Por favor, informe a codificação da ocorrência (ex: <code>CRA.ST601.2790-2794</code>) antes de prosseguir.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    if st.button("Entendido", type="primary", use_container_width=True, key="btn_fechar_aviso_cod_obrigatoria"):
+        st.rerun()
+
+
+@st.dialog("Relacionar Foto ao Registro Anterior", width="large")
+def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_data=""):
+    from services.image_service import obter_foto_preview, extrair_nome_foto
+
+    st.markdown(
+        "<div style='font-size: 14.5px; color: #334155; margin-bottom: 14px; line-height: 1.45;'>"
+        "Você está relacionando a nova foto selecionada ao último registro cadastrado. "
+        "Revise as fotos e dados lado a lado e, se desejar, modifique a <b>Codificação</b> e as <b>Siglas (NC / PT)</b> antes de confirmar a relação."
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+    target_id = last_nc.get("ID da Fiscalização")
+    ant_grp_id = last_nc.get("grupo_relacao")
+    if not ant_grp_id:
+        ant_grp_id = f"grp_{target_id}_{last_nc.get('Nº', 1)}_{st.session_state.nc_form_counter}"
+        last_nc["grupo_relacao"] = ant_grp_id
+
+    # Busca todos os registros do grupo base
+    grupo_recs = [nc for nc in st.session_state.temp_nc if nc.get("grupo_relacao") == ant_grp_id]
+    if not grupo_recs:
+        grupo_recs = [last_nc]
+
+    # Identificar siglas do grupo base
+    ant_siglas_lista = []
+    for rec in grupo_recs:
+        s_val = rec.get("Não Conformidade") or rec.get("Ponto de Atenção") or ""
+        for s in str(s_val).split(","):
+            s_clean = s.strip()
+            if s_clean and s_clean not in ant_siglas_lista:
+                ant_siglas_lista.append(s_clean)
+
+    has_nc = any(bool(str(rec.get("Não Conformidade", "")).strip()) for rec in grupo_recs)
+    ant_tipo = "Não Conformidade" if has_nc else "Ponto de Atenção"
+    ant_foto = grupo_recs[0].get("Foto")
+    ant_num = grupo_recs[0].get("Nº", 1)
+    ant_cod = last_nc.get("Codificação", "") or last_nc.get("Trecho", "")
+    ant_nome = extrair_nome_foto(ant_foto) or getattr(ant_foto, "name", f"Foto #{ant_num}")
+
+    # Identificar dados da foto atual a relacionar
+    if st.session_state.fill_photos:
+        idx_curr = min(max(0, st.session_state.get("carousel_index", 0)), len(st.session_state.fill_photos) - 1)
+        foto_num_atual = idx_curr + 1
+    else:
+        foto_num_atual = ant_num + 1
+    atual_nome = extrair_nome_foto(foto_atual) or getattr(foto_atual, "name", f"Foto #{foto_num_atual}")
+
+    # Opções de siglas de acordo com o tipo de relatório
+    is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
+    options_nc = st.session_state.socicam_nc_options if is_socicam else st.session_state.nc_options
+
+    col_ant, col_nova = st.columns(2, gap="medium")
+
+    with col_ant:
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); 
+                        padding: 9px 12px; border-radius: 8px 8px 0 0; 
+                        border: 1px solid #cbd5e1; border-bottom: none; 
+                        display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-weight: 600; color: #1e293b; font-size: 13.5px;">
+                    📷 Foto Anterior (Registro Base)
+                </span>
+                <span style="background: #2F5173; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                    Item #{ant_num}
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        with st.container(border=True):
+            thumb_ant = obter_foto_preview(ant_foto, max_size=(380, 260))
+            if thumb_ant:
+                try:
+                    st.image(thumb_ant, use_container_width=True)
+                except Exception:
+                    st.info(f"Foto: {ant_nome}")
+            else:
+                st.info(f"Foto: {ant_nome}")
+
+            st.caption(f"**Arquivo:** `{ant_nome}`")
+            st.divider()
+
+            st.markdown(f"**Codificação Anterior:** `{ant_cod if ant_cod else '-'}`")
+            ant_faixa = last_nc.get("Direção (faixa)", "")
+            st.markdown(f"**Direção (faixa) Anterior:** `{ant_faixa if ant_faixa else '-'}`")
+            st.markdown(f"**Tipo:** *{ant_tipo}*")
+            siglas_exibidas = ", ".join(ant_siglas_lista) if ant_siglas_lista else "-"
+            st.markdown(f"**Sigla(s):** **{siglas_exibidas}**")
+            if is_cra_fisc and ant_siglas_lista:
+                exp = expandir_siglas(", ".join(ant_siglas_lista))
+                if exp:
+                    st.caption(f":material/description: {exp}")
+
+    with col_nova:
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); 
+                        padding: 9px 12px; border-radius: 8px 8px 0 0; 
+                        border: 1px solid #7dd3fc; border-bottom: none; 
+                        display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-weight: 600; color: #0369a1; font-size: 13.5px;">
+                    🔗 Nova Foto (A Relacionar)
+                </span>
+                <span style="background: #0284c7; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                    Item #{foto_num_atual}
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        with st.container(border=True):
+            thumb_nova = obter_foto_preview(foto_atual, max_size=(380, 260))
+            if thumb_nova:
+                try:
+                    st.image(thumb_nova, use_container_width=True)
+                except Exception:
+                    st.info(f"Foto: {atual_nome}")
+            else:
+                st.info(f"Foto: {atual_nome}")
+
+            st.caption(f"**Arquivo:** `{atual_nome}`")
+            st.divider()
+
+            st.markdown("**Modificar campos relacionados:**")
+
+            tipo_idx = 1 if ant_tipo == "Ponto de Atenção" else 0
+            rel_tipo = st.radio(
+                "Tipo de Registro:",
+                options=["Não Conformidade", "Ponto de Atenção"],
+                index=tipo_idx,
+                horizontal=True,
+                key=f"modal_rel_tipo_{st.session_state.nc_form_counter}"
+            )
+
+            default_pills = [s for s in ant_siglas_lista if s in options_nc]
+            pills_label = "Siglas de Não Conformidade (NC):" if rel_tipo == "Não Conformidade" else "Siglas de Ponto de Atenção (PT):"
+            rel_siglas = st.pills(
+                pills_label,
+                options=options_nc,
+                default=default_pills,
+                selection_mode="multi",
+                key=f"modal_rel_siglas_{st.session_state.nc_form_counter}"
+            )
+
+            if rel_siglas:
+                exp_new = expandir_siglas(", ".join(rel_siglas))
+                if exp_new:
+                    st.caption(f":material/info: {exp_new}")
+
+            # Identificar se as siglas mudaram em relação à foto anterior
+            siglas_mudaram = (sorted(rel_siglas or []) != sorted(ant_siglas_lista))
+
+            # Não preenche automaticamente: o usuário preenche se desejar ou deixa em branco para herdar a anterior
+            rel_cod = st.text_input(
+                "Codificação:",
+                key=f"modal_rel_cod_{st.session_state.nc_form_counter}",
+                placeholder=f"Em branco = herdar anterior ({ant_cod}) ou digite...",
+                help="Deixe em branco para herdar a codificação anterior ou informe a nova codificação desejada."
+            )
+
+            rel_faixa = st.text_input(
+                "Direção (faixa):",
+                value=ant_faixa,
+                key=f"modal_rel_faixa_{st.session_state.nc_form_counter}",
+                placeholder="Ex: Faixa 1, Faixa 2, Sul, Norte...",
+                help="Informe ou modifique a direção/faixa desta foto relacionada."
+            )
+
+    # Painel Informativo sobre o Quadro Word
+    st.write("")
+    if is_cra_fisc:
+        if not siglas_mudaram:
+            cod_exib = rel_cod.strip() if rel_cod.strip() else ant_cod
+            st.info(
+                f":material/link: **Mesmas Siglas Mantidas:** A nova foto será agrupada sob a mesma codificação (`{cod_exib}`) no Quadro (relação 1:1)."
+            )
+        else:
+            st.success(
+                ":material/device_hub: **Siglas Diferentes Detectadas:** No Quadro, será gerada uma codificação para cada sigla (**1 para 1**) e as fotos ficarão relacionadas (**N para 1**) com colunas mescladas."
+            )
+
+    # Botões de Ação
+    st.write("")
+    col_conf, col_canc = st.columns([2, 1], gap="small")
+    with col_conf:
+        if st.button("Confirmar Relação", icon=":material/link:", type="primary", use_container_width=True, key=f"btn_modal_confirm_rel_{st.session_state.nc_form_counter}"):
+            if not rel_siglas:
+                st.error("Selecione ao menos uma sigla para confirmar a relação.")
+                return
+
+            foto_para_salvar = extrair_nome_foto(foto_atual) or foto_atual
+
+            # Colocar estado relacionado nas duas fotos que estão relacionadas:
+            # atualiza o registro base anterior (e todos os itens do mesmo grupo) para is_relacionado = True
+            for rec in st.session_state.temp_nc:
+                if ant_grp_id and rec.get("grupo_relacao") == ant_grp_id:
+                    rec["is_relacionado"] = True
+                elif ant_nome and extrair_nome_foto(rec.get("Foto")).lower() == ant_nome.lower():
+                    rec["is_relacionado"] = True
+
+            if is_cra_fisc:
+                base_raw = rel_cod.strip() if rel_cod.strip() else ant_cod
+                if not base_raw:
+                    st.error("A codificação é obrigatória! Por favor, preencha o campo Codificação para confirmar a relação.")
+                    return
+
+                base_limpa = base_raw.split("/")[0] if "/" in base_raw else base_raw
+
+                for sigla in rel_siglas:
+                    seq_tipo = obter_proximo_numero_sequencial_cra(
+                        st.session_state.temp_nc,
+                        id_vinculo=target_id,
+                        tipo_registro=rel_tipo
+                    )
+                    cod_final = calcular_codificacao_cra(base_limpa, data_fisc=target_fisc_data, seq_idx=seq_tipo)
+                    identificacao = cod_final if cod_final else sigla
+                    new_nc = {
+                        "ID da Fiscalização": target_id,
+                        "Nº": foto_num_atual,
+                        "Terminal": last_nc.get("Terminal", ""),
+                        "Pista": last_nc.get("Pista", ""),
+                        "Trecho": cod_final,
+                        "Codificação": cod_final,
+                        "Não Conformidade": sigla if rel_tipo == "Não Conformidade" else "",
+                        "Ponto de Atenção": sigla if rel_tipo == "Ponto de Atenção" else "",
+                        "Foto": foto_para_salvar,
+                        "Foto Anterior": "",
+                        "Legenda Anterior": "",
+                        "Observações": "",
+                        "Identificação": identificacao,
+                        "Direção (faixa)": rel_faixa.strip(),
+                        "Fundamento da infração": last_nc.get("Fundamento da infração", ""),
+                        "Determinação": last_nc.get("Determinação", ""),
+                        "Situação": last_nc.get("Situação", "Pendente"),
+                        "Análise ARPE": "",
+                        "is_relacionado": True,
+                        "grupo_relacao": ant_grp_id
+                    }
+                    st.session_state.temp_nc.append(new_nc)
+            else:
+                nc_desc_str = ", ".join(rel_siglas) if rel_tipo == "Não Conformidade" else ""
+                pa_desc_str = ", ".join(rel_siglas) if rel_tipo == "Ponto de Atenção" else ""
+                cod_final = rel_cod.strip() if rel_cod.strip() else ant_cod
+                identificacao = cod_final if cod_final else (nc_desc_str or pa_desc_str)
+                ncs_existentes = [nc for nc in st.session_state.temp_nc if nc.get("ID da Fiscalização") == target_id]
+                new_nc_num = len(ncs_existentes) + 1
+                new_nc = {
+                    "ID da Fiscalização": target_id,
+                    "Nº": new_nc_num,
+                    "Terminal": last_nc.get("Terminal", ""),
+                    "Pista": last_nc.get("Pista", ""),
+                    "Trecho": cod_final,
+                    "Codificação": cod_final,
+                    "Não Conformidade": nc_desc_str,
+                    "Ponto de Atenção": pa_desc_str,
+                    "Foto": foto_para_salvar,
+                    "Foto Anterior": "",
+                    "Legenda Anterior": "",
+                    "Observações": "",
+                    "Identificação": identificacao,
+                    "Direção (faixa)": rel_faixa.strip(),
+                    "Fundamento da infração": last_nc.get("Fundamento da infração", ""),
+                    "Determinação": last_nc.get("Determinação", ""),
+                    "Situação": last_nc.get("Situação", "Pendente"),
+                    "Análise ARPE": "",
+                    "is_relacionado": True,
+                    "grupo_relacao": ant_grp_id
+                }
+                st.session_state.temp_nc.append(new_nc)
+
+            st.session_state.relatorios_preenchimento_data = []
+            if "planilha_download_bytes" in st.session_state:
+                del st.session_state.planilha_download_bytes
+
+            if st.session_state.get("auto_advance_active", True) and st.session_state.fill_photos and st.session_state.carousel_index < len(st.session_state.fill_photos) - 1:
+                st.session_state.carousel_index += 1
+
+            st.session_state.pista_persistida = last_nc.get("Pista", "")
+            st.session_state.fundamento_persistido = last_nc.get("Fundamento da infração", "")
+            st.session_state.determinacao_persistida = last_nc.get("Determinação", "")
+            st.session_state.faixa_persistida = rel_faixa.strip()
+
+            st.session_state.nc_form_counter += 1
+            st.session_state.pending_toast = {"msg": "Foto relacionada com sucesso!", "icon": ":material/check_circle:"}
+            st.rerun()
+
+    with col_canc:
+        if st.button("Cancelar", icon=":material/close:", use_container_width=True, key=f"btn_modal_cancel_rel_{st.session_state.nc_form_counter}"):
+            st.rerun()
 
 
 

@@ -284,3 +284,139 @@ def adicionar_metadados_geracao(doc):
     props.identifier = f"geradorARPE_{agora.strftime('%Y%m%d_%H%M%S')}"
     return doc
 
+
+def calcular_codificacao_cra(base_input, data_fisc=None, seq_idx=1):
+    """
+    Calcula a codificação completa para o relatório CRA.
+    Estrutura: {base}/{ano}.{num_final:03d} (ex: CRA.ST601.2790-2794/2026.001).
+    Se base_input já contém /{ano}.{offset}, incrementa a partir do offset inicial (offset + seq_idx - 1).
+    Caso contrário, formata com /{ano}.{seq_idx:03d}.
+    """
+    if not base_input:
+        return ""
+    ano_padrao = extrair_ano(data_fisc)
+    base_limpa = str(base_input).strip()
+    if "/" in base_limpa:
+        partes = base_limpa.split("/", 1)
+        base = partes[0].strip()
+        sufixo = partes[1].strip()
+        import re
+        m = re.match(r"^(\d{4})\.(\d+)$", sufixo)
+        if m:
+            ano = m.group(1)
+            offset_inicial = int(m.group(2))
+            num_final = offset_inicial + (int(seq_idx) - 1)
+            return f"{base}/{ano}.{num_final:03d}"
+        m_ano = re.match(r"^(\d{4})$", sufixo)
+        if m_ano:
+            ano = m_ano.group(1)
+            return f"{base}/{ano}.{int(seq_idx):03d}"
+        return f"{base}/{ano_padrao}.{int(seq_idx):03d}"
+    else:
+        return f"{base_limpa}/{ano_padrao}.{int(seq_idx):03d}"
+
+
+def obter_proximo_numero_sequencial_cra(temp_nc: list, id_vinculo: str, tipo_registro: str) -> int:
+    """
+    Calcula o próximo número sequencial (.001, .002...) para a codificação CRA,
+    contando estritamente em relação ao tipo selecionado ('Não Conformidade' ou 'Ponto de Atenção')
+    adicionado para a fiscalização vinculada.
+    """
+    if not temp_nc:
+        return 1
+
+    campo_filtro = "Não Conformidade" if tipo_registro == "Não Conformidade" else "Ponto de Atenção"
+    recs_tipo = [
+        nc for nc in temp_nc
+        if str(nc.get("ID da Fiscalização", "")).strip() == str(id_vinculo).strip()
+        and str(nc.get(campo_filtro, "")).strip()
+    ]
+
+    import re
+    max_num = 0
+    for r in recs_tipo:
+        cod = str(r.get("Codificação", "") or r.get("Trecho", "")).strip()
+        m = re.search(r"/(\d{4})\.(\d+)$", cod)
+        if m:
+            try:
+                num = int(m.group(2))
+                if num > max_num:
+                    max_num = num
+            except ValueError:
+                pass
+
+    if max_num > 0:
+        return max_num + 1
+
+    return len(recs_tipo) + 1
+
+
+def formatar_codificacoes_contraidas(cods: list) -> str:
+    """
+    Formata lista de codificações relacionadas no formato contraído:
+    ex: 'codificação/2026.001 e .002.' se compartilharem a mesma base e ano.
+    Caso contrário, retorna a concatenação separada.
+    """
+    if not cods:
+        return ""
+    unique_cods = []
+    for c in cods:
+        c_clean = str(c).strip()
+        if c_clean and c_clean not in unique_cods:
+            unique_cods.append(c_clean)
+
+    if len(unique_cods) == 0:
+        return ""
+    if len(unique_cods) == 1:
+        return unique_cods[0]
+
+    import re
+    pattern = re.compile(r"^(.*?)/(\d{4})\.(\d+)$")
+    parsed = []
+    for c in unique_cods:
+        m = pattern.match(c)
+        if m:
+            parsed.append((m.group(1), m.group(2), m.group(3)))
+        else:
+            parsed.append(None)
+
+    if all(p is not None for p in parsed):
+        primeira_base = parsed[0][0]
+        primeiro_ano = parsed[0][1]
+        mesma_base_ano = all(p[0] == primeira_base and p[1] == primeiro_ano for p in parsed)
+        if mesma_base_ano:
+            sufixos = [f".{p[2]}" for p in parsed]
+            primeiro_completo = f"{primeira_base}/{primeiro_ano}{sufixos[0]}"
+            if len(sufixos) == 2:
+                return f"{primeiro_completo} e {sufixos[1]}."
+            else:
+                outros = ", ".join(sufixos[1:-1])
+                return f"{primeiro_completo}, {outros} e {sufixos[-1]}."
+
+    if len(unique_cods) == 2:
+        return f"{unique_cods[0]} e {unique_cods[1]}."
+    return f"{', '.join(unique_cods[:-1])} e {unique_cods[-1]}."
+
+
+def fotos_tem_mesmas_ncs(related_records: list) -> bool:
+    """
+    Verifica se todos os registros do grupo possuem exatamente as mesmas siglas de NC / PT.
+    """
+    if not related_records or len(related_records) <= 1:
+        return True
+
+    def _siglas_rec(rec):
+        nc = str(rec.get("Não Conformidade") or "").strip().lower()
+        pt = str(rec.get("Ponto de Atenção") or "").strip().lower()
+        parts_nc = set(p.strip() for p in nc.split(",") if p.strip())
+        parts_pt = set(p.strip() for p in pt.split(",") if p.strip())
+        return (frozenset(parts_nc), frozenset(parts_pt))
+
+    primeira = _siglas_rec(related_records[0])
+    for r in related_records[1:]:
+        if _siglas_rec(r) != primeira:
+            return False
+    return True
+
+
+

@@ -5,7 +5,13 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 import os
 import pandas as pd
 from datetime import datetime
-from utils import adicionar_titulo_secao, extrair_ano, formatar_data_extenso
+from utils import (
+    adicionar_titulo_secao,
+    extrair_ano,
+    formatar_data_extenso,
+    formatar_codificacoes_contraidas,
+    fotos_tem_mesmas_ncs
+)
 from database.manager import carregar_responsaveis, carregar_coordenadores
 
 def formatar_data_dd_mm_yyyy(data_val):
@@ -71,13 +77,28 @@ def _obter_caminho_foto_valido(foto_val, fotos_dir):
 
     return None
 
+def _obter_texto_localizacao_cra(rec: dict) -> str:
+    val = str(rec.get("Codificação") or rec.get("Trecho", "")).strip()
+    return val
+
+def _formatar_trecho_caption(rec: dict, tipo_relatorio: str, obs_text: str = "", cod_custom: str = None) -> str:
+    if str(tipo_relatorio).upper() != "CRA":
+        return ""
+    val = cod_custom if cod_custom else _obter_texto_localizacao_cra(rec)
+    if not val:
+        return ""
+    apresentando_suffix = " apresentando " if str(obs_text).strip() else ""
+    if val.lower().startswith("trecho") or any(val.upper().startswith(p) for p in ["CRA", "CRC", "NC"]):
+        return f"{val}{apresentando_suffix}"
+    return f"Trecho {val}{apresentando_suffix}"
+
 def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_relatorio="CRA"):
     if df_fotos is None or df_fotos.empty:
         return
     
     # Compatibilidade com planilhas antigas
     df_fotos = df_fotos.copy()
-    for col in ["Pista", "Trecho", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação"]:
+    for col in ["Pista", "Trecho", "Codificação", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação"]:
         if col not in df_fotos.columns:
             df_fotos[col] = ""
         
@@ -115,10 +136,11 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 
                 parts = []
                 if "CRA" in str(tipo_relatorio).upper():
-                    if trecho_val:
-                        parts.append(trecho_val)
+                    cod_val = _obter_texto_localizacao_cra(rec)
+                    if cod_val:
+                        parts.append(cod_val)
                     else:
-                        parts.append("Trecho Não Informado")
+                        parts.append("Codificação Não Informada")
                 else:
                     if ident:
                         parts.append(ident)
@@ -315,8 +337,19 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_nc_desc.paragraph_format.line_spacing = 1.15
                 
                 if str(tipo_relatorio).upper() == "CRA":
-                    trecho_val = str(rec_main.get("Trecho", "")).strip()
-                    label_item = trecho_val if trecho_val else "Trecho Não Informado"
+                    cods = []
+                    for r in related:
+                        c_val = _obter_texto_localizacao_cra(r)
+                        if c_val and c_val not in cods:
+                            cods.append(c_val)
+                    if cods:
+                        mesmas_nc = fotos_tem_mesmas_ncs(related)
+                        if mesmas_nc and len(cods) > 1:
+                            label_item = formatar_codificacoes_contraidas(cods)
+                        else:
+                            label_item = " e ".join(cods) if len(cods) <= 2 else (", ".join(cods[:-1]) + f" e {cods[-1]}")
+                    else:
+                        label_item = "Codificação Não Informada"
                 else:
                     label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or "Item")
                     
@@ -325,8 +358,19 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 run_nc_desc.font.name = 'Aptos'
                 run_nc_desc.font.size = Pt(11)
             
-            if len(related) == 1:
-                rec = related[0]
+            # Desduplica fotos no grupo para que uma foto com múltiplas NCs não seja renderizada repetida lado a lado
+            distinct_related = []
+            seen_fotos = set()
+            for r in related:
+                f_val = str(r.get("Foto") or r.get("Fotos") or r.get("foto") or "").strip().lower()
+                if f_val and f_val not in seen_fotos:
+                    seen_fotos.add(f_val)
+                    distinct_related.append(r)
+            if not distinct_related:
+                distinct_related = related[:1]
+
+            if len(distinct_related) == 1:
+                rec = distinct_related[0]
                     
                 table = doc.add_table(rows=2, cols=1)
                 table.style = 'Table Grid'
@@ -362,9 +406,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     num = str(num_val).zfill(2)
                 data_str = f", em {data_fisc}" if data_fisc else ""
                 
-                trecho = str(rec.get("Trecho", "")).strip()
-                trecho_txt = f"Trecho {trecho} apresentando " if trecho and str(tipo_relatorio).upper() == "CRA" else ""
-                
+                trecho_txt = _formatar_trecho_caption(rec, tipo_relatorio, obs_text)
                 caption_text = f"Foto {num} – {trecho_txt}{obs_text}{data_str}."
                 if str(tipo_relatorio).upper() in ["CRC", "SOCICAM"] or not trecho_txt:
                     caption_text = f"Foto {num} – {obs_text}{data_str}."
@@ -382,9 +424,21 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 table.columns[0].width = Inches(3.635)
                 table.columns[1].width = Inches(3.635)
                 
-                for i in range(0, len(related), 2):
-                    rec_left = related[i]
-                    rec_right = related[i+1] if i+1 < len(related) else None
+                # Se as fotos relacionadas tiverem as mesmas NC, a legenda de ambas usa a codificação contraída
+                mesmas_nc_rel = fotos_tem_mesmas_ncs(distinct_related)
+                cod_custom_rel = None
+                if str(tipo_relatorio).upper() == "CRA" and mesmas_nc_rel and len(distinct_related) > 1:
+                    cods_grupo = []
+                    for r in distinct_related:
+                        c_val = _obter_texto_localizacao_cra(r)
+                        if c_val and c_val not in cods_grupo:
+                            cods_grupo.append(c_val)
+                    if len(cods_grupo) > 1:
+                        cod_custom_rel = formatar_codificacoes_contraidas(cods_grupo)
+
+                for i in range(0, len(distinct_related), 2):
+                    rec_left = distinct_related[i]
+                    rec_right = distinct_related[i+1] if i+1 < len(distinct_related) else None
                     
                     row_img = table.add_row()
                     row_img.cells[0].width = Inches(3.635)
@@ -429,9 +483,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     if num_l == "00" or num_l == "":
                         num_l_val = records.index(rec_left) + 1
                         num_l = str(num_l_val).zfill(2)
-                    trecho_l = str(rec_left.get("Trecho", "")).strip()
                     obs_l = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip()
-                    trecho_txt_l = f"Trecho {trecho_l} apresentando " if trecho_l and str(tipo_relatorio).upper() == "CRA" else ""
+                    trecho_txt_l = _formatar_trecho_caption(rec_left, tipo_relatorio, obs_l, cod_custom=cod_custom_rel)
                     data_txt = f", em {data_fisc}" if data_fisc else ""
                     desc_text_l = f"Foto {num_l} – {trecho_txt_l}{obs_l}{data_txt}."
                     run_l = p_desc_left.add_run(desc_text_l)
@@ -447,9 +500,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         if num_r == "00" or num_r == "":
                             num_r_val = records.index(rec_right) + 1
                             num_r = str(num_r_val).zfill(2)
-                        trecho_r = str(rec_right.get("Trecho", "")).strip()
                         obs_r = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip()
-                        trecho_txt_r = f"Trecho {trecho_r} apresentando " if trecho_r and str(tipo_relatorio).upper() == "CRA" else ""
+                        trecho_txt_r = _formatar_trecho_caption(rec_right, tipo_relatorio, obs_r, cod_custom=cod_custom_rel)
                         desc_text_r = f"Foto {num_r} – {trecho_txt_r}{obs_r}{data_txt}."
                         run_r = p_desc_right.add_run(desc_text_r)
                         run_r.font.name = 'Aptos'

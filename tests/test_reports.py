@@ -247,6 +247,129 @@ def test_metadados_gerador_arpe():
     print("[PASS] test_metadados_gerador_arpe")
 
 
+def test_cra_codificacao_and_quadros_structure():
+    import pandas as pd
+    from docx import Document
+    from utils import calcular_codificacao_cra
+    from sections.quadros.quadros import agrupar_registros, criar_tabela_quadros
+
+    # 1. Testar calcular_codificacao_cra
+    assert calcular_codificacao_cra("CRA.ST601.2790-2794", "09/02/2026", 1) == "CRA.ST601.2790-2794/2026.001"
+    assert calcular_codificacao_cra("CRA.ST601.2790-2794", "09/02/2026", 2) == "CRA.ST601.2790-2794/2026.002"
+    assert calcular_codificacao_cra("CRA.ST601.2790-2794/2026.081", "09/02/2026", 1) == "CRA.ST601.2790-2794/2026.081"
+    assert calcular_codificacao_cra("CRA.ST601.2790-2794/2026.081", "09/02/2026", 2) == "CRA.ST601.2790-2794/2026.082"
+
+    # 2. Testar agrupar_registros com relação 1:N no CRA
+    rec1 = {
+        "Nº": 1,
+        "grupo_relacao": "grp_fisc_1",
+        "Codificação": "CRA.ST601.2790-2794/2026.081",
+        "Não Conformidade": "ATC",
+        "Direção (faixa)": "Faixa Esquerda",
+        "Fundamento da infração": "Item 4.2.2.1.3",
+        "Determinação": "Comprovar inclusão..."
+    }
+    rec2 = {
+        "Nº": 2,
+        "grupo_relacao": "grp_fisc_1",
+        "Codificação": "CRA.ST601.2790-2794/2026.082",
+        "Não Conformidade": "D",
+        "Direção (faixa)": "Faixa Esquerda",
+        "Fundamento da infração": "Item 4.2.2.1.3",
+        "Determinação": "Comprovar inclusão..."
+    }
+    df = pd.DataFrame([rec1, rec2])
+    grouped = agrupar_registros(df, "CRA")
+    assert len(grouped) == 2, f"Esperado 2 linhas (siglas individuais), obtido {len(grouped)}"
+    assert "Fotos 01 e 02" in grouped[0]["localizacao_formatada"]
+    assert "Faixa Esquerda" in grouped[0]["localizacao_formatada"]
+    assert grouped[0]["Codificação"] == "CRA.ST601.2790-2794/2026.081"
+    assert grouped[1]["Codificação"] == "CRA.ST601.2790-2794/2026.082"
+
+    # 3. Testar criar_tabela_quadros para CRA
+    cra = get_report("CRA")
+    doc = Document()
+    row = {"ID da Fiscalização": "2026-001", "Data": "15/07/2026", "Local": "CRA"}
+    cra.render_quadros(doc, row, df, criar_tabela_quadros)
+    table = doc.tables[0]
+    # Header row 1 col 0 deve ser CODIFICAÇÃO
+    assert table.cell(1, 0).text == "CODIFICAÇÃO", f"Header esperado CODIFICAÇÃO, obtido: {table.cell(1, 0).text}"
+    # Data row 2 col 0 deve ser a codificação formatada
+    assert "CRA.ST601.2790-2794/2026.081" in table.cell(2, 0).text
+    assert "Afundamento" in table.cell(2, 1).text
+    assert "Fotos 01 e 02" in table.cell(2, 2).text
+    # Data row 3 col 0 deve ser a codificação da segunda foto relacionada
+    assert "CRA.ST601.2790-2794/2026.082" in table.cell(3, 0).text
+    assert "Desgaste" in table.cell(3, 1).text
+    assert "Fotos 01 e 02" in table.cell(3, 2).text
+
+    # 4. Verificar mesclagem vertical N:1:1 para colunas 2, 3 e 4
+    assert table.cell(2, 2)._tc is table.cell(3, 2)._tc, "Coluna 2 (Localização/Fotos) deveria estar mesclada verticalmente"
+    assert table.cell(2, 3)._tc is table.cell(3, 3)._tc, "Coluna 3 (Fundamento) deveria estar mesclada verticalmente"
+    assert table.cell(2, 4)._tc is table.cell(3, 4)._tc, "Coluna 4 (Determinação) deveria estar mesclada verticalmente"
+    # Colunas 0 e 1 NÃO devem estar mescladas verticalmente (cada NC tem sua própria linha)
+    assert table.cell(2, 0)._tc is not table.cell(3, 0)._tc, "Coluna 0 (Codificação) deve ser individual"
+    assert table.cell(2, 1)._tc is not table.cell(3, 1)._tc, "Coluna 1 (Descrição) deve ser individual"
+    print("[PASS] test_cra_codificacao_and_quadros_structure")
+
+
+def test_cra_multi_nc_per_photo_and_complex_grouping():
+    import pandas as pd
+    from docx import Document
+    from sections.quadros.quadros import agrupar_registros, criar_tabela_quadros
+    from sections.finalizacao.finalizacao import criar_grade_fotos
+
+    # Simular Grupo 1: Foto 1 tem 2 NCs (ATC e D), Foto 2 relacionada tem 1 NC (JE)
+    # Todos compartilham grp_1
+    rec1 = {"Nº": 1, "Foto": "foto01.jpg", "grupo_relacao": "grp_1", "Codificação": "CRA.ST601.2790-2794/2026.081", "Não Conformidade": "ATC", "Direção (faixa)": "Faixa Esquerda", "Fundamento da infração": "Item 4.2.2.1.3", "Determinação": "Comprovar inclusão...", "Pista": "Norte"}
+    rec2 = {"Nº": 1, "Foto": "foto01.jpg", "grupo_relacao": "grp_1", "Codificação": "CRA.ST601.2790-2794/2026.082", "Não Conformidade": "D", "Direção (faixa)": "Faixa Esquerda", "Fundamento da infração": "Item 4.2.2.1.3", "Determinação": "Comprovar inclusão...", "Pista": "Norte"}
+    rec3 = {"Nº": 2, "Foto": "foto02.jpg", "grupo_relacao": "grp_1", "Codificação": "CRA.ST601.2790-2794/2026.083", "Não Conformidade": "JE", "Direção (faixa)": "Faixa Esquerda", "Fundamento da infração": "Item 4.2.2.1.3", "Determinação": "Comprovar inclusão...", "Pista": "Norte"}
+
+    # Simular Grupo 8 da ref: 4 fotos (21, 22, 23, 24) com 3 NCs (ALC, JE, D)
+    rec4 = {"Nº": 21, "Foto": "f21.jpg", "grupo_relacao": "grp_8", "Codificação": "CRA.ST402.3694-3698/2026.025", "Não Conformidade": "ALC", "Direção (faixa)": "Faixa Direita", "Fundamento da infração": "Item 4.2.2.1.3", "Determinação": "Comprovar inclusão...", "Pista": "Norte"}
+    rec5 = {"Nº": 22, "Foto": "f22.jpg", "grupo_relacao": "grp_8", "Codificação": "CRA.ST402.3694-3698/2026.026", "Não Conformidade": "JE", "Direção (faixa)": "Faixa Direita", "Fundamento da infração": "Item 4.2.2.1.3", "Determinação": "Comprovar inclusão...", "Pista": "Norte"}
+    rec6 = {"Nº": 23, "Foto": "f23.jpg", "grupo_relacao": "grp_8", "Codificação": "CRA.ST402.3694-3698/2026.027", "Não Conformidade": "D", "Direção (faixa)": "Faixa Direita", "Fundamento da infração": "Item 4.2.2.1.3", "Determinação": "Comprovar inclusão...", "Pista": "Norte"}
+    rec7 = {"Nº": 24, "Foto": "f24.jpg", "grupo_relacao": "grp_8", "Codificação": "CRA.ST402.3694-3698/2026.027", "Não Conformidade": "D", "Direção (faixa)": "Faixa Direita", "Fundamento da infração": "Item 4.2.2.1.3", "Determinação": "Comprovar inclusão...", "Pista": "Norte"}
+
+    df = pd.DataFrame([rec1, rec2, rec3, rec4, rec5, rec6, rec7])
+
+    grouped = agrupar_registros(df, "CRA")
+    # Esperado: 3 linhas para grp_1 e 3 linhas para grp_8 (rec6 e rec7 têm mesma codificação e NC no mesmo grupo) -> total 6 linhas
+    assert len(grouped) == 6, f"Esperado 6 linhas, obtido {len(grouped)}"
+    assert "Fotos 01 e 02" in grouped[0]["localizacao_formatada"]
+    assert "Fotos 21, 22, 23 e 24" in grouped[3]["localizacao_formatada"]
+
+    # Testar renderização do Quadro 2
+    cra = get_report("CRA")
+    doc = Document()
+    row = {"ID da Fiscalização": "2026-001", "Data": "15/07/2026", "Local": "CRA"}
+    cra.render_quadros(doc, row, df, criar_tabela_quadros)
+    table = doc.tables[0]
+
+    # Verificar que grp_1 (linhas 2, 3, 4) tem colunas 2, 3, 4 mescladas
+    assert table.cell(2, 2)._tc is table.cell(3, 2)._tc is table.cell(4, 2)._tc
+    assert table.cell(2, 3)._tc is table.cell(3, 3)._tc is table.cell(4, 3)._tc
+    assert table.cell(2, 4)._tc is table.cell(3, 4)._tc is table.cell(4, 4)._tc
+    # Mas colunas 0 e 1 são individuais (3 linhas distintas)
+    assert table.cell(2, 0)._tc is not table.cell(3, 0)._tc
+    assert table.cell(3, 0)._tc is not table.cell(4, 0)._tc
+    assert "2026.081" in table.cell(2, 0).text
+    assert "2026.082" in table.cell(3, 0).text
+    assert "2026.083" in table.cell(4, 0).text
+
+    # Verificar que grp_8 (linhas 5, 6, 7) tem colunas 2, 3, 4 mescladas
+    assert table.cell(5, 2)._tc is table.cell(6, 2)._tc is table.cell(7, 2)._tc
+    assert table.cell(5, 3)._tc is table.cell(6, 3)._tc is table.cell(7, 3)._tc
+    assert table.cell(5, 4)._tc is table.cell(6, 4)._tc is table.cell(7, 4)._tc
+    assert "Fotos 21, 22, 23 e 24" in table.cell(5, 2).text
+
+    # Testar criar_grade_fotos desduplicação
+    doc_fotos = Document()
+    criar_grade_fotos(doc_fotos, df, "CRA", None, "15/07/2026", tipo_relatorio="CRA")
+    # No grp_1, existem apenas 2 fotos físicas distintas (foto01 e foto02), não deve duplicar foto01
+    print("[PASS] test_cra_multi_nc_per_photo_and_complex_grouping")
+
+
 if __name__ == "__main__":
     test_factory_and_registry()
     test_cra_monitoramento_mixin_behavior()
@@ -255,4 +378,8 @@ if __name__ == "__main__":
     test_crc_fiscalizacao_quadro1_non_conformities()
     test_cra_fiscalizacao_quadros_total_rows()
     test_metadados_gerador_arpe()
+    test_cra_codificacao_and_quadros_structure()
+    test_cra_multi_nc_per_photo_and_complex_grouping()
     print("\nTodos os testes de relatórios passaram com sucesso!")
+
+
