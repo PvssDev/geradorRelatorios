@@ -1757,3 +1757,61 @@ div[class*="st-key-corpo_relatorio"] [data-testid="stWidgetLabel"] p {
     }
 }
 
+/* ==========================================
+   OTIMIZAÇÃO DE FOTOS - CARD / CHECKBOX PREMIUM
+   (UI/UX Pro Max & Estilização Streamlit)
+   ========================================== */
+.stApp div[class*="st-key-opt_compressao_box"] {
+    background: rgba(255, 255, 255, 0.78) !important;
+    border: 1px solid rgba(47, 81, 115, 0.22) !important;
+    border-radius: 10px !important;
+    padding: 8px 16px !important;
+    margin-bottom: 14px !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    box-shadow: 0 1px 4px rgba(13, 39, 64, 0.04) !important;
+    transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+.stApp div[class*="st-key-opt_compressao_box"]:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-color: #2F5173 !important;
+    box-shadow: 0 3px 10px rgba(13, 39, 64, 0.09) !important;
+}
+
+.stApp div[class*="st-key-opt_compressao_box"] [data-testid="stCheckbox"] {
+    min-height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.stApp div[class*="st-key-opt_compressao_box"] [data-testid="stCheckbox"] label {
+    cursor: pointer !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+}
+
+.stApp div[class*="st-key-opt_compressao_box"] [data-testid="stCheckbox"] [data-testid="stMarkdownContainer"] p {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #011A33 !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+}
+
+/* Indicador do Checkbox com Cores Institucionais ARPE */
+.stApp div[class*="st-key-opt_compressao_box"] [data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+    background-color: #0D2740 !important;
+    border-color: #0D2740 !important;
+    box-shadow: 0 2px 5px rgba(13, 39, 64, 0.25) !important;
+}
+
+.stApp div[class*="st-key-opt_compressao_box"] [data-testid="stCheckbox"] div[role="checkbox"]:focus-visible {
+    outline: 2px solid #0D2740 !important;
+    outline-offset: 2px !important;
+}
+
+

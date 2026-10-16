@@ -392,3 +392,154 @@ def obter_nomes_fotos_anteriores_concluidas(temp_nc: list) -> dict:
                 nomes[old_root] = "NC"
     return nomes
 
+
+def comprimir_imagem(
+    photo_source,
+    target_size_kb: int = 500,
+    max_dimension: int = 1920,
+    qualidade_inicial: int = 82
+) -> bytes:
+    """
+    Comprime e redimensiona uma imagem para aproximadamente target_size_kb (padrão 500 KB)
+    mantendo alta resolução e qualidade visual nítida para documentos e impressão.
+
+    Garante:
+    - Correção da orientação do sensor via ImageOps.exif_transpose (evita fotos viradas).
+    - Preservação estrita dos metadados EXIF (incluindo DateTimeOriginal para extrair_data_original_foto).
+    - Conversão segura para RGB com fundo branco caso possua transparência (PNG/RGBA).
+    - Redimensionamento proporcional se max(largura, altura) > max_dimension usando Lanczos.
+    - Loop adaptativo de qualidade JPEG para convergir próximo a ~500 KB.
+    - Retorno estritamente em memória (bytes), sem arquivos temporários no disco (LGPD).
+    - Fallback resiliente: em caso de erro, retorna os bytes originais com seek(0) preservado.
+    """
+    if not photo_source:
+        return b""
+
+    source_resolved = resolver_objeto_foto(photo_source)
+    if source_resolved is None:
+        source_resolved = photo_source
+
+    def _obter_bytes_originais(fonte) -> bytes:
+        try:
+            if hasattr(fonte, "seek"):
+                try:
+                    fonte.seek(0)
+                except Exception:
+                    pass
+            if hasattr(fonte, "getbuffer"):
+                return bytes(fonte.getbuffer())
+            elif hasattr(fonte, "read"):
+                return fonte.read()
+            elif isinstance(fonte, (bytes, bytearray)):
+                return bytes(fonte)
+            elif isinstance(fonte, str) and os.path.exists(fonte):
+                with open(fonte, "rb") as f:
+                    return f.read()
+        except Exception:
+            pass
+        return b""
+
+    try:
+        if hasattr(source_resolved, "seek"):
+            try:
+                source_resolved.seek(0)
+            except Exception:
+                pass
+
+        if isinstance(source_resolved, str):
+            if not os.path.exists(source_resolved):
+                return b""
+            img = Image.open(source_resolved)
+        elif hasattr(source_resolved, "read"):
+            img = Image.open(source_resolved)
+        elif isinstance(source_resolved, (bytes, bytearray)):
+            img = Image.open(io.BytesIO(source_resolved))
+        else:
+            return _obter_bytes_originais(source_resolved)
+
+        try:
+            # 1. Correção de orientação EXIF (modo retrato de smartphone)
+            img = ImageOps.exif_transpose(img)
+
+            # 2. Preservação dos metadados EXIF
+            raw_exif = img.info.get("exif")
+            if not raw_exif:
+                try:
+                    exif_obj = img.getexif()
+                    if exif_obj:
+                        raw_exif = exif_obj.tobytes()
+                except Exception:
+                    raw_exif = None
+
+            # 3. Tratamento de modo e transparência
+            if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                if img.mode != "RGBA":
+                    img = img.convert("RGBA")
+                bg.paste(img, mask=img.split()[-1])
+                img = bg
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # 4. Redimensionamento proporcional se maior que max_dimension
+            w, h = img.size
+            max_side = max(w, h)
+            if max_side > max_dimension:
+                scale = max_dimension / float(max_side)
+                new_w = max(1, int(w * scale))
+                new_h = max(1, int(h * scale))
+                img = img.resize((new_w, new_h), resample=Image.Resampling.LANCZOS)
+
+            # 5. Compressão adaptativa em JPEG visando ~target_size_kb
+            target_bytes = target_size_kb * 1024
+            qualities = [qualidade_inicial, 78, 72, 65]
+            best_bytes = None
+
+            for q in qualities:
+                buf = io.BytesIO()
+                save_kwargs = {"format": "JPEG", "quality": q, "optimize": True}
+                if raw_exif:
+                    save_kwargs["exif"] = raw_exif
+                img.save(buf, **save_kwargs)
+                data = buf.getvalue()
+
+                if best_bytes is None or len(data) < len(best_bytes):
+                    best_bytes = data
+
+                if len(data) <= target_bytes:
+                    best_bytes = data
+                    break
+
+            # Se ainda estiver acima de target_bytes no piso 65 (fotos com textura/ruído extremo)
+            if best_bytes and len(best_bytes) > target_bytes:
+                scale_sec = 1440 / float(max(img.size))
+                if scale_sec < 1.0:
+                    w2 = max(1, int(img.width * scale_sec))
+                    h2 = max(1, int(img.height * scale_sec))
+                    img_sec = img.resize((w2, h2), resample=Image.Resampling.LANCZOS)
+                    buf_sec = io.BytesIO()
+                    save_kwargs = {"format": "JPEG", "quality": 75, "optimize": True}
+                    if raw_exif:
+                        save_kwargs["exif"] = raw_exif
+                    img_sec.save(buf_sec, **save_kwargs)
+                    data_sec = buf_sec.getvalue()
+                    if len(data_sec) < len(best_bytes):
+                        best_bytes = data_sec
+
+            return best_bytes or _obter_bytes_originais(source_resolved)
+
+        finally:
+            try:
+                img.close()
+            except Exception:
+                pass
+            if hasattr(source_resolved, "seek"):
+                try:
+                    source_resolved.seek(0)
+                except Exception:
+                    pass
+
+    except Exception:
+        return _obter_bytes_originais(source_resolved)
+
+

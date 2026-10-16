@@ -59,7 +59,8 @@ def inicializar_estado_sessao() -> None:
         "show_contratos_modal": False,
         "show_add_custom_nc_modal": False,
         "active_pills_key_modal": None,
-        "manual_relacao_map": {}
+        "manual_relacao_map": {},
+        "otimizar_fotos_relatorio": True
     }
 
     for key, value in defaults.items():

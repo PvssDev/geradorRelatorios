@@ -6,7 +6,8 @@ from services.data_service import (
 )
 from services.image_service import (
     extrair_data_original_foto,
-    extrair_nome_foto
+    extrair_nome_foto,
+    comprimir_imagem
 )
 
 __all__ = [
@@ -15,4 +16,6 @@ __all__ = [
     "salvar_fotos_em_diretorio",
     "extrair_data_original_foto",
     "extrair_nome_foto",
+    "comprimir_imagem",
 ]
+

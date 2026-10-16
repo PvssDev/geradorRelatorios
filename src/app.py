@@ -213,6 +213,14 @@ with st.container():
             st.session_state.photos_uploader_version = 0
         if "mon_uploader_version" not in st.session_state:
             st.session_state.mon_uploader_version = 0
+
+        with st.container(key="opt_compressao_box"):
+            st.checkbox(
+                "Reduzir tamanho das fotos para ~500 KB (Otimização recomendada para relatório Word)",
+                value=st.session_state.get("otimizar_fotos_relatorio", True),
+                key="otimizar_fotos_relatorio",
+                help="Fotos de smartphones e câmeras costumam ter de 4 a 6 MB. Ao marcar esta opção, elas serão otimizadas para cerca de 500 KB mantendo alta nitidez visual no documento final, preservando a orientação e os metadados de data original."
+            )
             
         col_uploader, col_sort, col_clear = st.columns([3, 1, 1])
         with col_uploader:
@@ -1491,7 +1499,13 @@ with st.container():
                         os.makedirs(reports_dir, exist_ok=True)
 
                         if "fill_photos" in st.session_state and st.session_state.fill_photos:
-                            salvar_fotos_em_diretorio(st.session_state.fill_photos, fotos_dir)
+                            otimizar_fotos = st.session_state.get("otimizar_fotos_relatorio", True)
+                            salvar_fotos_em_diretorio(
+                                st.session_state.fill_photos, 
+                                fotos_dir, 
+                                otimizar=otimizar_fotos, 
+                                target_size_kb=500
+                            )
 
                         # Diagnóstico: verificar fotos salvas vs fotos referenciadas nas NCs
                         fotos_salvas = set(os.listdir(fotos_dir)) if os.path.isdir(fotos_dir) else set()
