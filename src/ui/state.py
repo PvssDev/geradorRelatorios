@@ -45,6 +45,10 @@ def inicializar_estado_sessao() -> None:
         "mon_uploader_version": 0,
         "pista_persistida": "",
         "trecho_persistido": "",
+        "codificacao_persistida": "",
+        "fundamento_persistido": "",
+        "determinacao_persistida": "",
+        "faixa_persistida": "",
         "show_foto_modal": False,
         "modal_foto_path": None,
         "show_confirm_exclusao_lote": False,
@@ -55,7 +59,8 @@ def inicializar_estado_sessao() -> None:
         "show_contratos_modal": False,
         "show_add_custom_nc_modal": False,
         "active_pills_key_modal": None,
-        "manual_relacao_map": {}
+        "manual_relacao_map": {},
+        "otimizar_fotos_relatorio": True
     }
 
     for key, value in defaults.items():

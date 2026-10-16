@@ -1,9 +1,63 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-/reports/
-/assets/
-dist/reports/
-dist/assets/
+*.py[cod]
+*$py.class
+*.exe
+
+# Ambientes virtuais
 venv/
+.venv/
+env/
+ENV/
+
+# IDEs e configurações locais
 .cursor/
 .agents/
+.vscode/
+.idea/
+.pytest_cache/
+
+# Relatórios, planilhas e documentos gerados
+*.docx
+*.doc
+*.pdf
+relatorio_*.docx
+**/relatorio_*.docx
+test_out*.docx
+**/reports/*.docx
+*.xlsx
+
+# Pastas de saída, scratch e temporários
+scratch/
+scratch_*.py
+ref_paragraphs.txt
 ref/
+dist/
+build/
+output/
+downloads/
+temp/
+*.spec
+
+# Testes automatizados locais
+tests/
+
+# Arquivos de lock e temporários do Microsoft Office
+~$*
+
+# Arquivos temporários e logs
+*.tmp
+*.log
+
+# Arquivos do Sistema Operacional (Windows / macOS)
+Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+ehthumbs.db
+.DS_Store
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+
+
