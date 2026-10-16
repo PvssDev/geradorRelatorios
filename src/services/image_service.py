@@ -4,7 +4,7 @@ import os
 import re
 import unicodedata
 import streamlit as st
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ExifTags
 
 
 def chave_ordenacao_natural(item):
@@ -175,6 +175,77 @@ def extrair_nome_foto(photo_source) -> str:
     if s.startswith("<streamlit") or s.startswith("<_io."):
         return ""
     return os.path.basename(s).strip()
+
+
+def extrair_data_original_foto(photo_source) -> str:
+    """
+    Extrai a data original (DateTimeOriginal) dos metadados EXIF da foto enviada.
+    - Retorna a data formatada em 'DD/MM/YYYY'.
+    - Busca estritamente a data original de criação/captura (tag 36867 / 0x9003)
+      e NÃO utiliza a data de modificação da imagem (tag 306).
+    - Em caso de ausência de metadados, erro de leitura, foto corrompida ou inexistente,
+      retorna 'xx/xx/xxxx'.
+    """
+    if not photo_source:
+        return "xx/xx/xxxx"
+
+    source_resolved = resolver_objeto_foto(photo_source)
+    if not source_resolved:
+        source_resolved = photo_source
+
+    raw_date = None
+    try:
+        if isinstance(source_resolved, str):
+            if not os.path.exists(source_resolved):
+                return "xx/xx/xxxx"
+            img = Image.open(source_resolved)
+        elif hasattr(source_resolved, "seek"):
+            try:
+                source_resolved.seek(0)
+            except Exception:
+                pass
+            img = Image.open(source_resolved)
+        else:
+            return "xx/xx/xxxx"
+
+        try:
+            exif = img.getexif()
+            if exif:
+                try:
+                    if hasattr(ExifTags, "IFD") and hasattr(ExifTags.IFD, "Exif"):
+                        exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+                    else:
+                        exif_ifd = exif.get_ifd(0x8769)
+                    if exif_ifd:
+                        raw_date = exif_ifd.get(36867) or exif_ifd.get(0x9003)
+                except Exception:
+                    pass
+
+            if not raw_date and hasattr(img, "_getexif"):
+                legacy_exif = img._getexif()
+                if isinstance(legacy_exif, dict):
+                    raw_date = legacy_exif.get(36867) or legacy_exif.get(0x9003)
+        finally:
+            try:
+                img.close()
+            except Exception:
+                pass
+            if hasattr(source_resolved, "seek"):
+                try:
+                    source_resolved.seek(0)
+                except Exception:
+                    pass
+
+        if raw_date:
+            match = re.search(r"(\d{4})[:/-](\d{2})[:/-](\d{2})", str(raw_date))
+            if match:
+                ano, mes, dia = match.groups()
+                return f"{dia}/{mes}/{ano}"
+
+    except Exception:
+        pass
+
+    return "xx/xx/xxxx"
 
 
 def obter_nomes_fotos_em_nc(temp_nc: list) -> dict:

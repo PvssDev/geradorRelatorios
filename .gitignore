@@ -39,9 +39,8 @@ downloads/
 temp/
 *.spec
 
-# Testes HTML pontuais de UI
-tests/test_center.html
-tests/test_swiper_page.html
+# Testes automatizados locais
+tests/
 
 # Arquivos temporários e logs
 *.tmp

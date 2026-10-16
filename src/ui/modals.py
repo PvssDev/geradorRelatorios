@@ -10,6 +10,7 @@ from database.manager import (
 from sections.quadros.quadros import MAP_SIGLAS, expandir_siglas
 from ui.state import sincronizar_opcoes_nc, BASE_NC_OPTIONS
 from utils import calcular_codificacao_cra, obter_proximo_numero_sequencial_cra
+from services.image_service import extrair_data_original_foto
 
 
 @st.dialog("Visualização Completa da Imagem", width="large", icon=":material/zoom_in:")
@@ -1103,7 +1104,8 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                         "Situação": last_nc.get("Situação", "Pendente"),
                         "Análise ARPE": "",
                         "is_relacionado": True,
-                        "grupo_relacao": ant_grp_id
+                        "grupo_relacao": ant_grp_id,
+                        "Data da Foto": extrair_data_original_foto(foto_para_salvar)
                     }
                     st.session_state.temp_nc.append(new_nc)
             else:
@@ -1133,7 +1135,8 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                     "Situação": last_nc.get("Situação", "Pendente"),
                     "Análise ARPE": "",
                     "is_relacionado": True,
-                    "grupo_relacao": ant_grp_id
+                    "grupo_relacao": ant_grp_id,
+                    "Data da Foto": extrair_data_original_foto(foto_para_salvar)
                 }
                 st.session_state.temp_nc.append(new_nc)
 

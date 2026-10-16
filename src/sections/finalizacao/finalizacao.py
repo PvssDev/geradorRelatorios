@@ -13,6 +13,7 @@ from utils import (
     fotos_tem_mesmas_ncs
 )
 from database.manager import carregar_responsaveis, carregar_coordenadores
+from services.image_service import extrair_data_original_foto
 
 def formatar_data_dd_mm_yyyy(data_val):
     if pd.isna(data_val) or not data_val:
@@ -98,7 +99,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
     
     # Compatibilidade com planilhas antigas
     df_fotos = df_fotos.copy()
-    for col in ["Pista", "Trecho", "Codificação", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação"]:
+    for col in ["Pista", "Trecho", "Codificação", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação", "Data da Foto"]:
         if col not in df_fotos.columns:
             df_fotos[col] = ""
         
@@ -228,10 +229,11 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_caption_right.paragraph_format.space_after = Pt(4)
                 
                 num_right = str(2 * idx + 2).zfill(2)
-                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
-                caption_right_text = f"Foto {num_right} – {obs_text}"
-                if not caption_right_text.endswith("."):
-                    caption_right_text += "."
+                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip().rstrip(".")
+                data_foto_r = rec.get("Data da Foto")
+                if not data_foto_r or data_foto_r == "xx/xx/xxxx":
+                    data_foto_r = extrair_data_original_foto(foto_path_right or foto_new)
+                caption_right_text = f"Foto {num_right} – {obs_text}, em {data_foto_r}." if obs_text else f"Foto {num_right}, em {data_foto_r}."
                 run_caption_right = p_caption_right.add_run(caption_right_text)
                 run_caption_right.font.name = 'Aptos'
                 run_caption_right.font.size = Pt(10)
@@ -404,12 +406,16 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 if num == "00" or num == "":
                     num_val = records.index(rec) + 1
                     num = str(num_val).zfill(2)
-                data_str = f", em {data_fisc}" if data_fisc else ""
+                data_foto = rec.get("Data da Foto")
+                if not data_foto or data_foto == "xx/xx/xxxx":
+                    data_foto = extrair_data_original_foto(foto_path or rec.get("Foto"))
+                data_str = f", em {data_foto}"
                 
-                trecho_txt = _formatar_trecho_caption(rec, tipo_relatorio, obs_text)
-                caption_text = f"Foto {num} – {trecho_txt}{obs_text}{data_str}."
+                obs_text_clean = str(obs_text).strip().rstrip(".")
+                trecho_txt = _formatar_trecho_caption(rec, tipo_relatorio, obs_text_clean)
+                caption_text = f"Foto {num} – {trecho_txt}{obs_text_clean}{data_str}."
                 if str(tipo_relatorio).upper() in ["CRC", "SOCICAM"] or not trecho_txt:
-                    caption_text = f"Foto {num} – {obs_text}{data_str}."
+                    caption_text = f"Foto {num} – {obs_text_clean}{data_str}."
                     
                 run_caption = p_caption.add_run(caption_text)
                 run_caption.font.name = 'Aptos'
@@ -483,10 +489,12 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     if num_l == "00" or num_l == "":
                         num_l_val = records.index(rec_left) + 1
                         num_l = str(num_l_val).zfill(2)
-                    obs_l = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip()
+                    obs_l = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip().rstrip(".")
+                    data_foto_l = rec_left.get("Data da Foto")
+                    if not data_foto_l or data_foto_l == "xx/xx/xxxx":
+                        data_foto_l = extrair_data_original_foto(f_path_left or rec_left.get("Foto"))
                     trecho_txt_l = _formatar_trecho_caption(rec_left, tipo_relatorio, obs_l, cod_custom=cod_custom_rel)
-                    data_txt = f", em {data_fisc}" if data_fisc else ""
-                    desc_text_l = f"Foto {num_l} – {trecho_txt_l}{obs_l}{data_txt}."
+                    desc_text_l = f"Foto {num_l} – {trecho_txt_l}{obs_l}, em {data_foto_l}."
                     run_l = p_desc_left.add_run(desc_text_l)
                     run_l.font.name = 'Aptos'
                     run_l.font.size = Pt(10)
@@ -500,9 +508,12 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         if num_r == "00" or num_r == "":
                             num_r_val = records.index(rec_right) + 1
                             num_r = str(num_r_val).zfill(2)
-                        obs_r = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip()
+                        obs_r = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip().rstrip(".")
+                        data_foto_r = rec_right.get("Data da Foto")
+                        if not data_foto_r or data_foto_r == "xx/xx/xxxx":
+                            data_foto_r = extrair_data_original_foto(f_path_right or rec_right.get("Foto"))
                         trecho_txt_r = _formatar_trecho_caption(rec_right, tipo_relatorio, obs_r, cod_custom=cod_custom_rel)
-                        desc_text_r = f"Foto {num_r} – {trecho_txt_r}{obs_r}{data_txt}."
+                        desc_text_r = f"Foto {num_r} – {trecho_txt_r}{obs_r}, em {data_foto_r}."
                         run_r = p_desc_right.add_run(desc_text_r)
                         run_r.font.name = 'Aptos'
                         run_r.font.size = Pt(10)

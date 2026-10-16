@@ -25,7 +25,8 @@ from services.image_service import (
     foto_anterior_ja_adicionada,
     obter_nomes_fotos_anteriores_concluidas,
     extrair_nome_foto,
-    verificar_foto_elegivel_relacionar
+    verificar_foto_elegivel_relacionar,
+    extrair_data_original_foto
 )
 from ui.state import inicializar_estado_sessao, obter_termos_ui
 from ui.modals import (
@@ -820,7 +821,8 @@ with st.container():
                                             "Fundamento da infração": "",
                                             "Determinação": pos_crc,
                                             "Situação": situacao,
-                                            "Análise ARPE": analise_arpe
+                                            "Análise ARPE": analise_arpe,
+                                            "Data da Foto": extrair_data_original_foto(foto_default)
                                         }
                                         st.session_state.temp_nc.append(rec)
                                         st.session_state.relatorios_preenchimento_data = []
@@ -893,7 +895,8 @@ with st.container():
                                         "Fundamento da infração": fundamento_infracao,
                                         "Determinação": determinacao,
                                         "Situação": situacao,
-                                        "Análise ARPE": analise_arpe
+                                        "Análise ARPE": analise_arpe,
+                                        "Data da Foto": extrair_data_original_foto(st.session_state.step1_foto_default)
                                     }
                                     st.session_state.temp_nc.append(rec)
 
@@ -1139,7 +1142,8 @@ with st.container():
                                             "Situação": situacao,
                                             "Análise ARPE": "",
                                             "is_relacionado": False,
-                                            "grupo_relacao": grp_id
+                                            "grupo_relacao": grp_id,
+                                            "Data da Foto": extrair_data_original_foto(foto_default)
                                         }
                                         st.session_state.temp_nc.append(rec)
                                 else:
@@ -1170,7 +1174,8 @@ with st.container():
                                         "Situação": situacao,
                                         "Análise ARPE": "",
                                         "is_relacionado": False,
-                                        "grupo_relacao": f"grp_{id_vinculo}_{novo_nc_num}_{st.session_state.nc_form_counter}"
+                                        "grupo_relacao": f"grp_{id_vinculo}_{novo_nc_num}_{st.session_state.nc_form_counter}",
+                                        "Data da Foto": extrair_data_original_foto(foto_default)
                                     }
                                     st.session_state.temp_nc.append(rec)
 
