@@ -15,18 +15,29 @@ from services.image_service import extrair_data_original_foto
 
 @st.dialog("Visualização Completa da Imagem", width="large", icon=":material/zoom_in:")
 def mostrar_foto_modal(uploaded_file):
-    if hasattr(uploaded_file, "seek"):
-        try:
-            uploaded_file.seek(0)
-        except Exception:
-            pass
-    caption = getattr(uploaded_file, "name", str(uploaded_file))
-    st.image(uploaded_file, caption=caption, use_container_width=True)
+    from services.image_service import obter_foto_base64
+    import os
+    caption = getattr(uploaded_file, "name", None)
+    if not caption and isinstance(uploaded_file, str):
+        caption = os.path.basename(uploaded_file)
+    if not caption:
+        caption = "Visualização da Imagem"
+
+    b64_src = obter_foto_base64(uploaded_file, max_size=(1600, 1200))
+    if b64_src:
+        st.html(
+            f'<div style="text-align: center; margin: 4px 0;">'
+            f'<img src="{b64_src}" style="max-width: 100%; max-height: 75vh; border-radius: 8px; object-fit: contain; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: inline-block;" alt="{caption}" />'
+            f'<p style="color: #64748b; font-size: 13.5px; margin-top: 10px; font-weight: 500;">{caption}</p>'
+            f'</div>'
+        )
+    else:
+        st.info(f"Imagem indisponível: {caption}")
 
 
 @st.dialog("Galeria de Fotos do Levantamento", width="large", icon=":material/photo_library:")
 def galeria_fotos_modal(fotos=None, target_index_key="carousel_index"):
-    from services.image_service import obter_foto_preview, obter_nomes_fotos_em_nc, foto_esta_em_nc
+    from services.image_service import obter_foto_base64, obter_nomes_fotos_em_nc, foto_esta_em_nc
     import os
     
     if fotos is None:
@@ -71,8 +82,11 @@ def galeria_fotos_modal(fotos=None, target_index_key="carousel_index"):
                         card_key = f"gal_card_{orig_idx}"
 
                     with st.container(key=card_key):
-                        thumb = obter_foto_preview(photo, max_size=(220, 165))
-                        st.image(thumb, use_container_width=True)
+                        b64_src = obter_foto_base64(photo, max_size=(220, 165))
+                        if b64_src:
+                            st.html(f'<img src="{b64_src}" style="width: 100%; height: auto; border-radius: 6px; display: block;" alt="Foto {orig_idx + 1}" />')
+                        else:
+                            st.info("Imagem indisponível")
                         
                         nome = getattr(photo, "name", None)
                         if not nome and isinstance(photo, str):
@@ -100,7 +114,7 @@ def galeria_fotos_modal(fotos=None, target_index_key="carousel_index"):
 
 @st.dialog("Atenção: Foto já utilizada", width="small")
 def alerta_foto_duplicada_modal(foto_name, acao_nome, fill_photos):
-    from services.image_service import obter_foto_preview
+    from services.image_service import obter_foto_base64
     
     st.markdown(
         "<div style='text-align: center; color: #ef4444; font-size: 48px;'>"
@@ -115,9 +129,9 @@ def alerta_foto_duplicada_modal(foto_name, acao_nome, fill_photos):
     
     photo_obj = next((p for p in fill_photos if getattr(p, "name", "") == foto_name or p == foto_name), None)
     if photo_obj:
-        thumb = obter_foto_preview(photo_obj, max_size=(320, 240))
-        if thumb:
-            st.image(thumb, use_container_width=True)
+        b64_src = obter_foto_base64(photo_obj, max_size=(320, 240))
+        if b64_src:
+            st.html(f'<div style="text-align: center; margin: 8px 0;"><img src="{b64_src}" style="max-width: 100%; height: auto; border-radius: 8px; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.12);" alt="{foto_name}" /></div>')
     
     st.write("")
     col1, col2 = st.columns(2)
@@ -869,7 +883,7 @@ def alerta_codificacao_obrigatoria_modal():
 
 @st.dialog("Relacionar Foto ao Registro Anterior", width="large")
 def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_data=""):
-    from services.image_service import obter_foto_preview, extrair_nome_foto
+    from services.image_service import obter_foto_base64, extrair_nome_foto
 
     st.markdown(
         "<div style='font-size: 14.5px; color: #334155; margin-bottom: 14px; line-height: 1.45;'>"
@@ -938,12 +952,9 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
             unsafe_allow_html=True
         )
         with st.container(border=True):
-            thumb_ant = obter_foto_preview(ant_foto, max_size=(380, 260))
-            if thumb_ant:
-                try:
-                    st.image(thumb_ant, use_container_width=True)
-                except Exception:
-                    st.info(f"Foto: {ant_nome}")
+            b64_ant = obter_foto_base64(ant_foto, max_size=(380, 260))
+            if b64_ant:
+                st.html(f'<img src="{b64_ant}" style="width: 100%; height: auto; border-radius: 6px; display: block;" alt="{ant_nome}" />')
             else:
                 st.info(f"Foto: {ant_nome}")
 
@@ -979,12 +990,9 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
             unsafe_allow_html=True
         )
         with st.container(border=True):
-            thumb_nova = obter_foto_preview(foto_atual, max_size=(380, 260))
-            if thumb_nova:
-                try:
-                    st.image(thumb_nova, use_container_width=True)
-                except Exception:
-                    st.info(f"Foto: {atual_nome}")
+            b64_nova = obter_foto_base64(foto_atual, max_size=(380, 260))
+            if b64_nova:
+                st.html(f'<img src="{b64_nova}" style="width: 100%; height: auto; border-radius: 6px; display: block;" alt="{atual_nome}" />')
             else:
                 st.info(f"Foto: {atual_nome}")
 

@@ -2,7 +2,7 @@ import os
 import base64
 import streamlit as st
 import streamlit.components.v1 as components
-from services.image_service import obter_foto_preview
+from services.image_service import obter_foto_base64
 
 _COMPONENT_DIR = os.path.dirname(os.path.abspath(__file__))
 _swiper_component = components.declare_component("swiper_carousel", path=_COMPONENT_DIR)
@@ -14,18 +14,7 @@ def _obter_foto_src_cached(f_key: str, _photo_source) -> str:
     Gera e armazena em cache o Data URL Base64 da miniatura.
     Executa a compressão/redimensionamento apenas uma vez por foto.
     """
-    thumb_bytes = obter_foto_preview(_photo_source, max_size=(420, 290))
-    if isinstance(thumb_bytes, bytes) and len(thumb_bytes) > 0:
-        b64 = base64.b64encode(thumb_bytes).decode("ascii")
-        return f"data:image/jpeg;base64,{b64}"
-    elif isinstance(thumb_bytes, str) and os.path.exists(thumb_bytes):
-        try:
-            with open(thumb_bytes, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode("ascii")
-                return f"data:image/jpeg;base64,{b64}"
-        except Exception:
-            return ""
-    return ""
+    return obter_foto_base64(_photo_source, max_size=(420, 290))
 
 
 def _obter_payload_fotos(photos: list, nomes_em_nc_dict: dict, carousel_type: str) -> list:
