@@ -19,6 +19,7 @@ from services.data_service import (
 )
 from services.image_service import (
     obter_foto_preview,
+    obter_foto_base64,
     obter_nomes_fotos_em_nc,
     foto_esta_em_nc,
     chave_ordenacao_natural,
@@ -621,8 +622,10 @@ with st.container():
                     if st.session_state.fill_photos:
                         idx_single = min(st.session_state.carousel_index, len(st.session_state.fill_photos) - 1)
                         current_photo = st.session_state.fill_photos[idx_single]
-                        preview_image = obter_foto_preview(current_photo, max_size=(400, 300))
-                        st.image(preview_image, caption=f"Foto {idx_single + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}")
+                        b64_single = obter_foto_base64(current_photo, max_size=(400, 300))
+                        if b64_single:
+                            st.html(f'<img src="{b64_single}" style="width: 100%; max-width: 480px; height: auto; border-radius: 8px; display: block; margin: 0 auto;" alt="{current_photo.name}" />')
+                        st.caption(f"Foto {idx_single + 1} de {len(st.session_state.fill_photos)}: {current_photo.name}")
                         foto_default = current_photo.name
                     else:
                         foto_default = ""

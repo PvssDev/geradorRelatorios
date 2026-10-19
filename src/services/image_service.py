@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 import io
 import os
 import re
@@ -116,6 +117,22 @@ def resolver_objeto_foto(photo_source):
         if os.path.basename(p_name).strip().lower() == nome_alvo:
             return p
 
+    # Procura em old_photos_to_match (fotos do monitoramento anterior)
+    old_match = st.session_state.get("old_photos_to_match", [])
+    for item in old_match:
+        p_path = item.get("old_photo_path")
+        if p_path:
+            p_base = os.path.basename(p_path).strip().lower()
+            id_nc = str(item.get("id_nc", "")).strip().lower()
+            if p_base == nome_alvo or id_nc == nome_alvo:
+                if os.path.exists(p_path):
+                    return p_path
+
+    # Normalização de caminhos Windows / Linux
+    clean_path = photo_source.replace("\\", os.sep).replace("/", os.sep)
+    if os.path.exists(clean_path):
+        return clean_path
+
     return None
 
 
@@ -159,6 +176,42 @@ def obter_foto_preview(photo_source, max_size=(400, 300)):
     if isinstance(source_resolved, str) and os.path.exists(source_resolved):
         return source_resolved
     return None
+
+
+def obter_foto_base64(photo_source, max_size=(400, 300)) -> str:
+    """
+    Retorna uma Data URL Base64 pronta ('data:image/jpeg;base64,...') para exibição direta
+    em tags HTML (<img src="...">) ou componentes web.
+    Elimina 100% das requisições HTTP ao endpoint virtual de mídia do Streamlit (/_stcore/media/),
+    prevenindo erros de 'Client Error: Image source error' (404) no Streamlit Cloud.
+    """
+    if photo_source is None:
+        return ""
+
+    thumb = obter_foto_preview(photo_source, max_size=max_size)
+    if isinstance(thumb, bytes) and len(thumb) > 0:
+        b64 = base64.b64encode(thumb).decode("ascii")
+        return f"data:image/jpeg;base64,{b64}"
+    elif isinstance(thumb, str) and os.path.exists(thumb):
+        try:
+            with open(thumb, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+                return f"data:image/jpeg;base64,{b64}"
+        except Exception:
+            return ""
+    elif hasattr(thumb, "read"):
+        try:
+            if hasattr(thumb, "seek"):
+                thumb.seek(0)
+            raw = thumb.read()
+            if hasattr(thumb, "seek"):
+                thumb.seek(0)
+            if raw:
+                b64 = base64.b64encode(raw).decode("ascii")
+                return f"data:image/jpeg;base64,{b64}"
+        except Exception:
+            return ""
+    return ""
 
 
 def extrair_nome_foto(photo_source) -> str:
