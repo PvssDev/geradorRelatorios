@@ -229,7 +229,7 @@ def gerar_relatorio(
         # Geração das Seções
         if planilha_elegibilidade:
             report_config.planilha_elegibilidade = planilha_elegibilidade
-        gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df, documento_anterior=documento_anterior, planilha_elegibilidade=planilha_elegibilidade)
+        gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df, documento_anterior=documento_anterior)
         gerar_secao_quadros(doc, row, nc_df, report_config)
         gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR, report_config=report_config)
 

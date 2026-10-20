@@ -278,13 +278,13 @@ class CraReport(BaseReport):
         ]
         return ("5. FISCALIZAÇÃO", [p1_runs, p2_runs])
 
-    def render_post_metodologia_extra_content(self, doc, row, planilha_elegibilidade=None) -> None:
+    def render_post_metodologia_extra_content(self, doc, row, planilha_elegibilidade=None, *args, **kwargs) -> None:
         """
         Renderiza o Quadro 1 – Demonstrativo da Elegibilidade do Trecho Fiscalizado para Indicação de NC
         a partir da planilha de elegibilidade inserida pelo usuário. Se nenhuma planilha for fornecida,
         o quadro fixo não é mais gerado (quadro mutável).
         """
-        planilha = planilha_elegibilidade or getattr(self, "planilha_elegibilidade", None)
+        planilha = planilha_elegibilidade or kwargs.get("planilha_elegibilidade") or getattr(self, "planilha_elegibilidade", None)
         if not planilha:
             return
 
