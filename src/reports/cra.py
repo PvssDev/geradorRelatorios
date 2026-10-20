@@ -278,139 +278,24 @@ class CraReport(BaseReport):
         ]
         return ("5. FISCALIZAÇÃO", [p1_runs, p2_runs])
 
-    def render_post_metodologia_extra_content(self, doc, row) -> None:
-        """Renderiza o Quadro 1 – Demonstrativo da Elegibilidade do Trecho Fiscalizado para Indicação de NC."""
-        from docx.shared import Inches, Pt
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.enum.table import WD_TABLE_ALIGNMENT
-        from docx.oxml import parse_xml
-        from docx.oxml.ns import nsdecls
+    def render_post_metodologia_extra_content(self, doc, row, planilha_elegibilidade=None) -> None:
+        """
+        Renderiza o Quadro 1 – Demonstrativo da Elegibilidade do Trecho Fiscalizado para Indicação de NC
+        a partir da planilha de elegibilidade inserida pelo usuário. Se nenhuma planilha for fornecida,
+        o quadro fixo não é mais gerado (quadro mutável).
+        """
+        planilha = planilha_elegibilidade or getattr(self, "planilha_elegibilidade", None)
+        if not planilha:
+            return
 
-        # Título do Quadro 1
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.paragraph_format.space_before = Pt(12)
-        p.paragraph_format.space_after = Pt(6)
-        
-        r1 = p.add_run("Quadro 1")
-        r1.bold = True
-        r1.font.name = 'Aptos'
-        r1.font.size = Pt(11)
-        
-        r2 = p.add_run(" – Demonstrativo da Elegibilidade do Trecho Fiscalizado para Indicação de NC")
-        r2.font.name = 'Aptos'
-        r2.font.size = Pt(11)
-
-        # Dados da tabela
-        dados_tabela = [
-            ("PE - 009, PISTA SENTIDO SUL (CRESCENTE)", [
-                ("29,08 - 29,14", "ST 6.02", "49,29\n(página 285)", "FD 4,16\n(página 125)"),
-                ("33,88-33,90", "ST 6.06", "47,02\n(página 296)", "FD 3,58\n(página 125)"),
-                ("34,00-34,02", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
-                ("34,28-34,40", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
-                ("34,52-34,56", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
-                ("34,66-34,68", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
-                ("34,72-34,74", "ST 6.07", "44,60\n(página 297)", "FD 3,21\n(página 125)"),
-                ("36,02-36,13", "ST 4.01", "71,00\n(página 223)", "FE 3,92\n(página 125)"),
-                ("36,18-36,32", "ST 4.01", "71,00\n(página 223)", "FE 3,92\n(página 125)"),
-                ("36,94-36,98", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
-                ("37,00-37,10", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
-                ("37,10-37,12", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
-                ("37,38-37,38", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
-                ("37,54-37,58", "ST 4.02", "61,68\n(página 225)", "FE 4,30\n(página 125)"),
-                ("37,62-37,66", "ST 4.03", "51,64\n(página 227)", "FD 3,22\n(página 125)"),
-                ("38,32+38,32", "ST 4.03", "51,64\n(página 227)", "FD 3,22\n(página 125)"),
-                ("41,16-41,22", "ST 3.01", "42,34\n(página 204)", "FD 3,00\n(página 125)"),
-                ("41,84-41,88", "ST 3.02", "45,60\n(página 206)", "FD 2,88\n(página 125)"),
-            ]),
-            ("PE - 009, PISTA SENTIDO NORTE (DECRESCENTE)", [
-                ("40,16-40,60", "ST 4.06", "70,36\n(página 233)", "FD 3,74\n(página 125)"),
-                ("39,94-39,90", "ST 4.06", "70,36\n(página 233)", "FD 3,74\n(página 125)"),
-            ]),
-            ("VPE – 034, PISTA SENTIDO SUL (CRESCENTE)", [
-                ("00,06-00,36", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
-                ("00,45-00,48\n(ROTATÓRIA)", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
-                ("00,52-00,56", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
-                ("00,58-00,62", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
-                ("00,68-00,86", "ST 5.01", "58,46\n(página 250)", "FE 4,32\n(página 125)"),
-                ("01,56-01,58", "ST 5.02", "35,91\n(página 252)", "FE 4,86\n(página 125)"),
-                ("01,76-01,78", "ST 5.02", "35,91\n(página 252)", "FE 4,86\n(página 125)"),
-                ("02,04-02,12", "ST 5.03", "35,36\n(página 254)", "FD 4,23\n(página 125)"),
-            ]),
-            ("VPE - 034, PISTA SENTIDO NORTE (DECRESCENTE)", [
-                ("02,78-02,72", "ST 5.11", "60,89\n(página 271)", "FE 4,23\n(página 125)"),
-                ("02,16-02,08", "ST 5.11", "60,89\n(página 271)", "FE 4,23\n(página 125)"),
-            ])
-        ]
-
-        total_rows = 1 + sum(1 + len(items) for _, items in dados_tabela)
-        table = doc.add_table(rows=total_rows, cols=4)
-        table.style = 'Table Grid'
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-
-        # Cabeçalho Principal (Linha 0)
-        headers = [
-            "TRECHO ELEGÍVEL\n(KMinicial-KMfinal)",
-            "SUBTRECHO",
-            "IGG\n(Relatório Anual 01/2025)",
-            "IRI\n(Relatório Anual 01/2025)"
-        ]
-        hdr_row = table.rows[0]
-        for c_idx, text in enumerate(headers):
-            cell = hdr_row.cells[c_idx]
-            cell.text = text
-            shd = parse_xml(r'<w:shd {} w:fill="DDDDDD"/>'.format(nsdecls('w')))
-            cell._tc.get_or_add_tcPr().append(shd)
-            for p_cell in cell.paragraphs:
-                p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in p_cell.runs:
-                    run.font.name = 'Aptos'
-                    run.font.size = Pt(10)
-                    run.bold = True
-
-        # Preenchimento das seções e dados
-        curr_row = 1
-        for track_title, items in dados_tabela:
-            # Linha de Sentido da Pista (mesclada nas 4 colunas)
-            row_track = table.rows[curr_row]
-            a = row_track.cells[0]
-            b = row_track.cells[3]
-            merged_cell = a.merge(b)
-            merged_cell.text = track_title
-            shd_track = parse_xml(r'<w:shd {} w:fill="FFFFCC"/>'.format(nsdecls('w')))
-            merged_cell._tc.get_or_add_tcPr().append(shd_track)
-            for p_cell in merged_cell.paragraphs:
-                p_cell.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                for run in p_cell.runs:
-                    run.font.name = 'Aptos'
-                    run.font.size = Pt(10)
-                    run.bold = False
-            curr_row += 1
-
-            # Linhas de Dados
-            for col0, col1, col2, col3 in items:
-                row_data = table.rows[curr_row]
-                row_data.cells[0].text = col0
-                row_data.cells[1].text = col1
-                row_data.cells[2].text = col2
-                row_data.cells[3].text = col3
-                for cell in row_data.cells:
-                    for p_cell in cell.paragraphs:
-                        p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        for run in p_cell.runs:
-                            run.font.name = 'Aptos'
-                            run.font.size = Pt(10)
-                            run.bold = False
-                curr_row += 1
-
-        # Largura das colunas
-        col_widths = [Inches(1.8), Inches(1.1), Inches(1.9), Inches(1.9)]
-        for row_t in table.rows:
-            for idx, width in enumerate(col_widths):
-                if idx < len(row_t.cells):
-                    row_t.cells[idx].width = width
-
-        doc.add_paragraph()
+        try:
+            from services.elegibilidade_service import extrair_dados_elegibilidade, renderizar_quadro_elegibilidade
+            dados = extrair_dados_elegibilidade(planilha)
+            if dados and dados.get("sections"):
+                renderizar_quadro_elegibilidade(doc, dados)
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao renderizar Quadro 1 de Elegibilidade: {e}")
 
     def render_quadros(self, doc, row, nc_df, criar_tabela_quadros_fn) -> None:
         from utils import formatar_mes_ano

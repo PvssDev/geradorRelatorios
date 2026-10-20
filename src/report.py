@@ -83,8 +83,12 @@ def gerar_relatorio(
     gerar_todos=False,
     tipo_relatorio="CRA",
     documento_anterior=None,
+    planilha_elegibilidade=None,
+    **kwargs
 ):
     """Gera o relatório completo com base nos dados da fiscalização."""
+    if not planilha_elegibilidade and "planilha_elegibilidade" in kwargs:
+        planilha_elegibilidade = kwargs["planilha_elegibilidade"]
 
     BASE_DIR, FOTOS_DIR, RELATORIOS_DIR = _obter_caminhos_base(fotos_dir, relatorios_dir)
     
@@ -223,7 +227,9 @@ def gerar_relatorio(
         gerar_capa_primeira_pagina(doc, logo_capa_path, row, report_config, documento_anterior=documento_anterior)
 
         # Geração das Seções
-        gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df, documento_anterior=documento_anterior)
+        if planilha_elegibilidade:
+            report_config.planilha_elegibilidade = planilha_elegibilidade
+        gerar_secao_introducao(doc, row, total_achados, report_config, nc_df=nc_df, documento_anterior=documento_anterior, planilha_elegibilidade=planilha_elegibilidade)
         gerar_secao_quadros(doc, row, nc_df, report_config)
         gerar_secao_finalizacao(doc, row, total_achados, nc_df=nc_df, fotos_dir=FOTOS_DIR, report_config=report_config)
 

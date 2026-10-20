@@ -325,6 +325,21 @@ with st.container():
                 key=f"mon_anterior_uploader_{st.session_state.mon_uploader_version}"
             )
 
+        uploaded_planilha_elegibilidade = None
+        if st.session_state.get("tipo_relatorio", "CRA") == "CRA" and not is_monitoring:
+            if "planilha_elegibilidade_version" not in st.session_state:
+                st.session_state.planilha_elegibilidade_version = 0
+            uploaded_planilha_elegibilidade = st.file_uploader(
+                "Planilha de Demonstrativo de Elegibilidade (Quadro 1)",
+                type=["xlsx", "xls"],
+                help="Upload da planilha de Demonstrativo da Elegibilidade (.xlsx) para geração do Quadro 1",
+                key=f"planilha_elegibilidade_uploader_{st.session_state.planilha_elegibilidade_version}"
+            )
+            if uploaded_planilha_elegibilidade:
+                st.session_state.uploaded_planilha_elegibilidade = uploaded_planilha_elegibilidade
+            elif "uploaded_planilha_elegibilidade" in st.session_state:
+                st.session_state.uploaded_planilha_elegibilidade = None
+
         if "old_photos_to_match" not in st.session_state:
             st.session_state.old_photos_to_match = []
 
@@ -1620,13 +1635,18 @@ with st.container():
                                 st.toast("Por favor, faça o upload do arquivo do monitoramento anterior (.docx) para gerar o relatório CRC Monitoramento.", icon=":material/error:")
                                 st.stop()
 
-                            arquivos_gerados, _ = gerar_relatorio(
+                            planilha_eleg_input = uploaded_planilha_elegibilidade or st.session_state.get("uploaded_planilha_elegibilidade")
+                            import importlib
+                            import report
+                            importlib.reload(report)
+                            arquivos_gerados, _ = report.gerar_relatorio(
                                 caminho_planilha=excel_buffer,
                                 fotos_dir=fotos_dir,
                                 relatorios_dir=reports_dir,
                                 gerar_todos=True,
                                 tipo_relatorio=tipo_key,
-                                documento_anterior=uploaded_mon_anterior
+                                documento_anterior=uploaded_mon_anterior,
+                                planilha_elegibilidade=planilha_eleg_input
                             )
 
                             if not arquivos_gerados:
