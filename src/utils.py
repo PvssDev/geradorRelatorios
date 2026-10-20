@@ -419,4 +419,200 @@ def fotos_tem_mesmas_ncs(related_records: list) -> bool:
     return True
 
 
+def carregar_mapa_siglas_completo() -> dict:
+    """
+    Carrega o mapa consolidado de siglas e descrições técnicas,
+    mesclando MAP_SIGLAS com os cadastros personalizados de custom_ncs.json
+    e custom_ncs_socicam.json.
+    """
+    try:
+        from sections.quadros.quadros import MAP_SIGLAS
+        local_map = MAP_SIGLAS.copy()
+    except Exception:
+        local_map = {
+            "FI": "Fissuras",
+            "TTC": "Trincas isoladas transversais curtas",
+            "TTL": "Trincas isoladas transversais longas",
+            "TLC": "Trincas isoladas longitudinais curtas",
+            "TLL": "Trincas isoladas longitudinais longas",
+            "J": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+            "JE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
+            "TRR": "Trincas isoladas no revestimento devido à retração térmica ou dissecação da base (solo-cimento) ou do revestimento",
+            "TB": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+            "TBE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
+            "ALP": "Afundamento local plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
+            "ATP": "Afundamento da trilha plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
+            "ALC": "Afundamento local de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
+            "ATC": "Afundamento da trilha de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
+            "O": "Ondulação/Corrugação, caracterizada por ondulações transversais causadas por instabilidade da mistura betuminosa constituinte do revestimento ou da base",
+            "E": "Escorregamento do revestimento betuminoso",
+            "EX": "Exsudação do ligante betuminoso no revestimento",
+            "D": "Desgaste acentuado na superfície do revestimento",
+            "P": "buracos decorrentes da desagregação do revestimento e às vezes de camadas inferiores",
+            "R": "Remendo"
+        }
+
+    try:
+        import os
+        import json
+        quadros_dir = os.path.dirname(os.path.abspath(__file__))
+        for fname in ["custom_ncs.json", "custom_ncs_socicam.json"]:
+            c_path = os.path.abspath(os.path.join(quadros_dir, "database", fname))
+            if not os.path.exists(c_path):
+                c_path = os.path.abspath(os.path.join(quadros_dir, "..", "database", fname))
+            if os.path.exists(c_path):
+                with open(c_path, "r", encoding="utf-8") as f:
+                    custom_list = json.load(f)
+                    for item in custom_list:
+                        s = item.get("sigla", "")
+                        d = item.get("descricao", "")
+                        if s and d:
+                            local_map[s] = d
+    except Exception:
+        pass
+
+    return local_map
+
+
+def converter_faixa_para_sigla(faixa: str | None) -> str:
+    """
+    Converte a descrição da faixa para sua respectiva sigla oficial:
+    - Faixa da Esquerda / Esquerda -> FE
+    - Faixa da Direita / Direita -> FD
+    - Faixa Esquerda e Direita / Esquerda e Direita / Ambas / FED -> FED
+    """
+    if not faixa:
+        return ""
+    texto = str(faixa).strip()
+    if not texto or texto.lower() in ("none", "nan", "null", "-", "não informado"):
+        return ""
+
+    u = texto.upper()
+    if u.startswith("NA "):
+        u = u[3:].strip()
+    elif u.startswith("NO "):
+        u = u[3:].strip()
+
+    if u in ("FE", "FD", "FED"):
+        return u
+
+    tem_esq = ("ESQ" in u) or ("FE" in u.split()) or (u == "E")
+    tem_dir = ("DIR" in u) or ("FD" in u.split()) or (u == "D")
+
+    if (tem_esq and tem_dir) or "FED" in u or "AMBAS" in u:
+        return "FED"
+    if tem_esq:
+        return "FE"
+    if tem_dir:
+        return "FD"
+
+    return u
+
+
+def combinar_faixas_relacionadas(faixa1: str | None, faixa2: str | None) -> str:
+    """
+    Combina as faixas de fotos que se juntam:
+    - Se uma for Esquerda (FE) e a outra Direita (FD), o resultado é 'FED'.
+    - Se ambas forem Esquerda, o resultado é 'FE'.
+    - Se ambas forem Direita, o resultado é 'FD'.
+    - Se qualquer uma já for 'FED', o resultado é 'FED'.
+    """
+    s1 = converter_faixa_para_sigla(faixa1)
+    s2 = converter_faixa_para_sigla(faixa2)
+
+    if not s1 and not s2:
+        return ""
+    if not s1:
+        return s2
+    if not s2:
+        return s1
+
+    if s1 == "FED" or s2 == "FED":
+        return "FED"
+
+    if (s1 == "FE" and s2 == "FD") or (s1 == "FD" and s2 == "FE"):
+        return "FED"
+
+    if s1 == s2:
+        return s1
+
+    tem_esq = s1 in ("FE", "FED") or s2 in ("FE", "FED")
+    tem_dir = s1 in ("FD", "FED") or s2 in ("FD", "FED")
+    if tem_esq and tem_dir:
+        return "FED"
+
+    return s1 or s2
+
+
+def formatar_legenda_foto(
+    num: int | str,
+    codificacao: str,
+    siglas_ou_ncs: list | str,
+    faixa: str,
+    data_foto: str
+) -> str:
+    """
+    Formata a legenda da foto seguindo o padrão oficial:
+    foto 01 - (codificação). (descrição das não conformidades) na (sigla da faixa (FE/FD/FED)). (DATA do metadado)
+    """
+    # 1. Prefixo da foto (ex: 'foto 01 - ')
+    try:
+        num_clean = str(num).strip()
+        num_int = int(num_clean)
+        num_str = f"{num_int:02d}"
+    except Exception:
+        num_str = str(num).strip().zfill(2) if str(num).strip() else "01"
+    prefixo = f"foto {num_str} - "
+
+    # 2. Codificação (ex: 'CRA.ST601.2790-2794/2026.001. ')
+    cod_clean = str(codificacao or "").strip().rstrip(".")
+    cod_part = f"{cod_clean}. " if cod_clean else ""
+
+    # 3. Descrições das Não Conformidades (ex: 'desc1 e desc2' ou 'desc1, desc2 e desc3')
+    if isinstance(siglas_ou_ncs, str):
+        siglas_lista = [s.strip() for s in siglas_ou_ncs.split(",") if s.strip()]
+    elif isinstance(siglas_ou_ncs, (list, tuple, set)):
+        siglas_lista = [str(s).strip() for s in siglas_ou_ncs if str(s).strip()]
+    else:
+        siglas_lista = []
+
+    mapa = carregar_mapa_siglas_completo()
+    descs = []
+    for s in siglas_lista:
+        d = mapa.get(s, s).strip().rstrip(".")
+        if d and d not in descs:
+            descs.append(d)
+
+    if not descs:
+        desc_part = ""
+    elif len(descs) == 1:
+        desc_part = descs[0]
+    elif len(descs) == 2:
+        desc_part = f"{descs[0]} e {descs[1]}"
+    else:
+        desc_part = f"{', '.join(descs[:-1])} e {descs[-1]}"
+
+    # 4. Faixa em siglas (ex: ' na FE', ' na FD', ' na FED')
+    sigla_faixa = converter_faixa_para_sigla(faixa)
+    if not sigla_faixa:
+        faixa_part = ""
+    else:
+        faixa_part = f" na {sigla_faixa}"
+
+    # 5. Data do metadado (ex: '. (14/10/2026)')
+    corpo_legenda = f"{cod_part}{desc_part}{faixa_part}".strip().rstrip(".")
+    data_clean = str(data_foto or "").strip().strip("()")
+    if data_clean and data_clean.lower() not in ("none", "nan", ""):
+        if corpo_legenda:
+            corpo = f"{corpo_legenda}. ({data_clean})"
+        else:
+            corpo = f"({data_clean})"
+    else:
+        corpo = f"{corpo_legenda}." if corpo_legenda else ""
+
+    return f"{prefixo}{corpo}"
+
+
+
+
 

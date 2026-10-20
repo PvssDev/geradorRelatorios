@@ -45,7 +45,14 @@ from ui.modals import (
     relacionar_foto_modal
 )
 from sections.quadros.quadros import MAP_SIGLAS, expandir_siglas
-from utils import calcular_codificacao_cra, extrair_ano, obter_proximo_numero_sequencial_cra
+from utils import (
+    calcular_codificacao_cra,
+    extrair_ano,
+    obter_proximo_numero_sequencial_cra,
+    formatar_legenda_foto,
+    converter_faixa_para_sigla,
+    combinar_faixas_relacionadas
+)
 from ui.components.swiper import render_swiper_carousel
 
 st.set_page_config(page_title="Gerador de Relatórios", layout="wide")
@@ -865,7 +872,16 @@ with st.container():
                 else:
                     identificacao = st.session_state.get("step1_identificacao", "")
                     if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
-                        direcao_faixa = st.text_input("Direção (faixa)", key=f"nc_dir_{st.session_state.nc_form_counter}", placeholder="Direção/faixa...")
+                        faixa_salva_step2 = st.session_state.get("faixa_persistida", "Direita")
+                        sigla_f2 = converter_faixa_para_sigla(faixa_salva_step2)
+                        opts_f2 = ["Direita", "Esquerda"]
+                        idx_f2 = 1 if sigla_f2 == "FE" else 0
+                        direcao_faixa = st.selectbox(
+                            "Direção (faixa)",
+                            options=opts_f2,
+                            index=idx_f2,
+                            key=f"nc_dir_{st.session_state.nc_form_counter}"
+                        )
                     else:
                         direcao_faixa = ""
                     fundamento_infracao = st.text_input("Fundamento da infração", key=f"nc_fund_{st.session_state.nc_form_counter}", placeholder="Fundamento legal...")
@@ -984,11 +1000,16 @@ with st.container():
 
                     col_f3, col_f4 = st.columns(2)
                     with col_f3:
-                        direcao_faixa = st.text_input(
+                        faixa_salva = st.session_state.get("faixa_persistida", "Direita")
+                        sigla_faixa_salva = converter_faixa_para_sigla(faixa_salva)
+                        opts_faixa = ["Direita", "Esquerda"]
+                        idx_faixa = 1 if sigla_faixa_salva == "FE" else 0
+
+                        direcao_faixa = st.selectbox(
                             "Direção (faixa)",
-                            value=st.session_state.get("faixa_persistida", ""),
-                            key=f"nc_dir_{st.session_state.nc_form_counter}",
-                            placeholder="Direção/faixa..."
+                            options=opts_faixa,
+                            index=idx_faixa,
+                            key=f"nc_dir_{st.session_state.nc_form_counter}"
                         )
                     with col_f4:
                         pista = st.text_input(
@@ -1084,6 +1105,21 @@ with st.container():
                         )
                         cod_preview = codificacao.strip() if "/" in codificacao.strip() else calcular_codificacao_cra(codificacao, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview)
                         st.caption(f":material/tag: Código gerado para este item: **{cod_preview}**")
+
+                        if st.session_state.fill_photos:
+                            idx_curr = min(max(0, st.session_state.get("carousel_index", 0)), len(st.session_state.fill_photos) - 1)
+                            foto_num_preview = idx_curr + 1
+                        else:
+                            foto_num_preview = 1
+                        data_foto_preview = extrair_data_original_foto(foto_default)
+                        legenda_preview = formatar_legenda_foto(
+                            num=foto_num_preview,
+                            codificacao=cod_preview,
+                            siglas_ou_ncs=siglas_ativas,
+                            faixa=direcao_faixa,
+                            data_foto=data_foto_preview
+                        )
+                        st.caption(f":material/subtitles: **Legenda:** {legenda_preview}")
                     
                     trecho = codificacao
 
@@ -1117,6 +1153,27 @@ with st.container():
                                     
                                     grp_id = f"grp_{id_vinculo}_{foto_num}_{st.session_state.nc_form_counter}"
                                     cod_input = codificacao.strip()
+                                    data_foto_val = extrair_data_original_foto(foto_default)
+
+                                    seq_idx_primeira = obter_proximo_numero_sequencial_cra(
+                                        st.session_state.temp_nc,
+                                        id_vinculo=id_vinculo,
+                                        tipo_registro=tipo_registro
+                                    )
+                                    if not cod_input:
+                                        cod_legenda = ""
+                                    elif "/" in cod_input and len(siglas_ativas) == 1:
+                                        cod_legenda = cod_input
+                                    else:
+                                        cod_legenda = calcular_codificacao_cra(cod_input, data_fisc=data_fisc_vinculo, seq_idx=seq_idx_primeira)
+
+                                    legenda_completa = formatar_legenda_foto(
+                                        num=foto_num,
+                                        codificacao=cod_legenda,
+                                        siglas_ou_ncs=siglas_ativas,
+                                        faixa=direcao_faixa,
+                                        data_foto=data_foto_val
+                                    )
                                     
                                     for sigla in siglas_ativas:
                                         seq_idx = obter_proximo_numero_sequencial_cra(
@@ -1145,7 +1202,8 @@ with st.container():
                                             "Foto": foto_default,
                                             "Foto Anterior": "",
                                             "Legenda Anterior": "",
-                                            "Observações": nc_legenda,
+                                            "Observações": legenda_completa,
+                                            "Legenda da Foto": legenda_completa,
                                             "Identificação": identificacao,
                                             "Direção (faixa)": direcao_faixa,
                                             "Fundamento da infração": fundamento_infracao,
@@ -1154,7 +1212,7 @@ with st.container():
                                             "Análise ARPE": "",
                                             "is_relacionado": False,
                                             "grupo_relacao": grp_id,
-                                            "Data da Foto": extrair_data_original_foto(foto_default)
+                                            "Data da Foto": data_foto_val
                                         }
                                         st.session_state.temp_nc.append(rec)
                                 else:
@@ -1164,6 +1222,17 @@ with st.container():
                                     novo_nc_num = len(ncs_existentes) + 1
                                     cod_formatado = codificacao
                                     identificacao = cod_formatado if cod_formatado else (nc_desc_str or pa_desc_str)
+                                    data_foto_val = extrair_data_original_foto(foto_default)
+
+                                    siglas_list = nc_descricao if tipo_registro == "Não Conformidade" else ponto_atencao
+                                    if not nc_legenda or not nc_legenda.strip():
+                                        nc_legenda = formatar_legenda_foto(
+                                            num=novo_nc_num,
+                                            codificacao=cod_formatado,
+                                            siglas_ou_ncs=siglas_list,
+                                            faixa=direcao_faixa,
+                                            data_foto=data_foto_val
+                                        )
 
                                     rec = {
                                         "ID da Fiscalização": id_vinculo,
@@ -1178,6 +1247,7 @@ with st.container():
                                         "Foto Anterior": "",
                                         "Legenda Anterior": "",
                                         "Observações": nc_legenda,
+                                        "Legenda da Foto": nc_legenda,
                                         "Identificação": identificacao,
                                         "Direção (faixa)": direcao_faixa,
                                         "Fundamento da infração": fundamento_infracao,
@@ -1186,7 +1256,7 @@ with st.container():
                                         "Análise ARPE": "",
                                         "is_relacionado": False,
                                         "grupo_relacao": f"grp_{id_vinculo}_{novo_nc_num}_{st.session_state.nc_form_counter}",
-                                        "Data da Foto": extrair_data_original_foto(foto_default)
+                                        "Data da Foto": data_foto_val
                                     }
                                     st.session_state.temp_nc.append(rec)
 
@@ -1348,7 +1418,7 @@ with st.container():
                                 if col in df_nc_only.columns:
                                     df_nc_only = df_nc_only.drop(columns=[col])
                         elif not is_monitoring:
-                            for c in ["Trecho", "Observações", "Legenda da Foto"]:
+                            for c in ["Trecho", "Observações"]:
                                 if c in df_nc_only.columns:
                                     df_nc_only = df_nc_only.drop(columns=[c])
                         
@@ -1387,6 +1457,10 @@ with st.container():
                                 "Não Conformidade": st.column_config.TextColumn(
                                     "Não Conformidade",
                                     width="large"
+                                ),
+                                "Legenda da Foto": st.column_config.TextColumn(
+                                    "Legenda da Foto",
+                                    width="large"
                                 )
                             },
                             disabled=[col for col in df_nc_only.columns if col != "Excluir"],
@@ -1416,7 +1490,7 @@ with st.container():
                                 if col in df_pa_only.columns:
                                     df_pa_only = df_pa_only.drop(columns=[col])
                             if not is_monitoring:
-                                for c in ["Trecho", "Observações", "Legenda da Foto"]:
+                                for c in ["Trecho", "Observações"]:
                                     if c in df_pa_only.columns:
                                         df_pa_only = df_pa_only.drop(columns=[c])
                             
@@ -1450,6 +1524,10 @@ with st.container():
                                     ),
                                     "Ponto de Atenção": st.column_config.TextColumn(
                                         "Ponto de Atenção",
+                                        width="large"
+                                    ),
+                                    "Legenda da Foto": st.column_config.TextColumn(
+                                        "Legenda da Foto",
                                         width="large"
                                     )
                                 },

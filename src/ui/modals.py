@@ -9,7 +9,13 @@ from database.manager import (
 )
 from sections.quadros.quadros import MAP_SIGLAS, expandir_siglas
 from ui.state import sincronizar_opcoes_nc, BASE_NC_OPTIONS
-from utils import calcular_codificacao_cra, obter_proximo_numero_sequencial_cra
+from utils import (
+    calcular_codificacao_cra,
+    obter_proximo_numero_sequencial_cra,
+    formatar_legenda_foto,
+    converter_faixa_para_sigla,
+    combinar_faixas_relacionadas
+)
 from services.image_service import extrair_data_original_foto
 
 
@@ -675,7 +681,22 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                             dir_val = nc_target.get("Direção (faixa)", "")
                             dir_val_str = "" if (dir_val is None or str(dir_val).strip().lower() in ["nan", "none", "null"]) else str(dir_val).strip()
-                            edit_direcao = st.text_input("Direção (faixa)", value=dir_val_str, key=f"{nc_key_prefix}_direcao")
+                            sigla_curr = converter_faixa_para_sigla(dir_val_str)
+                            if sigla_curr == "FED" or dir_val_str.upper() == "FED":
+                                opts_dir = ["FED", "Direita", "Esquerda"]
+                                idx_dir = 0
+                            elif sigla_curr == "FE":
+                                opts_dir = ["Direita", "Esquerda"]
+                                idx_dir = 1
+                            else:
+                                opts_dir = ["Direita", "Esquerda"]
+                                idx_dir = 0
+                            edit_direcao = st.selectbox(
+                                "Direção (faixa)",
+                                options=opts_dir,
+                                index=idx_dir,
+                                key=f"{nc_key_prefix}_direcao"
+                            )
                         else:
                             edit_direcao = ""
 
@@ -776,7 +797,22 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
                             dir_val = nc_target.get("Direção (faixa)", "")
                             dir_val_str = "" if (dir_val is None or str(dir_val).strip().lower() in ["nan", "none", "null"]) else str(dir_val).strip()
-                            edit_direcao = st.text_input("Direção (faixa)", value=dir_val_str, key=f"{nc_key_prefix}_direcao")
+                            sigla_curr = converter_faixa_para_sigla(dir_val_str)
+                            if sigla_curr == "FED" or dir_val_str.upper() == "FED":
+                                opts_dir = ["FED", "Direita", "Esquerda"]
+                                idx_dir = 0
+                            elif sigla_curr == "FE":
+                                opts_dir = ["Direita", "Esquerda"]
+                                idx_dir = 1
+                            else:
+                                opts_dir = ["Direita", "Esquerda"]
+                                idx_dir = 0
+                            edit_direcao = st.selectbox(
+                                "Direção (faixa)",
+                                options=opts_dir,
+                                index=idx_dir,
+                                key=f"{nc_key_prefix}_direcao"
+                            )
                         else:
                             edit_direcao = ""
 
@@ -793,12 +829,23 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             else:
                                 nc_target["Não Conformidade"] = edit_nc_desc
                                 nc_target["Ponto de Atenção"] = ""
-                            nc_target["Observações"] = edit_observacoes
-                            if "Legenda da Foto" in nc_target:
-                                nc_target["Legenda da Foto"] = edit_observacoes
+                            
                             ident = edit_codificacao if edit_codificacao else (edit_pa_desc if edit_is_pa else edit_nc_desc)
                             nc_target["Identificação"] = ident
                             nc_target["Direção (faixa)"] = edit_direcao
+
+                            # Recalcular legenda formatada para CRA
+                            data_foto = nc_target.get("Data da Foto") or extrair_data_original_foto(nc_target.get("Foto"))
+                            nova_legenda = formatar_legenda_foto(
+                                num=nc_target.get("Nº", 1),
+                                codificacao=edit_codificacao or nc_target.get("Codificação", ""),
+                                siglas_ou_ncs=edit_pa_desc if edit_is_pa else edit_nc_desc,
+                                faixa=edit_direcao,
+                                data_foto=data_foto
+                            )
+                            nc_target["Observações"] = nova_legenda
+                            if "Legenda da Foto" in nc_target:
+                                nc_target["Legenda da Foto"] = nova_legenda
                             nc_target["Fundamento da infração"] = edit_fundamento
                             nc_target["Determinação"] = edit_determinacao
                             st.session_state.relatorios_preenchimento_data = []
@@ -963,7 +1010,9 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
 
             st.markdown(f"**Codificação Anterior:** `{ant_cod if ant_cod else '-'}`")
             ant_faixa = last_nc.get("Direção (faixa)", "")
-            st.markdown(f"**Direção (faixa) Anterior:** `{ant_faixa if ant_faixa else '-'}`")
+            sigla_ant_disp = converter_faixa_para_sigla(ant_faixa)
+            disp_ant_faixa = f"{ant_faixa} ({sigla_ant_disp})" if sigla_ant_disp and sigla_ant_disp != ant_faixa else (ant_faixa if ant_faixa else "-")
+            st.markdown(f"**Direção (faixa) Anterior:** `{disp_ant_faixa}`")
             st.markdown(f"**Tipo:** *{ant_tipo}*")
             siglas_exibidas = ", ".join(ant_siglas_lista) if ant_siglas_lista else "-"
             st.markdown(f"**Sigla(s):** **{siglas_exibidas}**")
@@ -1036,12 +1085,16 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                 help="Deixe em branco para herdar a codificação anterior ou informe a nova codificação desejada."
             )
 
-            rel_faixa = st.text_input(
+            sigla_ant = converter_faixa_para_sigla(ant_faixa)
+            opts_rel_faixa = ["Direita", "Esquerda"]
+            idx_rel_faixa = 0 if sigla_ant == "FE" else 1 if sigla_ant == "FD" else 0
+
+            rel_faixa = st.selectbox(
                 "Direção (faixa):",
-                value=ant_faixa,
+                options=opts_rel_faixa,
+                index=idx_rel_faixa,
                 key=f"modal_rel_faixa_{st.session_state.nc_form_counter}",
-                placeholder="Ex: Faixa 1, Faixa 2, Sul, Norte...",
-                help="Informe ou modifique a direção/faixa desta foto relacionada."
+                help="Escolha se a foto relacionada é na faixa Direita ou Esquerda."
             )
 
     # Painel Informativo sobre o Quadro Word
@@ -1056,6 +1109,27 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
             st.success(
                 ":material/device_hub: **Siglas Diferentes Detectadas:** No Quadro, será gerada uma codificação para cada sigla (**1 para 1**) e as fotos ficarão relacionadas (**N para 1**) com colunas mescladas."
             )
+        
+        base_raw_prev = rel_cod.strip() if rel_cod.strip() else ant_cod
+        base_limpa_prev = base_raw_prev.split("/")[0] if "/" in base_raw_prev else base_raw_prev
+        seq_prev = obter_proximo_numero_sequencial_cra(
+            st.session_state.temp_nc,
+            id_vinculo=target_id,
+            tipo_registro=rel_tipo
+        )
+        cod_prev_rel = calcular_codificacao_cra(base_limpa_prev, data_fisc=target_fisc_data, seq_idx=seq_prev)
+        data_prev_rel = extrair_data_original_foto(foto_atual)
+        faixa_combinada_prev = combinar_faixas_relacionadas(ant_faixa, rel_faixa)
+        leg_prev = formatar_legenda_foto(
+            num=foto_num_atual,
+            codificacao=cod_prev_rel,
+            siglas_ou_ncs=rel_siglas,
+            faixa=faixa_combinada_prev,
+            data_foto=data_prev_rel
+        )
+        st.caption(f":material/subtitles: **Legenda:** {leg_prev}")
+        if faixa_combinada_prev == "FED":
+            st.caption(":material/sync_alt: **Faixa Combinada:** Como uma foto é da Esquerda e a outra da Direita, a legenda de ambas terá a sigla **FED**.")
 
     # Botões de Ação
     st.write("")
@@ -1067,14 +1141,27 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                 return
 
             foto_para_salvar = extrair_nome_foto(foto_atual) or foto_atual
+            faixa_combinada = combinar_faixas_relacionadas(ant_faixa, rel_faixa)
 
             # Colocar estado relacionado nas duas fotos que estão relacionadas:
             # atualiza o registro base anterior (e todos os itens do mesmo grupo) para is_relacionado = True
+            # e atualiza a faixa e a legenda de ambos para a faixa combinada (ex: FED)
             for rec in st.session_state.temp_nc:
-                if ant_grp_id and rec.get("grupo_relacao") == ant_grp_id:
+                if (ant_grp_id and rec.get("grupo_relacao") == ant_grp_id) or (ant_nome and extrair_nome_foto(rec.get("Foto")).lower() == ant_nome.lower()):
                     rec["is_relacionado"] = True
-                elif ant_nome and extrair_nome_foto(rec.get("Foto")).lower() == ant_nome.lower():
-                    rec["is_relacionado"] = True
+                    rec["Direção (faixa)"] = faixa_combinada
+                    r_cod = str(rec.get("Codificação") or rec.get("Trecho") or "")
+                    r_siglas = rec.get("Não Conformidade") or rec.get("Ponto de Atenção") or ""
+                    r_data = rec.get("Data da Foto") or extrair_data_original_foto(rec.get("Foto"))
+                    r_leg = formatar_legenda_foto(
+                        num=rec.get("Nº", 1),
+                        codificacao=r_cod,
+                        siglas_ou_ncs=r_siglas,
+                        faixa=faixa_combinada,
+                        data_foto=r_data
+                    )
+                    rec["Observações"] = r_leg
+                    rec["Legenda da Foto"] = r_leg
 
             if is_cra_fisc:
                 base_raw = rel_cod.strip() if rel_cod.strip() else ant_cod
@@ -1083,6 +1170,21 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                     return
 
                 base_limpa = base_raw.split("/")[0] if "/" in base_raw else base_raw
+                data_foto_rel = extrair_data_original_foto(foto_para_salvar)
+
+                seq_primeira = obter_proximo_numero_sequencial_cra(
+                    st.session_state.temp_nc,
+                    id_vinculo=target_id,
+                    tipo_registro=rel_tipo
+                )
+                cod_legenda_rel = calcular_codificacao_cra(base_limpa, data_fisc=target_fisc_data, seq_idx=seq_primeira)
+                legenda_relacionada = formatar_legenda_foto(
+                    num=foto_num_atual,
+                    codificacao=cod_legenda_rel,
+                    siglas_ou_ncs=rel_siglas,
+                    faixa=faixa_combinada,
+                    data_foto=data_foto_rel
+                )
 
                 for sigla in rel_siglas:
                     seq_tipo = obter_proximo_numero_sequencial_cra(
@@ -1104,16 +1206,17 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                         "Foto": foto_para_salvar,
                         "Foto Anterior": "",
                         "Legenda Anterior": "",
-                        "Observações": "",
+                        "Observações": legenda_relacionada,
+                        "Legenda da Foto": legenda_relacionada,
                         "Identificação": identificacao,
-                        "Direção (faixa)": rel_faixa.strip(),
+                        "Direção (faixa)": faixa_combinada,
                         "Fundamento da infração": last_nc.get("Fundamento da infração", ""),
                         "Determinação": last_nc.get("Determinação", ""),
                         "Situação": last_nc.get("Situação", "Pendente"),
                         "Análise ARPE": "",
                         "is_relacionado": True,
                         "grupo_relacao": ant_grp_id,
-                        "Data da Foto": extrair_data_original_foto(foto_para_salvar)
+                        "Data da Foto": data_foto_rel
                     }
                     st.session_state.temp_nc.append(new_nc)
             else:
@@ -1123,6 +1226,14 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                 identificacao = cod_final if cod_final else (nc_desc_str or pa_desc_str)
                 ncs_existentes = [nc for nc in st.session_state.temp_nc if nc.get("ID da Fiscalização") == target_id]
                 new_nc_num = len(ncs_existentes) + 1
+                data_foto_rel = extrair_data_original_foto(foto_para_salvar)
+                legenda_relacionada = formatar_legenda_foto(
+                    num=new_nc_num,
+                    codificacao=cod_final,
+                    siglas_ou_ncs=rel_siglas,
+                    faixa=faixa_combinada,
+                    data_foto=data_foto_rel
+                )
                 new_nc = {
                     "ID da Fiscalização": target_id,
                     "Nº": new_nc_num,
@@ -1135,16 +1246,17 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                     "Foto": foto_para_salvar,
                     "Foto Anterior": "",
                     "Legenda Anterior": "",
-                    "Observações": "",
+                    "Observações": legenda_relacionada,
+                    "Legenda da Foto": legenda_relacionada,
                     "Identificação": identificacao,
-                    "Direção (faixa)": rel_faixa.strip(),
+                    "Direção (faixa)": faixa_combinada,
                     "Fundamento da infração": last_nc.get("Fundamento da infração", ""),
                     "Determinação": last_nc.get("Determinação", ""),
                     "Situação": last_nc.get("Situação", "Pendente"),
                     "Análise ARPE": "",
                     "is_relacionado": True,
                     "grupo_relacao": ant_grp_id,
-                    "Data da Foto": extrair_data_original_foto(foto_para_salvar)
+                    "Data da Foto": data_foto_rel
                 }
                 st.session_state.temp_nc.append(new_nc)
 
