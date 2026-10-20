@@ -1087,7 +1087,8 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
 
             sigla_ant = converter_faixa_para_sigla(ant_faixa)
             opts_rel_faixa = ["Direita", "Esquerda"]
-            idx_rel_faixa = 0 if sigla_ant == "FE" else 1 if sigla_ant == "FD" else 0
+            # Recomenda a mesma faixa escolhida na foto anterior
+            idx_rel_faixa = 1 if sigla_ant == "FE" else 0
 
             rel_faixa = st.selectbox(
                 "Direção (faixa):",
@@ -1142,6 +1143,8 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
 
             foto_para_salvar = extrair_nome_foto(foto_atual) or foto_atual
             faixa_combinada = combinar_faixas_relacionadas(ant_faixa, rel_faixa)
+            # No Quadro 2 a faixa deve aparecer por extenso
+            faixa_extenso = {"FE": "Esquerda", "FD": "Direita", "FED": "Esquerda e Direita"}.get(faixa_combinada, faixa_combinada)
 
             # Colocar estado relacionado nas duas fotos que estão relacionadas:
             # atualiza o registro base anterior (e todos os itens do mesmo grupo) para is_relacionado = True
@@ -1149,7 +1152,7 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
             for rec in st.session_state.temp_nc:
                 if (ant_grp_id and rec.get("grupo_relacao") == ant_grp_id) or (ant_nome and extrair_nome_foto(rec.get("Foto")).lower() == ant_nome.lower()):
                     rec["is_relacionado"] = True
-                    rec["Direção (faixa)"] = faixa_combinada
+                    rec["Direção (faixa)"] = faixa_extenso
                     r_cod = str(rec.get("Codificação") or rec.get("Trecho") or "")
                     r_siglas = rec.get("Não Conformidade") or rec.get("Ponto de Atenção") or ""
                     r_data = rec.get("Data da Foto") or extrair_data_original_foto(rec.get("Foto"))
@@ -1209,7 +1212,7 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                         "Observações": legenda_relacionada,
                         "Legenda da Foto": legenda_relacionada,
                         "Identificação": identificacao,
-                        "Direção (faixa)": faixa_combinada,
+                        "Direção (faixa)": faixa_extenso,
                         "Fundamento da infração": last_nc.get("Fundamento da infração", ""),
                         "Determinação": last_nc.get("Determinação", ""),
                         "Situação": last_nc.get("Situação", "Pendente"),
@@ -1249,7 +1252,7 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                     "Observações": legenda_relacionada,
                     "Legenda da Foto": legenda_relacionada,
                     "Identificação": identificacao,
-                    "Direção (faixa)": faixa_combinada,
+                    "Direção (faixa)": faixa_extenso,
                     "Fundamento da infração": last_nc.get("Fundamento da infração", ""),
                     "Determinação": last_nc.get("Determinação", ""),
                     "Situação": last_nc.get("Situação", "Pendente"),
