@@ -385,8 +385,8 @@ def formatar_codificacoes_contraidas(cods: list) -> str:
         primeiro_ano = parsed[0][1]
         mesma_base_ano = all(p[0] == primeira_base and p[1] == primeiro_ano for p in parsed)
         if mesma_base_ano:
-            sufixos = [f".{p[2]}" for p in parsed]
-            primeiro_completo = f"{primeira_base}/{primeiro_ano}{sufixos[0]}"
+            sufixos = [p[2] for p in parsed]
+            primeiro_completo = f"{primeira_base}/{primeiro_ano}.{sufixos[0]}"
             if len(sufixos) == 2:
                 return f"{primeiro_completo} e {sufixos[1]}."
             else:

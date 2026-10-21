@@ -5,7 +5,6 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import pandas as pd
-from utils import formatar_codificacoes_contraidas
 
 MAP_SIGLAS = {
     "FI": "Fissuras",
@@ -177,9 +176,9 @@ def agrupar_registros(df, report_config=None):
                 s = f"Fotos {', '.join(nums_formatted[:-1])} e {nums_formatted[-1]}"
             grupo_fotos_str[grp] = s
 
-        # 3. Agrupar registros da tabela por (grupo_relacao, Não Conformidade, Ponto de Atenção)
+        # 3. Preparar registros da tabela para o CRA: registros com mesma Codificação e mesma NC são desduplicados; codificações diferentes permanecem em linhas separadas
         grouped = []
-        chaves_cra = ["grupo_relacao", "Não Conformidade", "Ponto de Atenção"]
+        chaves_cra = ["grupo_relacao", "Não Conformidade", "Ponto de Atenção", "Codificação"]
         for rec in records:
             found = False
             for g_rec in grouped:
@@ -191,12 +190,6 @@ def agrupar_registros(df, report_config=None):
                         match = False
                         break
                 if match:
-                    if "all_cods" not in g_rec:
-                        g_rec["all_cods"] = [_limpar_valor_campo(g_rec.get("Codificação", ""))]
-                    cod_novo = _limpar_valor_campo(rec.get("Codificação", ""))
-                    if cod_novo and cod_novo not in g_rec["all_cods"]:
-                        g_rec["all_cods"].append(cod_novo)
-                        g_rec["Codificação"] = formatar_codificacoes_contraidas(g_rec["all_cods"])
                     found = True
                     break
             if not found:
@@ -208,7 +201,6 @@ def agrupar_registros(df, report_config=None):
                 faixa = _limpar_valor_campo(rec.get("Direção (faixa)", ""))
                 new_g["localizacao_formatada"] = f"{faixa}/\n{fotos_str}" if (faixa and fotos_str) else (faixa or fotos_str)
                 new_g["_resolved_grupo"] = grp
-                new_g["all_cods"] = [_limpar_valor_campo(rec.get("Codificação", ""))]
                 grouped.append(new_g)
 
         # Garante que registros do mesmo grupo fiquem contíguos na tabela para mesclagem vertical

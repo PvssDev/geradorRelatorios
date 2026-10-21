@@ -348,11 +348,10 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         if c_val and c_val not in cods:
                             cods.append(c_val)
                     if cods:
-                        mesmas_nc = fotos_tem_mesmas_ncs(related)
-                        if mesmas_nc and len(cods) > 1:
+                        if len(cods) > 1:
                             label_item = formatar_codificacoes_contraidas(cods)
                         else:
-                            label_item = " e ".join(cods) if len(cods) <= 2 else (", ".join(cods[:-1]) + f" e {cods[-1]}")
+                            label_item = cods[0]
                     else:
                         label_item = "Codificação Não Informada"
                 else:
@@ -455,10 +454,9 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 table.columns[0].width = Inches(3.635)
                 table.columns[1].width = Inches(3.635)
                 
-                # Se as fotos relacionadas tiverem as mesmas NC, a legenda de ambas usa a codificação contraída
-                mesmas_nc_rel = fotos_tem_mesmas_ncs(distinct_related)
+                # No CRA, todas as fotos de duplas relacionadas usam a codificação contraída (/2026.001 e 002.)
                 cod_custom_rel = None
-                if str(tipo_relatorio).upper() == "CRA" and mesmas_nc_rel and len(distinct_related) > 1:
+                if str(tipo_relatorio).upper() == "CRA" and len(distinct_related) > 1:
                     cods_grupo = []
                     for r in distinct_related:
                         c_val = _obter_texto_localizacao_cra(r)
