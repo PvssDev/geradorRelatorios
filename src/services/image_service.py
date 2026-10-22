@@ -188,6 +188,9 @@ def obter_foto_base64(photo_source, max_size=(400, 300)) -> str:
     if photo_source is None:
         return ""
 
+    if hasattr(photo_source, "b64_data") and photo_source.b64_data:
+        return photo_source.b64_data
+
     thumb = obter_foto_preview(photo_source, max_size=max_size)
     if isinstance(thumb, bytes) and len(thumb) > 0:
         b64 = base64.b64encode(thumb).decode("ascii")

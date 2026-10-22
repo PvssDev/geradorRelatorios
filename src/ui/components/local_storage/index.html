@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body {
+      background: transparent;
+      padding: 4px;
+      overflow: hidden;
+    }
+    .panel {
+      background: #ffffff;
+      border: 1px solid rgba(13, 39, 64, 0.12);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 2px 8px rgba(1, 26, 51, 0.05);
+      transition: all 0.2s ease;
+    }
+    .panel.connected {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: #f0fdf4;
+    }
+    .panel.not-connected {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: #fffbeb;
+    }
+    .left-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+    .status-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .panel.connected .status-icon {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .panel.not-connected .status-icon {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .text-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+    }
+    .title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .desc {
+      font-size: 12px;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .folder-path {
+      font-family: monospace;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #0369a1;
+      background: rgba(3, 105, 161, 0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+      max-width: 320px;
+      display: inline-block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: middle;
+    }
+    .btn-action {
+      background-color: #0D2740;
+      color: #f8fafc;
+      border: 1px solid #011A33;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 5px rgba(13, 39, 64, 0.2);
+    }
+    .btn-action:hover {
+      background-color: #2F5173;
+      border-color: #0D2740;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(1, 26, 51, 0.25);
+    }
+    .btn-action:active {
+      transform: scale(0.98);
+    }
+    .btn-action.btn-change {
+      background-color: #e2e8f0;
+      color: #1e293b;
+      border-color: #cbd5e1;
+      box-shadow: none;
+    }
+    .btn-action.btn-change:hover {
+      background-color: #cbd5e1;
+      color: #0f172a;
+    }
+    .sync-indicator {
+      font-size: 11.5px;
+      color: #16a34a;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="panel" class="panel not-connected">
+    <div class="left-section">
+      <div id="statusIcon" class="status-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </div>
+      <div class="text-container">
+        <div id="panelTitle" class="title">Conectar Pasta Local de Trabalho (geradorRelatorios)</div>
+        <div id="panelDesc" class="desc">Selecione uma pasta física no seu computador para sincronizar mídias e progresso automaticamente.</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div id="syncBadge" style="display: none;" class="sync-indicator">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Sincronizado
+      </div>
+      <button id="btnConnect" class="btn-action">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          <line x1="12" y1="11" x2="12" y2="17"></line>
+          <line x1="9" y1="14" x2="15" y2="14"></line>
+        </svg>
+        <span id="btnText">Selecionar Pasta Local</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const Streamlit = {
+      setComponentReady: function() {
+        window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:componentReady", apiVersion: 1 }, "*");
+      },
+      setFrameHeight: function(h) {
+        window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:setFrameHeight", height: h }, "*");
+      },
+      setComponentValue: function(val) {
+        window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: val }, "*");
+      }
+    };
+
+    // Banco IndexedDB para guardar e restaurar o handle da pasta local selecionada
+    const DB_NAME = "ARPE_Relatorios_DB";
+    const DB_VERSION = 1;
+    const STORE_NAME = "FolderHandles";
+
+    function openIndexedDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function saveDirectoryHandle(handle) {
+      try {
+        const db = await openIndexedDB();
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put(handle, "activeFolderHandle");
+        return new Promise((res, rej) => {
+          tx.oncomplete = () => res(true);
+          tx.onerror = () => rej(tx.error);
+        });
+      } catch (e) {
+        console.error("Erro salvando handle:", e);
+      }
+    }
+
+    async function loadDirectoryHandle() {
+      try {
+        const db = await openIndexedDB();
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const req = tx.objectStore(STORE_NAME).get("activeFolderHandle");
+        return new Promise((res) => {
+          req.onsuccess = () => res(req.result || null);
+          req.onerror = () => res(null);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Variáveis em memória do componente
+    let activeDirectoryHandle = null;
+    let pendingPermissionHandle = null;
+    let currentReportKey = "CRA__Fiscalização";
+    let isConnected = false;
+    let latestQueue = [];
+    let lastProcessedVersion = 0;
+    let currentSessionId = null;
+    let processingChain = Promise.resolve();
+    let lastLoadedPayload = null;
+
+    // Normaliza nome de subpasta para o tipo e categoria
+    function getSubfolderName(tipo, cat) {
+      const t = (tipo || "CRA").toUpperCase();
+      const c = (cat || "Fiscalização").toLowerCase().includes("mon") ? "monitoramento" : "fiscalizacao";
+      return `${t.toLowerCase()}_${c}`;
+    }
+
+    // Garante ou cria a pasta raiz 'geradorRelatorio' caso o usuário tenha selecionado Desktop/Documentos
+    async function getBaseFolderHandle(rootDirHandle) {
+      const name = (rootDirHandle.name || "").toLowerCase();
+      if (name === "geradorrelatorio" || name === "geradorrelatorios") {
+        return rootDirHandle;
+      }
+      return await rootDirHandle.getDirectoryHandle("geradorRelatorio", { create: true });
+    }
+
+    // Garante ou cria subpastas hierárquicas: /geradorRelatorio/[tipo_cat]/[estado | midia/[fotos | arquivos]]
+    async function ensureHierarchy(rootDirHandle, tipo, cat) {
+      const baseDir = await getBaseFolderHandle(rootDirHandle);
+      const relFolderName = getSubfolderName(tipo, cat);
+      const relDirHandle = await baseDir.getDirectoryHandle(relFolderName, { create: true });
+      const midiaDirHandle = await relDirHandle.getDirectoryHandle("midia", { create: true });
+      const fotosDirHandle = await midiaDirHandle.getDirectoryHandle("fotos", { create: true });
+      const arquivosDirHandle = await midiaDirHandle.getDirectoryHandle("arquivos", { create: true });
+      const estadoDirHandle = await relDirHandle.getDirectoryHandle("estado", { create: true });
+      return { relDirHandle, midiaDirHandle, fotosDirHandle, arquivosDirHandle, estadoDirHandle };
+    }
+
+    // Salva arquivo JSON na pasta 'estado' da combinação atual
+    async function writeStateFile(estadoDirHandle, data) {
+      const fileHandle = await estadoDirHandle.getFileHandle("estado.json", { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(data, null, 2));
+      await writable.close();
+    }
+
+    // Lê arquivo JSON da pasta 'estado'
+    async function readStateFile(estadoDirHandle) {
+      try {
+        const fileHandle = await estadoDirHandle.getFileHandle("estado.json");
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        return JSON.parse(text);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Sincroniza arquivos em uma subpasta (grava novos e remove os excluídos no upload)
+    async function syncFolderEntries(dirHandle, newFilesList, activeNamesList) {
+      if (!dirHandle) return;
+
+      // 1. Grava ou atualiza arquivos novos enviados
+      if (newFilesList && newFilesList.length) {
+        for (const item of newFilesList) {
+          try {
+            if (!item.name || !item.base64) continue;
+            const fileHandle = await dirHandle.getFileHandle(item.name, { create: true });
+            const writable = await fileHandle.createWritable();
+            const res = await fetch(item.base64);
+            const buf = await res.arrayBuffer();
+            await writable.write(buf);
+            await writable.close();
+          } catch (err) {
+            console.warn("Erro ao gravar arquivo em pasta local:", item.name, err);
+          }
+        }
+      }
+
+      // 2. Remove arquivos que foram excluídos do upload (se activeNamesList foi fornecida)
+      if (Array.isArray(activeNamesList)) {
+        const activeSet = new Set(activeNamesList.map(n => (n || "").toLowerCase().trim()));
+        try {
+          for await (const entry of dirHandle.values()) {
+            if (entry.kind === "file") {
+              const entryNameLower = entry.name.toLowerCase().trim();
+              if (!activeSet.has(entryNameLower)) {
+                try {
+                  await dirHandle.removeEntry(entry.name);
+                } catch (delErr) {
+                  console.warn("Erro ao remover arquivo órfão da pasta local:", entry.name, delErr);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Erro ao varrer arquivos para sincronização:", e);
+        }
+      }
+    }
+
+    // Lê todos os arquivos das subpastas 'fotos' e 'arquivos' (e raiz de midia para compatibilidade)
+    async function readMediaFiles(fotosDirHandle, arquivosDirHandle, legacyMidiaDirHandle) {
+      const mediaFiles = [];
+
+      // 1. Fotos
+      if (fotosDirHandle) {
+        try {
+          for await (const entry of fotosDirHandle.values()) {
+            if (entry.kind === "file") {
+              const file = await entry.getFile();
+              const b64 = await fileToBase64(file);
+              mediaFiles.push({
+                name: file.name,
+                size: file.size,
+                type: file.type || "image/jpeg",
+                category: "foto",
+                base64: b64
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("Erro ao ler fotos locais:", err);
+        }
+      }
+
+      // 2. Arquivos (planilhas, docs)
+      if (arquivosDirHandle) {
+        try {
+          for await (const entry of arquivosDirHandle.values()) {
+            if (entry.kind === "file") {
+              const file = await entry.getFile();
+              const b64 = await fileToBase64(file);
+              mediaFiles.push({
+                name: file.name,
+                size: file.size,
+                type: file.type || "application/octet-stream",
+                category: "arquivo",
+                base64: b64
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("Erro ao ler arquivos locais:", err);
+        }
+      }
+
+      // 3. Compatibilidade legada: se haviam arquivos soltos na raiz de midia/
+      if (legacyMidiaDirHandle) {
+        try {
+          for await (const entry of legacyMidiaDirHandle.values()) {
+            if (entry.kind === "file") {
+              const file = await entry.getFile();
+              const b64 = await fileToBase64(file);
+              const isImg = /\.(jpg|jpeg|png|webp)$/i.test(file.name);
+              mediaFiles.push({
+                name: file.name,
+                size: file.size,
+                type: file.type || (isImg ? "image/jpeg" : "application/octet-stream"),
+                category: isImg ? "foto" : "arquivo",
+                base64: b64
+              });
+            }
+          }
+        } catch (e) {}
+      }
+
+      return mediaFiles;
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Atualiza interface do banner
+    function updateUI(connected, folderName, needsPermission) {
+      const panel = document.getElementById("panel");
+      const title = document.getElementById("panelTitle");
+      const desc = document.getElementById("panelDesc");
+      const btnText = document.getElementById("btnText");
+      const btn = document.getElementById("btnConnect");
+      const syncBadge = document.getElementById("syncBadge");
+
+      if (connected) {
+        panel.className = "panel connected";
+        title.innerHTML = `Pasta Local Conectada: <span class="folder-path">${folderName || "geradorRelatorio"}</span>`;
+        desc.textContent = "Alterações, fotos e arquivos são sincronizados localmente na máquina a cada modificação.";
+        btnText.textContent = "Trocar Pasta";
+        btn.className = "btn-action btn-change";
+        syncBadge.style.display = "flex";
+      } else if (needsPermission) {
+        panel.className = "panel not-connected";
+        title.innerHTML = `Pasta Local Detectada: <span class="folder-path">${folderName || "geradorRelatorio"}</span>`;
+        desc.textContent = "Clique para reativar o acesso de sincronização nesta sessão do navegador.";
+        btnText.textContent = "Reconectar Pasta";
+        btn.className = "btn-action";
+        syncBadge.style.display = "none";
+      } else {
+        panel.className = "panel not-connected";
+        title.textContent = "Conectar Pasta Local na Máquina (geradorRelatorio)";
+        desc.textContent = "Selecione uma pasta física no seu computador para sincronizar suas mídias e seu progresso.";
+        btnText.textContent = "Conectar Pasta Local";
+        btn.className = "btn-action";
+        syncBadge.style.display = "none";
+      }
+      Streamlit.setFrameHeight(document.getElementById("panel").offsetHeight + 10);
+    }
+
+    // Handler de clique para selecionar pasta via File System Access API
+    document.getElementById("btnConnect").addEventListener("click", async () => {
+      try {
+        if (!window.showDirectoryPicker) {
+          alert("Seu navegador não suporta a File System Access API. Recomendamos o uso do Google Chrome ou Microsoft Edge.");
+          return;
+        }
+
+        // Se já temos uma pasta salva e apenas precisamos que o usuário autorize o acesso
+        if (pendingPermissionHandle && !isConnected) {
+          const perm = await pendingPermissionHandle.requestPermission({ mode: "readwrite" });
+          if (perm === "granted") {
+            activeDirectoryHandle = pendingPermissionHandle;
+            pendingPermissionHandle = null;
+            isConnected = true;
+            updateUI(true, activeDirectoryHandle.name);
+            await triggerLoadState();
+            await flushMessageQueue();
+            return;
+          }
+        }
+
+        // Abre diálogo nativo do sistema operacional (Windows/Linux/Mac)
+        const handle = await window.showDirectoryPicker({
+          id: "arpe_gerador_relatorios_folder",
+          mode: "readwrite"
+        });
+
+        if (handle) {
+          activeDirectoryHandle = handle;
+          pendingPermissionHandle = null;
+          await saveDirectoryHandle(handle);
+          isConnected = true;
+          updateUI(true, handle.name);
+
+          // Dispara leitura inicial dos dados dessa pasta para o Streamlit
+          await triggerLoadState();
+          await flushMessageQueue();
+        }
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Erro ao selecionar diretório:", err);
+          alert("Não foi possível acessar a pasta selecionada: " + err.message);
+        }
+      }
+    });
+
+    // Função para carregar estado e mídias da pasta local e enviar ao Streamlit
+    async function triggerLoadState(tipoArg, catArg, silent) {
+      if (!activeDirectoryHandle) return;
+      try {
+        let [tipo, cat] = currentReportKey.split("__");
+        if (tipoArg) tipo = tipoArg;
+        if (catArg) cat = catArg;
+        const { estadoDirHandle, fotosDirHandle, arquivosDirHandle, midiaDirHandle } = await ensureHierarchy(activeDirectoryHandle, tipo, cat);
+        const savedState = await readStateFile(estadoDirHandle);
+        const mediaFiles = await readMediaFiles(fotosDirHandle, arquivosDirHandle, midiaDirHandle);
+
+        const payload = {
+          action: "LOADED_FROM_DISK",
+          folderName: activeDirectoryHandle.name,
+          tipo: tipo,
+          cat: cat,
+          state: savedState,
+          media: mediaFiles,
+          ackVersion: lastProcessedVersion,
+          timestamp: Date.now()
+        };
+        if (silent) {
+          lastLoadedPayload = payload;
+        } else {
+          Streamlit.setComponentValue(payload);
+        }
+      } catch (e) {
+        console.error("Erro ao carregar dados locais:", e);
+      }
+    }
+
+    // Limpa registros do relatório ativo apagando a subpasta específica daquele relatório
+    async function triggerClearState(tipo, cat) {
+      if (!activeDirectoryHandle) return;
+      try {
+        const baseDir = await getBaseFolderHandle(activeDirectoryHandle);
+        const relFolderName = getSubfolderName(tipo, cat);
+        try { 
+          await baseDir.removeEntry(relFolderName, { recursive: true }); 
+        } catch (e) {
+          console.warn("Subpasta não existia ou erro ao remover:", e);
+        }
+      } catch (e) {
+        console.error("Erro ao limpar dados locais:", e);
+      }
+    }
+
+    // Salva estado e novas mídias na pasta local
+    async function triggerSaveState(tipo, cat, stateData) {
+      if (!activeDirectoryHandle) return;
+      try {
+        const { estadoDirHandle } = await ensureHierarchy(activeDirectoryHandle, tipo, cat);
+        if (stateData) {
+          await writeStateFile(estadoDirHandle, stateData);
+        }
+
+        const syncBadge = document.getElementById("syncBadge");
+        if (syncBadge) {
+          syncBadge.style.opacity = "0.5";
+          setTimeout(() => { syncBadge.style.opacity = "1"; }, 300);
+        }
+      } catch (e) {
+        console.error("Erro salvando estado local:", e);
+      }
+    }
+
+    // Sincroniza mídias (fotos e arquivos) nas respectivas pastas
+    async function triggerSaveMedia(tipo, cat, photosToSave, activePhotoNames, arquivosToSave, activeArquivoNames) {
+      if (!activeDirectoryHandle) return;
+      try {
+        const { fotosDirHandle, arquivosDirHandle } = await ensureHierarchy(activeDirectoryHandle, tipo, cat);
+        if (photosToSave || activePhotoNames) {
+          await syncFolderEntries(fotosDirHandle, photosToSave, activePhotoNames);
+        }
+        if (arquivosToSave || activeArquivoNames) {
+          await syncFolderEntries(arquivosDirHandle, arquivosToSave, activeArquivoNames);
+        }
+
+        const syncBadge = document.getElementById("syncBadge");
+        if (syncBadge) {
+          syncBadge.style.opacity = "0.5";
+          setTimeout(() => { syncBadge.style.opacity = "1"; }, 300);
+        }
+      } catch (e) {
+        console.error("Erro sincronizando mídias locais:", e);
+      }
+    }
+
+    // Processa uma ação da fila. Retorna true se ela gerou um payload de leitura (LOAD).
+    async function processAction(item) {
+      const action = item.action;
+      const tipo = item.tipo || "CRA";
+      const cat = item.cat || "Fiscalização";
+      if (action === "SAVE") {
+        await triggerSaveState(tipo, cat, item.state_data);
+      } else if (action === "SYNC_MEDIA") {
+        await triggerSaveMedia(
+          tipo, cat,
+          item.photos_to_save || [],
+          Array.isArray(item.active_photo_names) ? item.active_photo_names : null,
+          item.arquivos_to_save || [],
+          Array.isArray(item.active_arquivo_names) ? item.active_arquivo_names : null
+        );
+      } else if (action === "LOAD") {
+        await triggerLoadState(tipo, cat, true);
+        return "LOADED";
+      } else if (action === "CLEAR") {
+        await triggerClearState(tipo, cat);
+        return "CLEARED";
+      }
+      return null;
+    }
+
+    // Processa em série todas as ações ainda não executadas e devolve um ACK ao Streamlit
+    function flushMessageQueue() {
+      processingChain = processingChain.then(async () => {
+        if (!activeDirectoryHandle) return;
+        const pending = (latestQueue || [])
+          .filter(it => it && typeof it.version === "number" && it.version > lastProcessedVersion)
+          .sort((a, b) => a.version - b.version);
+        if (!pending.length) return;
+
+        let loaded = false;
+        let cleared = false;
+        for (const item of pending) {
+          try {
+            const kind = await processAction(item);
+            if (kind === "LOADED") { loaded = true; cleared = false; }
+            if (kind === "CLEARED") { cleared = true; loaded = false; lastLoadedPayload = null; }
+          } catch (e) {
+            console.error("Erro processando ação local:", item.action, e);
+          }
+          lastProcessedVersion = item.version;
+        }
+
+        if (loaded && lastLoadedPayload) {
+          lastLoadedPayload.ackVersion = lastProcessedVersion;
+          lastLoadedPayload.timestamp = Date.now();
+          Streamlit.setComponentValue(lastLoadedPayload);
+          lastLoadedPayload = null;
+        } else if (cleared) {
+          Streamlit.setComponentValue({
+            action: "CLEARED_ON_DISK",
+            ackVersion: lastProcessedVersion,
+            timestamp: Date.now()
+          });
+        } else {
+          Streamlit.setComponentValue({
+            action: "ACK",
+            ackVersion: lastProcessedVersion,
+            timestamp: Date.now()
+          });
+        }
+      });
+      return processingChain;
+    }
+
+    // Inicialização ao carregar o iframe
+    async function init() {
+      Streamlit.setFrameHeight(75);
+      Streamlit.setComponentReady();
+
+      try {
+        const savedHandle = await loadDirectoryHandle();
+        if (savedHandle) {
+          const perm = await savedHandle.queryPermission({ mode: "readwrite" });
+          if (perm === "granted") {
+            activeDirectoryHandle = savedHandle;
+            isConnected = true;
+            updateUI(true, savedHandle.name);
+            await triggerLoadState();
+            await flushMessageQueue();
+          } else {
+            pendingPermissionHandle = savedHandle;
+            updateUI(false, savedHandle.name, true);
+          }
+        } else {
+          updateUI(false);
+        }
+      } catch (e) {
+        updateUI(false);
+      }
+    }
+
+    // Escuta renderizações enviadas pelo Streamlit (Python -> Componente)
+    window.addEventListener("message", (event) => {
+      if (event.data && event.data.type === "streamlit:render") {
+        const args = event.data.args || {};
+        const tipo = args.tipo || "CRA";
+        const cat = args.cat || "Fiscalização";
+        currentReportKey = `${tipo}__${cat}`;
+        latestQueue = Array.isArray(args.queue) ? args.queue : [];
+
+        // Nova sessão do Streamlit (refresh): a numeração recomeça
+        if (args.sessionId && args.sessionId !== currentSessionId) {
+          currentSessionId = args.sessionId;
+          lastProcessedVersion = 0;
+        }
+        if (!latestQueue.length) return;
+        if (latestQueue.every(it => it.version <= lastProcessedVersion)) {
+          // Já processadas: apenas reconfirma para o Python limpar a fila
+          Streamlit.setComponentValue({ action: "ACK", ackVersion: lastProcessedVersion, timestamp: Date.now() });
+          return;
+        }
+        flushMessageQueue();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

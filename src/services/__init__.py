@@ -21,5 +21,14 @@ __all__ = [
     "comprimir_imagem",
     "obter_foto_preview",
     "obter_foto_base64",
+    "salvar_sessao_local",
+    "carregar_sessao_local",
+    "limpar_sessao_local",
 ]
+
+from services.session_cache_service import (
+    salvar_sessao_local,
+    carregar_sessao_local,
+    limpar_sessao_local
+)
 

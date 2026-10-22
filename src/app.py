@@ -29,12 +29,19 @@ from services.image_service import (
     verificar_foto_elegivel_relacionar,
     extrair_data_original_foto
 )
-from ui.state import inicializar_estado_sessao, obter_termos_ui
+from ui.state import (
+    inicializar_estado_sessao,
+    obter_termos_ui,
+    salvar_estado_relatorio_ativo,
+    enfileirar_acao_fs,
+    verificar_e_alternar_relatorio
+)
 from ui.modals import (
     mostrar_foto_modal,
     galeria_fotos_modal,
     confirmar_exclusao_lote_modal,
     confirmar_exclusao_nc_modal,
+    confirmar_limpar_registros_modal,
     gerenciar_responsaveis_modal,
     gerenciar_coordenadores_modal,
     gerenciar_contratos_modal,
@@ -54,6 +61,7 @@ from utils import (
     combinar_faixas_relacionadas
 )
 from ui.components.swiper import render_swiper_carousel
+from ui.components.local_storage import render_local_file_system_sync, RestoredLocalFile
 
 st.set_page_config(page_title="Gerador de Relatórios", layout="wide")
 
@@ -190,8 +198,7 @@ with col_center_group:
             st.session_state.widget_menu_tipo = st.session_state.tipo_relatorio
             st.rerun()
         elif tipo_sel != st.session_state.tipo_relatorio:
-            st.session_state.tipo_relatorio = tipo_sel
-            st.session_state.nc_form_step = 1
+            verificar_e_alternar_relatorio(tipo_sel, st.session_state.categoria_relatorio)
             st.rerun()
             
     with nav_col2:
@@ -207,12 +214,143 @@ with col_center_group:
             st.session_state.widget_menu_categoria = st.session_state.categoria_relatorio
             st.rerun()
         elif cat_sel != st.session_state.categoria_relatorio:
-            st.session_state.categoria_relatorio = cat_sel
-            st.session_state.nc_form_step = 1
+            verificar_e_alternar_relatorio(st.session_state.tipo_relatorio, cat_sel)
             st.rerun()
 
 # Layout principal da aplicação
 with st.container():
+
+    # Sincronização com pasta física local na máquina do usuário (geradorRelatorio)
+    # Ações legadas definidas via _pending_fs_action são convertidas para a fila versionada
+    if st.session_state.get("_pending_fs_action"):
+        _legacy_act = dict(st.session_state._pending_fs_action)
+        _legacy_act.pop("version", None)
+        st.session_state._pending_fs_action = None
+        enfileirar_acao_fs(_legacy_act)
+
+    if "_fs_session_id" not in st.session_state:
+        import uuid
+        st.session_state._fs_session_id = uuid.uuid4().hex
+
+    fs_res = render_local_file_system_sync(
+        queue=st.session_state.get("_fs_action_queue", []),
+        tipo=st.session_state.tipo_relatorio,
+        cat=st.session_state.categoria_relatorio,
+        session_id=st.session_state._fs_session_id,
+        key="local_fs_sync_widget"
+    )
+
+    # Processamento de respostas do sistema de arquivos local
+    if fs_res and isinstance(fs_res, dict):
+        current_fs_ts = fs_res.get("timestamp", 0)
+        last_fs_ts = st.session_state.get("_last_fs_sync_timestamp", 0)
+
+        # Só processa se for um evento novo (evita reprocessamento a cada clique ou reexecução do Streamlit)
+        if current_fs_ts > last_fs_ts:
+            st.session_state._last_fs_sync_timestamp = current_fs_ts
+            res_action = fs_res.get("action")
+
+            # Remove da fila as ações já confirmadas pelo navegador
+            ack_version = fs_res.get("ackVersion")
+            if isinstance(ack_version, (int, float)) and st.session_state.get("_fs_action_queue"):
+                st.session_state._fs_action_queue = [
+                    a for a in st.session_state._fs_action_queue if a.get("version", 0) > ack_version
+                ]
+
+            if res_action == "LOADED_FROM_DISK":
+                saved_state = fs_res.get("state")
+                if saved_state and isinstance(saved_state, dict):
+                    st.session_state.temp_fiscalizacoes = saved_state.get("temp_fiscalizacoes", [])
+                    st.session_state.temp_nc = saved_state.get("temp_nc", [])
+                    st.session_state.manual_relacao_map = saved_state.get("manual_relacao_map", {})
+                    if "pista_persistida" in saved_state:
+                        st.session_state.pista_persistida = saved_state.get("pista_persistida", "")
+                    if "trecho_persistido" in saved_state:
+                        st.session_state.trecho_persistido = saved_state.get("trecho_persistido", "")
+                    if "codificacao_persistida" in saved_state:
+                        st.session_state.codificacao_persistida = saved_state.get("codificacao_persistida", "")
+                    if "fundamento_persistido" in saved_state:
+                        st.session_state.fundamento_persistido = saved_state.get("fundamento_persistido", "")
+                    if "determinacao_persistida" in saved_state:
+                        st.session_state.determinacao_persistida = saved_state.get("determinacao_persistida", "")
+                    if "faixa_persistida" in saved_state:
+                        st.session_state.faixa_persistida = saved_state.get("faixa_persistida", "")
+
+                media_list = fs_res.get("media", [])
+                restored_photos = []
+                for item in media_list:
+                    name = item.get("name", "")
+                    size = item.get("size", 0)
+                    mime = item.get("type", "application/octet-stream")
+                    category = item.get("category", "")
+                    b64 = item.get("base64", "")
+                    lower_name = name.lower()
+
+                    if category == "foto" or any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+                        restored_photos.append(RestoredLocalFile(name, size, mime, b64))
+                    elif category == "arquivo" or any(lower_name.endswith(ext) for ext in [".xlsx", ".xls"]):
+                        st.session_state.uploaded_planilha_elegibilidade = RestoredLocalFile(name, size, mime, b64)
+                        st.session_state._planilha_salva_local = name
+                    elif category == "arquivo" or any(lower_name.endswith(ext) for ext in [".docx", ".doc"]):
+                        doc_file = RestoredLocalFile(name, size, mime, b64)
+                        st.session_state.uploaded_mon_anterior = doc_file
+                        st.session_state._mon_doc_salvo_local = name
+                        if is_monitoring:
+                            try:
+                                from monitoramento_utils import extrair_ncs_e_fotos_anterior
+                                st.session_state.old_photos_to_match = extrair_ncs_e_fotos_anterior(doc_file)
+                                label_counts = {}
+                                for itm in st.session_state.old_photos_to_match:
+                                    id_nc = str(itm.get("id_nc", "")).strip()
+                                    t = str(itm.get("trecho", "")).strip()
+                                    if len(t) > 35:
+                                        t = t[:32] + "..."
+                                    base_lbl = f"{id_nc} - {t}"
+                                    label_counts[base_lbl] = label_counts.get(base_lbl, 0) + 1
+                                label_curr_idx = {}
+                                for itm in st.session_state.old_photos_to_match:
+                                    id_nc = str(itm.get("id_nc", "")).strip()
+                                    t = str(itm.get("trecho", "")).strip()
+                                    if len(t) > 35:
+                                        t = t[:32] + "..."
+                                    base_lbl = f"{id_nc} - {t}"
+                                    total = label_counts[base_lbl]
+                                    if total > 1:
+                                        idx_l = label_curr_idx.get(base_lbl, 0) + 1
+                                        label_curr_idx[base_lbl] = idx_l
+                                        itm["display_label"] = f"{base_lbl} ({idx_l})"
+                                    else:
+                                        itm["display_label"] = base_lbl
+                            except Exception:
+                                pass
+
+                st.session_state._fotos_restauradas = restored_photos
+                st.session_state.fill_photos = restored_photos
+
+                st.rerun()
+
+            elif res_action == "CLEARED_ON_DISK":
+                st.session_state.temp_fiscalizacoes = []
+                st.session_state.temp_nc = []
+                st.session_state.manual_relacao_map = {}
+                st.session_state.fill_photos = []
+                st.session_state._fotos_restauradas = []
+                st.session_state._uploader_fotos_anteriores = []
+                st.session_state.pista_persistida = ""
+                st.session_state.trecho_persistido = ""
+                st.session_state.codificacao_persistida = ""
+                st.session_state.fundamento_persistido = ""
+                st.session_state.determinacao_persistida = ""
+                st.session_state.faixa_persistida = ""
+                st.session_state.photos_uploader_version = st.session_state.get("photos_uploader_version", 0) + 1
+                st.session_state.mon_uploader_version = st.session_state.get("mon_uploader_version", 0) + 1
+                if "uploaded_planilha_elegibilidade" in st.session_state:
+                    st.session_state.uploaded_planilha_elegibilidade = None
+                if "uploaded_mon_anterior" in st.session_state:
+                    st.session_state.uploaded_mon_anterior = None
+                st.session_state.old_photos_to_match = []
+                st.toast("Registros e mídias do relatório ativo limpos com sucesso na máquina local!", icon="🧹")
+                st.rerun()
 
     # 1. Upload de Fotos do Levantamento no início
     with st.container(border=True, key="upload_arquivos_container"):
@@ -285,8 +423,19 @@ with st.container():
             if st.button("Limpar", icon=":material/ink_eraser:", key="btn_clear_uploads", use_container_width=True):
                 st.session_state.photos_uploader_version += 1
                 st.session_state.fill_photos = []
+                st.session_state._fotos_restauradas = []
+                st.session_state._uploader_fotos_anteriores = []
                 if "carousel_index" in st.session_state:
                     st.session_state.carousel_index = 0
+                st.session_state._pending_fs_action = {
+                    "action": "SYNC_MEDIA",
+                    "tipo": st.session_state.tipo_relatorio,
+                    "cat": st.session_state.categoria_relatorio,
+                    "photos_to_save": [],
+                    "active_photo_names": [],
+                    "version": st.session_state.get("_fs_sync_version", 0) + 1
+                }
+                st.session_state._fs_sync_version = st.session_state._pending_fs_action["version"]
                 st.rerun()
 
         # Guarda a foto que estava ativa no carrossel para não perder o foco após reordenação
@@ -297,23 +446,65 @@ with st.container():
                 foto_ativa_anterior = st.session_state.fill_photos[idx_anterior].name
 
         sort_option = st.session_state.fill_photos_sort_option
-        if uploaded_nc_photos:
-            photos_to_sort = list(uploaded_nc_photos)
-            if sort_option == "Nome (A-Z / 0-9)":
-                photos_to_sort.sort(key=chave_ordenacao_natural)
-            elif sort_option == "Nome (Z-A / 9-0)":
-                photos_to_sort.sort(key=chave_ordenacao_natural, reverse=True)
-            # Se for "Ordem de Upload", preserva exatamente a ordem de envio original do uploader
-            st.session_state.fill_photos = photos_to_sort
 
-            # Se havia uma foto ativa antes, restaura o índice para essa mesma foto na nova ordem
-            if foto_ativa_anterior:
-                for new_idx, photo in enumerate(photos_to_sort):
-                    if photo.name == foto_ativa_anterior:
-                        st.session_state.carousel_index = new_idx
-                        break
-        else:
-            st.session_state.fill_photos = []
+        # Fotos atuais = fotos restauradas da pasta local + fotos presentes no uploader
+        uploads_atuais = list(uploaded_nc_photos or [])
+        nomes_upload = [getattr(p, "name", "") for p in uploads_atuais if getattr(p, "name", "")]
+        nomes_upload_set = set(nomes_upload)
+        restauradas = [
+            r for r in st.session_state.get("_fotos_restauradas", [])
+            if r.name not in nomes_upload_set
+        ]
+        todas_fotos = restauradas + uploads_atuais
+
+        # Detecta o que mudou no uploader desde a última execução (adição / remoção)
+        nomes_anteriores = st.session_state.get("_uploader_fotos_anteriores", [])
+        novas_fotos = [p for p in uploads_atuais if getattr(p, "name", "") not in nomes_anteriores]
+        houve_remocao = any(n not in nomes_upload_set for n in nomes_anteriores)
+
+        if novas_fotos or houve_remocao:
+            media_list = []
+            for p in novas_fotos:
+                try:
+                    raw = p.getvalue() if hasattr(p, "getvalue") else p.read()
+                    mime = getattr(p, "type", None) or "image/jpeg"
+                    media_list.append({
+                        "name": p.name,
+                        "size": getattr(p, "size", len(raw)),
+                        "type": mime,
+                        "base64": f"data:{mime};base64," + base64.b64encode(raw).decode("utf-8")
+                    })
+                except Exception:
+                    pass
+            st.session_state._uploader_fotos_anteriores = nomes_upload
+            st.session_state._fotos_restauradas = restauradas
+            # Sincroniza com geradorRelatorio/[tipo_cat]/midia/fotos/ (grava novas e apaga as removidas)
+            enfileirar_acao_fs({
+                "action": "SYNC_MEDIA",
+                "tipo": st.session_state.tipo_relatorio,
+                "cat": st.session_state.categoria_relatorio,
+                "photos_to_save": media_list,
+                "active_photo_names": [p.name for p in todas_fotos],
+            })
+            st.session_state.fill_photos = todas_fotos
+            st.rerun()
+
+        photos_to_sort = list(todas_fotos)
+        if sort_option == "Nome (A-Z / 0-9)":
+            photos_to_sort.sort(key=chave_ordenacao_natural)
+        elif sort_option == "Nome (Z-A / 9-0)":
+            photos_to_sort.sort(key=chave_ordenacao_natural, reverse=True)
+        # Se for "Ordem de Upload", preserva a ordem (restauradas primeiro, depois as do uploader)
+        st.session_state.fill_photos = photos_to_sort
+
+        # Se havia uma foto ativa antes, restaura o índice para essa mesma foto na nova ordem
+        if foto_ativa_anterior:
+            for new_idx, photo in enumerate(photos_to_sort):
+                if photo.name == foto_ativa_anterior:
+                    st.session_state.carousel_index = new_idx
+                    break
+        if restauradas:
+            st.caption(f":material/folder_open: **{len(restauradas)} foto(s)** recuperadas da pasta local (midia/fotos/).")
 
         # 1.1 Upload de Documentos Auxiliares
         uploaded_mon_anterior = None
@@ -336,14 +527,101 @@ with st.container():
                 key=f"planilha_elegibilidade_uploader_{st.session_state.planilha_elegibilidade_version}"
             )
             if uploaded_planilha_elegibilidade:
+                st.session_state._planilha_no_uploader = uploaded_planilha_elegibilidade.name
                 st.session_state.uploaded_planilha_elegibilidade = uploaded_planilha_elegibilidade
-            elif "uploaded_planilha_elegibilidade" in st.session_state:
+                if st.session_state.get("_planilha_salva_local") != uploaded_planilha_elegibilidade.name:
+                    try:
+                        raw = uploaded_planilha_elegibilidade.getvalue()
+                        b64 = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + base64.b64encode(raw).decode("utf-8")
+                        st.session_state._planilha_salva_local = uploaded_planilha_elegibilidade.name
+
+                        active_arq = [uploaded_planilha_elegibilidade.name]
+                        if st.session_state.get("_mon_doc_salvo_local"):
+                            active_arq.append(st.session_state._mon_doc_salvo_local)
+
+                        st.session_state._pending_fs_action = {
+                            "action": "SYNC_MEDIA",
+                            "tipo": st.session_state.tipo_relatorio,
+                            "cat": st.session_state.categoria_relatorio,
+                            "arquivos_to_save": [{
+                                "name": uploaded_planilha_elegibilidade.name,
+                                "size": len(raw),
+                                "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                "base64": b64
+                            }],
+                            "active_arquivo_names": active_arq,
+                            "version": st.session_state.get("_fs_sync_version", 0) + 1
+                        }
+                        st.session_state._fs_sync_version = st.session_state._pending_fs_action["version"]
+                        st.rerun()
+                    except Exception:
+                        pass
+            elif st.session_state.get("_planilha_no_uploader"):
+                # Usuário removeu a planilha do upload: remove também de midia/arquivos/
+                st.session_state._planilha_no_uploader = None
+                st.session_state._planilha_salva_local = None
                 st.session_state.uploaded_planilha_elegibilidade = None
+                active_arq = [st.session_state._mon_doc_salvo_local] if st.session_state.get("_mon_doc_salvo_local") else []
+                enfileirar_acao_fs({
+                    "action": "SYNC_MEDIA",
+                    "tipo": st.session_state.tipo_relatorio,
+                    "cat": st.session_state.categoria_relatorio,
+                    "arquivos_to_save": [],
+                    "active_arquivo_names": active_arq,
+                })
+                st.rerun()
+            elif st.session_state.get("uploaded_planilha_elegibilidade"):
+                st.caption(f":material/table_view: Planilha carregada da pasta local (midia/arquivos/): **{st.session_state.uploaded_planilha_elegibilidade.name}**")
 
         if "old_photos_to_match" not in st.session_state:
             st.session_state.old_photos_to_match = []
 
+        if is_monitoring and not uploaded_mon_anterior and st.session_state.get("_mon_doc_no_uploader"):
+            # Usuário removeu o documento anterior do upload: remove também de midia/arquivos/
+            st.session_state._mon_doc_no_uploader = None
+            st.session_state._mon_doc_salvo_local = None
+            st.session_state.uploaded_mon_anterior = None
+            st.session_state.old_photos_to_match = []
+            active_arq = [st.session_state._planilha_salva_local] if st.session_state.get("_planilha_salva_local") else []
+            enfileirar_acao_fs({
+                "action": "SYNC_MEDIA",
+                "tipo": st.session_state.tipo_relatorio,
+                "cat": st.session_state.categoria_relatorio,
+                "arquivos_to_save": [],
+                "active_arquivo_names": active_arq,
+            })
+            st.rerun()
+
         if is_monitoring and uploaded_mon_anterior:
+            st.session_state._mon_doc_no_uploader = uploaded_mon_anterior.name
+            if st.session_state.get("_mon_doc_salvo_local") != uploaded_mon_anterior.name:
+                try:
+                    raw = uploaded_mon_anterior.getvalue()
+                    b64 = "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64," + base64.b64encode(raw).decode("utf-8")
+                    st.session_state._mon_doc_salvo_local = uploaded_mon_anterior.name
+
+                    active_arq = [uploaded_mon_anterior.name]
+                    if st.session_state.get("_planilha_salva_local"):
+                        active_arq.append(st.session_state._planilha_salva_local)
+
+                    st.session_state._pending_fs_action = {
+                        "action": "SYNC_MEDIA",
+                        "tipo": st.session_state.tipo_relatorio,
+                        "cat": st.session_state.categoria_relatorio,
+                        "arquivos_to_save": [{
+                            "name": uploaded_mon_anterior.name,
+                            "size": len(raw),
+                            "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "base64": b64
+                        }],
+                        "active_arquivo_names": active_arq,
+                        "version": st.session_state.get("_fs_sync_version", 0) + 1
+                    }
+                    st.session_state._fs_sync_version = st.session_state._pending_fs_action["version"]
+                    st.rerun()
+                except Exception:
+                    pass
+
             last_parsed_key = f"last_parsed_{uploaded_mon_anterior.name}_{uploaded_mon_anterior.size}"
             if st.session_state.get("last_parsed_file") != last_parsed_key or not st.session_state.get("old_photos_to_match"):
                 from monitoramento_utils import extrair_ncs_e_fotos_anterior
@@ -376,10 +654,9 @@ with st.container():
                         
                 st.session_state.last_parsed_file = last_parsed_key
                 st.session_state.carousel_index = 0
-        elif is_monitoring and "last_parsed_file" in st.session_state and uploaded_mon_anterior is None:
-            # Se o usuário removeu explicitamente o arquivo do uploader, limpa as fotos
-            st.session_state.old_photos_to_match = []
-            del st.session_state.last_parsed_file
+        elif is_monitoring and st.session_state.get("old_photos_to_match") and not uploaded_mon_anterior:
+            doc_nome = getattr(st.session_state.get("uploaded_mon_anterior"), "name", "Documento anterior")
+            st.caption(f":material/description: **{len(st.session_state.old_photos_to_match)} registros** de {doc_nome} carregados da pasta local (midia/arquivos/).")
         elif not is_monitoring:
             st.session_state.old_photos_to_match = []
             if "last_parsed_file" in st.session_state:
@@ -505,6 +782,7 @@ with st.container():
                 if campos_em_branco:
                     st.warning(f"Atenção: Os seguintes campos opcionais de preenchimento ficaram em branco: {', '.join(campos_em_branco)}.")
                 
+                salvar_estado_relatorio_ativo()
                 st.session_state.last_added_fisc_msg = f"{term_fisc} {id_fisc} adicionado(a) com sucesso!"
                 st.rerun()
 
@@ -881,6 +1159,7 @@ with st.container():
                                             if "monitoring_new_photo_index" in st.session_state and st.session_state.fill_photos and st.session_state.monitoring_new_photo_index < len(st.session_state.fill_photos) - 1:
                                                 st.session_state.monitoring_new_photo_index += 1
                                         
+                                        salvar_estado_relatorio_ativo()
                                         st.session_state.nc_form_counter += 1
                                         st.session_state.pending_toast = {"msg": "Registro salvo com sucesso!", "icon": ":material/check_circle:"}
                                         st.rerun()
@@ -964,6 +1243,7 @@ with st.container():
                                 st.session_state.pista_persistida = st.session_state.step1_pista
                                 st.session_state.trecho_persistido = st.session_state.step1_trecho
                             
+                                salvar_estado_relatorio_ativo()
                                 st.session_state.nc_form_counter += 1
                                 st.session_state.nc_form_step = 1
                                 st.session_state.pending_toast = {"msg": f"Adicionado com sucesso ao ID {st.session_state.step1_id_vinculo}!", "icon": ":material/check_circle:"}
@@ -1288,6 +1568,7 @@ with st.container():
                                 st.session_state.determinacao_persistida = determinacao
                                 st.session_state.faixa_persistida = direcao_faixa
 
+                                salvar_estado_relatorio_ativo()
                                 st.session_state.nc_form_counter += 1
                                 st.session_state.pending_toast = {"msg": f"Adicionado com sucesso ao ID {id_vinculo}!", "icon": ":material/check_circle:"}
                                 st.rerun()
@@ -1788,23 +2069,20 @@ with st.container():
 
                 st.session_state.nc_form_counter += 1
                 st.session_state.nc_form_step = 1
+                salvar_estado_relatorio_ativo()
                 st.session_state.pending_toast = {"msg": "Auto preenchimento realizado com sucesso!", "icon": ":material/check_circle:"}
                 st.rerun()
             
     with col_limpar:
         if st.button("Limpar Registros", icon=":material/delete_forever:", type="secondary", use_container_width=True, key="btn_clear_all_data"):
-            # Mantém st.session_state.temp_fiscalizacoes e os campos de preenchimento de ID intactos
-            st.session_state.temp_nc = []
-            st.session_state.relatorios_preenchimento_data = []
-            if "planilha_download_bytes" in st.session_state:
-                del st.session_state.planilha_download_bytes
-            st.session_state.photos_uploader_version += 1
-            st.session_state.fill_photos = []
-            if "carousel_index" in st.session_state:
-                st.session_state.carousel_index = 0
-            st.session_state.pista_persistida = ""
-            st.session_state.trecho_persistido = ""
-            st.rerun()
+            st.session_state.show_confirm_limpar_registros = True
+
+    # Renderiza o modal de limpeza de registros isolada caso tenha sido solicitado
+    if st.session_state.get("show_confirm_limpar_registros", False):
+        confirmar_limpar_registros_modal(
+            tipo_relatorio=st.session_state.tipo_relatorio,
+            categoria_relatorio=st.session_state.categoria_relatorio
+        )
 
     # Exibir botões de download dos relatórios se gerados
     if st.session_state.relatorios_preenchimento_data:
