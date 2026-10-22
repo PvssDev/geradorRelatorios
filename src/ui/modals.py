@@ -8,7 +8,7 @@ from database.manager import (
     salvar_custom_ncs_socicam
 )
 from sections.quadros.quadros import MAP_SIGLAS, expandir_siglas
-from ui.state import sincronizar_opcoes_nc, BASE_NC_OPTIONS
+from ui.state import sincronizar_opcoes_nc, BASE_NC_OPTIONS, salvar_estado_relatorio_ativo
 from utils import (
     calcular_codificacao_cra,
     obter_proximo_numero_sequencial_cra,
@@ -168,6 +168,7 @@ def confirmar_exclusao_lote_modal(ids, term_plural_lower="fiscalizações", term
             st.session_state.temp_fiscalizacoes = [f for f in st.session_state.temp_fiscalizacoes if f["ID da Fiscalização"] not in ids]
             st.session_state.temp_nc = [nc for nc in st.session_state.temp_nc if nc["ID da Fiscalização"] not in ids]
             st.session_state.relatorios_preenchimento_data = []
+            salvar_estado_relatorio_ativo()
             st.session_state.pending_toast = f":green[:material/check_circle:] {term_plural} selecionadas excluídas com sucesso!"
             st.rerun()
     with col_nao:
@@ -207,11 +208,132 @@ def confirmar_exclusao_nc_modal(nc_keys):
             st.session_state.temp_nc = novas_ncs
             
             st.session_state.relatorios_preenchimento_data = []
+            salvar_estado_relatorio_ativo()
             st.session_state.pending_toast = ":green[:material/check_circle:] Não Conformidades selecionadas excluídas com sucesso!"
             st.rerun()
     with col_nao:
         if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_cancel_nc_del"):
             st.rerun()
+
+
+@st.dialog("Atenção: Limpar Registros", icon=":material/warning:")
+def confirmar_limpar_registros_modal(tipo_relatorio: str, categoria_relatorio: str):
+    """
+    Modal de confirmação para limpar apenas os registros do tipo e categoria ativos.
+    Exige tempo de segurança de 5 segundos para leitura antes de habilitar o botão vermelho de exclusão.
+    """
+    import time
+    from services.session_cache_service import limpar_sessao_local
+
+    st.markdown(
+        f"Você está prestes a resetar e **apagar todos os registros** de:<br/>"
+        f"<h3 style='color: #b91c1c; margin: 4px 0;'>{tipo_relatorio} — {categoria_relatorio}</h3>"
+        f"Ao confirmar, todos os dados salvos deste relatório específico serão **perdidos definitivamente**.",
+        unsafe_allow_html=True
+    )
+    st.write("")
+
+    # Gerenciamento do temporizador de 5 segundos
+    now = time.time()
+    if "_clear_modal_start_time" not in st.session_state:
+        st.session_state._clear_modal_start_time = now
+
+    elapsed = now - st.session_state._clear_modal_start_time
+    tempo_restante = max(0, int(5 - elapsed))
+
+    placeholder_info = st.empty()
+    placeholder_botoes = st.empty()
+
+    if tempo_restante > 0:
+        placeholder_info.warning(
+            f":material/timer: Por segurança, leia as instruções acima. "
+            f"O botão de exclusão será liberado em **{tempo_restante}s**..."
+        )
+        with placeholder_botoes.container():
+            col_del, col_canc = st.columns(2)
+            with col_del:
+                st.button(
+                    f"Excluir Tudo ({tempo_restante}s)",
+                    icon=":material/delete_forever:",
+                    disabled=True,
+                    use_container_width=True,
+                    key="btn_clear_confirm_disabled"
+                )
+            with col_canc:
+                if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_clear_cancel_wait"):
+                    if "_clear_modal_start_time" in st.session_state:
+                        del st.session_state._clear_modal_start_time
+                    st.session_state.show_confirm_limpar_registros = False
+                    st.rerun()
+
+        # Aguarda 1 segundo e força o rerun para atualizar o contador
+        time.sleep(1)
+        st.rerun()
+    else:
+        placeholder_info.error(
+            ":material/report: **Tempo de segurança concluído.** "
+            "A exclusão afetará única e exclusivamente este relatório."
+        )
+        with placeholder_botoes.container():
+            col_del, col_canc = st.columns(2)
+            with col_del:
+                with st.container(key="btn_container_perigo_excluir"):
+                    if st.button(
+                        "Sim, Excluir Definitivamente",
+                        icon=":material/delete_forever:",
+                        type="primary",
+                        use_container_width=True,
+                        key="btn_clear_confirm_action"
+                    ):
+                        # Reseta as listas do relatório ativo
+                        st.session_state.temp_nc = []
+                        st.session_state.temp_fiscalizacoes = []
+                        st.session_state.relatorios_preenchimento_data = []
+                        if "planilha_download_bytes" in st.session_state:
+                            del st.session_state.planilha_download_bytes
+                        st.session_state.photos_uploader_version += 1
+                        st.session_state.fill_photos = []
+                        if "carousel_index" in st.session_state:
+                            st.session_state.carousel_index = 0
+                        st.session_state.pista_persistida = ""
+                        st.session_state.trecho_persistido = ""
+                        st.session_state.codificacao_persistida = ""
+                        st.session_state.fundamento_persistido = ""
+                        st.session_state.determinacao_persistida = ""
+                        st.session_state.faixa_persistida = ""
+                        st.session_state.manual_relacao_map = {}
+                        st.session_state._fotos_restauradas = []
+                        st.session_state._uploader_fotos_anteriores = []
+                        st.session_state._planilha_salva_local = None
+                        st.session_state._mon_doc_salvo_local = None
+                        if "uploaded_planilha_elegibilidade" in st.session_state:
+                            st.session_state.uploaded_planilha_elegibilidade = None
+                        if "uploaded_mon_anterior" in st.session_state:
+                            st.session_state.uploaded_mon_anterior = None
+                        st.session_state.old_photos_to_match = []
+
+                        # Apaga o arquivo de cache correspondente em geradorRelatorios/
+                        limpar_sessao_local(tipo_relatorio, categoria_relatorio)
+
+                        # Enfileira remoção das subpastas midia e estado na máquina física do usuário
+                        from ui.state import enfileirar_acao_fs
+                        enfileirar_acao_fs({
+                            "action": "CLEAR",
+                            "tipo": tipo_relatorio,
+                            "cat": categoria_relatorio,
+                        })
+
+                        if "_clear_modal_start_time" in st.session_state:
+                            del st.session_state._clear_modal_start_time
+                        st.session_state.show_confirm_limpar_registros = False
+                        st.session_state.pending_toast = f":green[:material/check_circle:] Registros de {tipo_relatorio} ({categoria_relatorio}) resetados com sucesso!"
+                        st.rerun()
+            with col_canc:
+                if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_clear_cancel_done"):
+                    if "_clear_modal_start_time" in st.session_state:
+                        del st.session_state._clear_modal_start_time
+                    st.session_state.show_confirm_limpar_registros = False
+                    st.rerun()
 
 
 @st.dialog("Gerenciar Pessoal Responsável", icon=":material/group:")
@@ -566,6 +688,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
                             
+                            salvar_estado_relatorio_ativo()
                             st.session_state["fisc_edit_version"] = fisc_version + 1
                             st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas com sucesso para o ID '{novo_id_clean}'!"
                             st.rerun()
@@ -634,6 +757,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
+                            salvar_estado_relatorio_ativo()
                             st.session_state["nc_edit_version"] = nc_version + 1
                             st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
@@ -719,6 +843,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
+                            salvar_estado_relatorio_ativo()
                             st.session_state["nc_edit_version"] = nc_version + 1
                             st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
@@ -851,6 +976,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
+                            salvar_estado_relatorio_ativo()
                             st.session_state["nc_edit_version"] = nc_version + 1
                             st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
@@ -899,6 +1025,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             st.session_state.relatorios_preenchimento_data = []
                             if "planilha_download_bytes" in st.session_state:
                                 del st.session_state.planilha_download_bytes
+                            salvar_estado_relatorio_ativo()
                             st.session_state["nc_edit_version"] = nc_version + 1
                             st.session_state.pending_toast = f":green[:material/check_circle:] Alterações salvas para o item nº {nc_target.get('Nº', 1)}!"
                             st.rerun()
@@ -1275,6 +1402,7 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
             st.session_state.determinacao_persistida = last_nc.get("Determinação", "")
             st.session_state.faixa_persistida = rel_faixa.strip()
 
+            salvar_estado_relatorio_ativo()
             st.session_state.nc_form_counter += 1
             st.session_state.pending_toast = {"msg": "Foto relacionada com sucesso!", "icon": ":material/check_circle:"}
             st.rerun()

@@ -32,6 +32,8 @@ def _obter_payload_fotos(photos: list, nomes_em_nc_dict: dict, carousel_type: st
     for p in photos:
         if isinstance(p, str):
             photo_sig.append(p)
+        elif hasattr(p, "b64_data") and p.b64_data:
+            photo_sig.append((p.name, p.size, len(p.b64_data)))
         else:
             photo_sig.append((getattr(p, "name", ""), getattr(p, "size", 0)))
     current_sig = (tuple(photo_sig), nc_sig, carousel_type)
@@ -50,12 +52,16 @@ def _obter_payload_fotos(photos: list, nomes_em_nc_dict: dict, carousel_type: st
             name = os.path.basename(p)
             mtime = os.path.getmtime(p) if os.path.exists(p) else 0
             f_key = f"disk_{p}_{mtime}"
+            src = _obter_foto_src_cached(f_key, p)
+        elif hasattr(p, "b64_data") and p.b64_data:
+            name = p.name
+            src = p.b64_data
         else:
             name = getattr(p, "name", "foto.jpg")
             size = getattr(p, "size", 0)
             f_key = f"up_{name}_{size}"
+            src = _obter_foto_src_cached(f_key, p)
 
-        src = _obter_foto_src_cached(f_key, p)
         name_lower = name.lower()
         root_lower, _ = os.path.splitext(name_lower)
         is_nc = False

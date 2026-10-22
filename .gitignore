@@ -37,6 +37,7 @@ build/
 output/
 downloads/
 temp/
+geradorRelatorios/
 *.spec
 
 # Testes automatizados locais
