@@ -259,52 +259,13 @@ class BaseReport(ABC):
         pass
 
     def _replace_raw_text(self, text: str) -> str:
-        if not text:
-            return ""
-        return (text.replace("fiscalização", "monitoramento")
-                    .replace("Fiscalização", "Monitoramento")
-                    .replace("FISCALIZAÇÃO", "MONITORAMENTO")
-                    .replace("fiscalizações", "monitoramentos")
-                    .replace("Fiscalizações", "Monitoramentos")
-                    .replace("FISCALIZAÇÕES", "MONITORAMENTOS")
-                    .replace("fiscalizatória", "monitoradora")
-                    .replace("fiscalizatórias", "monitoradoras")
-                    .replace("Fiscalizatória", "Monitoradora")
-                    .replace("Fiscalizatórias", "Monitoradoras")
-                    .replace("fiscalizatório", "monitorador")
-                    .replace("fiscalizatórios", "monitoradores")
-                    .replace("Fiscalizatório", "Monitorador")
-                    .replace("Fiscalizatórios", "Monitoradores")
-                    .replace("fiscalizado", "monitorado")
-                    .replace("fiscalizados", "monitorados")
-                    .replace("Fiscalizado", "Monitorado")
-                    .replace("Fiscalizados", "Monitorados")
-                    .replace("FISCALIZADO", "MONITORADO")
-                    .replace("FISCALIZADOS", "MONITORADOS")
-                    .replace("fiscalizador", "monitorador")
-                    .replace("fiscalizadores", "monitoradores")
-                    .replace("Fiscalizador", "Monitorador")
-                    .replace("Fiscalizadores", "Monitorador")
-                    .replace("FISCALIZADOR", "MONITORADOR")
-                    .replace("FISCALIZADORES", "MONITORADORES")
-                    .replace("fiscalizadora", "monitoradora")
-                    .replace("fiscalizadoras", "monitoradoras")
-                    .replace("Fiscalizadora", "Monitoradora")
-                    .replace("Fiscalizadoras", "Monitoradoras")
-                    .replace("fiscalizar", "monitorar")
-                    .replace("Fiscalizar", "Monitorar")
-                    .replace("FISCALIZAR", "MONITORAR"))
+        from core.utils.text_transformer import transformar_para_monitoramento
+        return transformar_para_monitoramento(text)
 
     def _replace_text(self, paragraphs_list) -> list:
-        if not paragraphs_list:
-            return []
-        res = []
-        for p in paragraphs_list:
-            new_p = []
-            for text, bold, italic, color in p:
-                new_p.append((self._replace_raw_text(text), bold, italic, color))
-            res.append(new_p)
-        return res
+        from core.utils.text_transformer import transformar_paragrafos_monitoramento
+        return transformar_paragrafos_monitoramento(paragraphs_list)
+
 
 
 class BaseMonitoramentoMixin:

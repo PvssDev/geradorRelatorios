@@ -1,42 +1,83 @@
 # -*- coding: utf-8 -*-
+"""
+Especialização do Relatório para o CRA Monitoramento (Rota do Atlântico).
+Complexo Viário e Logístico de SUAPE – Express Way (Contrato CT Nº 043/2011 e Convênio ARPE/Suape nº 003/2021).
+Utiliza a nova Engine de Monitoramento em memória e templates padronizados.
+"""
 import os
-import re
-import pandas as pd
+from typing import Any, Dict, List, Optional, Tuple
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx import Document
+import pandas as pd
 
 from reports.base import BaseMonitoramentoMixin
 from reports.cra import CraReport
-from monitoramento_utils import (
+from core.interfaces.report_contracts import IReportContract
+from services.previous_report.previous_report_audit_service import (
     extrair_metadados_anterior,
     extrair_linhas_quadro1_anterior,
-    criar_tabela_quadro1_monitoramento,
+)
+from monitoramento_utils import criar_tabela_quadro1_monitoramento
+from reports.templates.cra_monitoramento_templates import (
+    CRA_MONITORAMENTO_KEY,
+    CRA_MONITORAMENTO_DISPLAY_NAME,
+    CRA_MONITORAMENTO_DEFAULT_CONTRATO,
+    CRA_MONITORAMENTO_CAPA_TITULO,
+    CRA_MONITORAMENTO_CAPA_CTR_NUMBER_TEMPLATE,
+    CRA_MONITORAMENTO_ABBREVIATIONS,
+    CRA_MONITORAMENTO_QUADRO1_COL_WIDTHS,
+    get_cra_monitoramento_quadro1_headers,
+    get_cra_monitoramento_objective_paragraphs,
+    get_cra_monitoramento_intro_paragraphs,
+    get_cra_monitoramento_objective_section_paragraphs,
+    get_cra_monitoramento_conclusions_paragraphs,
 )
 
 
-class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
+def _normalizar_pista(val: Any) -> str:
+    """Normaliza o nome da pista para evitar inconsistências entre strings vazias e 'Única'."""
+    s = str(val).strip() if not pd.isna(val) else ""
+    if not s or s.upper() in ["ÚNICA", "UNICA"]:
+        return "Única"
+    return s
+
+
+class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract):
+    """Relatório Técnico-Operacional de Monitoramento da Concessionária Rota do Atlântico (CRA)."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.N_prev = "X"
-        self.N_curr = "X"
+        self.N_prev = 0
+        self.N_curr = 1
         self.ctr_num = "XX/XXXX"
+        self.processo_sei_prev = "xxxxxxxx-xxx"
+        self.documento_anterior = None
 
     @property
     def key(self) -> str:
-        return "CRA_MONITORAMENTO"
+        return CRA_MONITORAMENTO_KEY
 
     @property
     def display_name(self) -> str:
-        return "CRA (Monitoramento)"
+        return CRA_MONITORAMENTO_DISPLAY_NAME
+
+    @property
+    def default_contrato(self) -> str:
+        return CRA_MONITORAMENTO_DEFAULT_CONTRATO
 
     @property
     def capa_titulo(self) -> str:
-        return "RELATÓRIO DO 1° MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL"
+        n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
+        return f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL"
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "COORDENADORIA DE TRANSPORTES E RODOVIAS\nRELATÓRIO DO 1° MONITORAMENTO DO PROCESSO\nDE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
+        n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
+        return (
+            "COORDENADORIA DE TRANSPORTES E RODOVIAS\n"
+            f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO\n"
+            "DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
+        )
 
     @property
     def sumario_before_abreviaturas(self) -> bool:
@@ -46,23 +87,10 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
     def signatures_before_apendices(self) -> bool:
         return True
 
-    def get_abbreviations(self) -> list:
-        return [
-            ("CRA", "Concessionária Rota do Atlântico"),
-            ("ECR", "ECR Engenharia Ltda"),
-            ("FD", "Faixa Direita"),
-            ("FE", "Faixa Esquerda"),
-            ("IGG", "Índice de Gravidade Global"),
-            ("IRI", "Índice Irregularidade Longitudinal"),
-            ("NC", "Não Conformidade"),
-            ("PDCL", "Programa de Desenvolvimento do Complexo Logístico, Anexo IV do Contrato de Concessão nº 043/2011"),
-            ("SUAPE", "Poder Concedente e Regulador do Contrato de Concessão firmado com a CRA"),
-            ("TPF", "TPF Engenharia Ltda"),
-            ("TDR", "Tronco Distribuidor Rodoviário"),
-            ("VI", "Verificador Independente contratado por SUAPE, atualmente o Consórcio formado pelas Empresas TPF e ECR")
-        ]
+    def get_abbreviations(self) -> List[Tuple[str, str]]:
+        return list(CRA_MONITORAMENTO_ABBREVIATIONS)
 
-    def get_process_sei_texts(self, row, ano=None) -> list:
+    def get_process_sei_texts(self, row: Any, ano: Optional[Any] = None) -> List[str]:
         from utils import extrair_mes_ano_numerico, extrair_ano
         if isinstance(row, (str, int)) and ano is None:
             ano = str(row)
@@ -71,27 +99,21 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
             ano = ano or extrair_ano(row.get("Data", "") if hasattr(row, "get") else row["Data"])
             data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
             mes_ano = extrair_mes_ano_numerico(data_val)
+
+        n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         return [
-            f"RELATÓRIO DO 1° MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}",
-            "SEI Nº xxxxxxxx-xxx"
+            f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}",
+            f"SEI Nº {self.processo_sei_prev}"
         ]
 
-    def get_objective_paragraphs(self, row) -> list:
-        return [
-            [(
-                "Este Relatório de Monitoramento tem por objetivo apresentar os resultados das vistorias realizadas pela ARPE "
-                "no Complexo Viário e Logístico de SUAPE referentes às Não Conformidades do relatório anterior.",
-                False, False, None
-            )]
-        ]
+    def get_objective_paragraphs(self, row: Any) -> List[Any]:
+        return get_cra_monitoramento_objective_paragraphs()
 
-    # ------------------------------------------------------------------
-    # Capa de Monitoramento CRA
-    # ------------------------------------------------------------------
-    def gerar_capa_monitoramento(self, doc, logo_path, row, documento_anterior):
-        style = doc.styles['Normal']
-        style.font.name = 'Aptos'
-        
+    def gerar_capa_monitoramento(self, doc: Any, logo_path: str, row: Any, documento_anterior: Any) -> None:
+        """Renderiza a capa do CRA Monitoramento com auditoria anterior integrada."""
+        style = doc.styles["Normal"]
+        style.font.name = "Aptos"
+
         section = doc.sections[0]
         section.page_width = Inches(8.27)
         section.page_height = Inches(11.69)
@@ -102,16 +124,16 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
 
         self.documento_anterior = documento_anterior
         meta = extrair_metadados_anterior(documento_anterior)
-        self.N_prev = meta["N_prev"]
-        self.N_curr = meta["N_curr"]
-        self.ctr_num = meta["ctr_num"] if meta["ctr_num"] != "XX/XXXX" else "07/2025"
-        self.processo_sei_prev = meta["processo_sei_prev"] if meta["processo_sei_prev"] not in ("XXXXXXXX", "xxxxxxxx", "xxxxxxxx-xxx", "") else "xxxxxxxx-xxx"
+        self.N_prev = meta.n_prev
+        self.N_curr = meta.n_curr
+        self.ctr_num = meta.ctr_num if meta.ctr_num != "XX/XXXX" else "07/2025"
+        self.processo_sei_prev = meta.processo_sei_prev if meta.processo_sei_prev not in ("XXXXXXXX", "xxxxxxxx", "") else "xxxxxxxx-xxx"
 
-        n_curr_str = f"{self.N_curr}º" if self.N_curr != "X" else "1º"
+        n_curr_str = meta.n_curr_ordinal
 
-        def add_cover_p(text, bold=True, size_pt=12, space_after=6, align=WD_ALIGN_PARAGRAPH.CENTER):
+        def add_cover_p(text: str, bold: bool = True, size_pt: int = 12, space_after: int = 6):
             p = doc.add_paragraph()
-            p.alignment = align
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p.paragraph_format.space_after = Pt(space_after)
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.line_spacing = 1.15
@@ -122,21 +144,21 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
                 run.bold = bold
             return p
 
-        # Cabeçalho Superior em 3 linhas
+        # Cabeçalho Superior
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("COORDENADORIA DE TRANSPORTES E RODOVIAS", bold=True, size_pt=12, space_after=4)
         add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO", bold=True, size_pt=12, space_after=4)
         add_cover_p(f"DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {self.ctr_num}", bold=True, size_pt=12, space_after=12)
 
-        # Imagem da Capa (capa_monitoramento.png)
+        # Imagem da Capa
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         capa_mon = os.path.join(base_dir, "assets", "capa_monitoramento.png")
         if not os.path.exists(capa_mon):
             capa_mon = os.path.join(base_dir, "assets", "capa_1.png")
         if not os.path.exists(capa_mon):
-            capa_mon = logo_path  # fallback
-            
+            capa_mon = logo_path
+
         if os.path.exists(capa_mon):
             doc.add_picture(capa_mon, width=Inches(5.90))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -154,10 +176,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         add_cover_p("", bold=False, size_pt=11, space_after=6)
         add_cover_p("Recife, data da assinatura eletrônica", bold=False, size_pt=11, space_after=0)
 
-    # ------------------------------------------------------------------
-    # Sumário Dinâmico
-    # ------------------------------------------------------------------
-    def get_sumario_linhas(self, row, nc_df=None) -> list:
+    def get_sumario_linhas(self, row: Any, nc_df: Any = None) -> List[str]:
         from utils import formatar_mes_ano
         try:
             mes_ano = formatar_mes_ano(row["Data"]).upper()
@@ -170,7 +189,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
             f"3.\tRESULTADOS DAS VISTORIAS DAS NÃO CONFORMIDADES – {mes_ano}\t5",
         ]
 
-        id_fisc = str(row.get("ID da Fiscalização", "")).strip()
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
         current_ncs = pd.DataFrame()
         if nc_df is not None and not nc_df.empty:
             if "ID da Fiscalização" in nc_df.columns:
@@ -182,11 +201,9 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         pistas_unicas = []
         if not current_ncs.empty and "Pista" in current_ncs.columns:
             for p in current_ncs["Pista"].tolist():
-                p_str = str(p).strip() if not pd.isna(p) else ""
-                if not p_str:
-                    p_str = "Única"
-                if p_str not in pistas_unicas:
-                    pistas_unicas.append(p_str)
+                p_norm = _normalizar_pista(p)
+                if p_norm not in pistas_unicas:
+                    pistas_unicas.append(p_norm)
 
         if not pistas_unicas:
             pistas_unicas = ["Sentido Sul", "Sentido Norte"]
@@ -210,29 +227,28 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
             "5.\tCONCLUSÕES E RECOMENDAÇÕES\t9",
             f"\tAPÊNDICE - MEMORIAL FOTOGRÁFICO - VISTORIAS REALIZADAS EM {mes_ano}\t10",
         ])
-
         return linhas
 
-    # ------------------------------------------------------------------
-    # Seções de Monitoramento 1 a 4
-    # ------------------------------------------------------------------
-    def gerar_secoes_monitoramento(self, doc, row, nc_df, total_achados, documento_anterior=None):
+    def gerar_secoes_monitoramento(self, doc: Any, row: Any, nc_df: Any, total_achados: int, documento_anterior: Any = None) -> None:
+        """Gera as Seções 1 a 4 com correção garantida de identificações e bounds checking."""
         from utils import adicionar_titulo_secao, formatar_data_extenso, formatar_mes_ano
 
         meta = extrair_metadados_anterior(documento_anterior)
-        N_curr = meta["N_curr"] if meta["N_curr"] != "X" else getattr(self, "N_curr", "1")
-        ctr_num = meta["ctr_num"] if meta["ctr_num"] != "XX/XXXX" else getattr(self, "ctr_num", "07/2025")
+        N_curr = meta.n_curr if meta.n_curr else self.N_curr
+        ctr_num = meta.ctr_num if meta.ctr_num != "XX/XXXX" else self.ctr_num
+        n_curr_str = f"{N_curr}º"
 
-        n_curr_str = f"{N_curr}º" if N_curr != "X" else "1º"
+        # Extração segura e tipada do Quadro 1 anterior (corrige o bug de ncs_from_prev)
+        itens_prev = extrair_linhas_quadro1_anterior(documento_anterior)
+        ncs_from_prev = [{"id_nc": it.id_nc, "info_ou_constatacao": it.info_ou_constatacao} for it in itens_prev]
 
         data_extenso = formatar_data_extenso(row["Data"])
         try:
-            from pandas import to_datetime
-            data_vistoria = to_datetime(row["Data"], dayfirst=True).strftime("%d/%m/%Y")
+            data_vistoria = pd.to_datetime(row["Data"], dayfirst=True).strftime("%d/%m/%Y")
         except Exception:
             data_vistoria = "14 e 15/04/2026"
 
-        id_fisc = str(row.get("ID da Fiscalização", "")).strip()
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
         mes_ano_cap = formatar_mes_ano(row["Data"]).upper()
 
         if nc_df is not None and not nc_df.empty:
@@ -241,7 +257,6 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
                 current_ncs = nc_df[mask_id].copy()
             else:
                 current_ncs = nc_df.copy()
-            
             if current_ncs.empty:
                 current_ncs = nc_df.copy()
 
@@ -254,9 +269,9 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         else:
             ncs_reais = pd.DataFrame()
 
-        def add_p(text, bold=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+        def add_p(text: str, bold: bool = False):
             p = doc.add_paragraph()
-            p.alignment = align
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             p.paragraph_format.space_after = Pt(6)
             p.paragraph_format.line_spacing = 1.15
             run = p.add_run(text)
@@ -265,7 +280,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
             run.bold = bold
             return p
 
-        def add_label_text(label, text):
+        def add_label_text(label: str, text: str):
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             p.paragraph_format.space_after = Pt(4)
@@ -282,28 +297,14 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         # 1. INTRODUÇÃO
         adicionar_titulo_secao(doc, "1. INTRODUÇÃO")
         doc.add_paragraph()
-        add_p(
-            f"Registra-se, preliminarmente, que o Relatório de Fiscalização Técnico-Operacional ARPE/CTR {ctr_num} "
-            f"registrou as Não Conformidades identificadas e foi devidamente encaminhado à Concessionária Rota do "
-            f"Atlântico (CRA) e aos órgãos concedentes para as providências cabíveis."
-        )
-        add_p(
-            f"A Concessionária Rota do Atlântico (CRA) apresentou o cronograma de obras atualizado por trecho, com detalhamento "
-            f"dos prazos de execução das ações de conservação especial do pavimento e sinalização viária."
-        )
-        add_p(
-            f"Neste contexto, este {n_curr_str} Relatório de Monitoramento descreve a evolução das Não Conformidades apontadas, "
-            f"com base nas vistorias técnicas realizadas pela equipe da ARPE em {data_extenso} no Sistema Viário Express Way."
-        )
+        for p_runs in get_cra_monitoramento_intro_paragraphs(ctr_num, n_curr_str, data_extenso):
+            add_p(p_runs[0][0])
 
         # 2. OBJETIVO
         adicionar_titulo_secao(doc, "2. OBJETIVO")
         doc.add_paragraph()
-        add_p(
-            f"Este {n_curr_str} Relatório de Monitoramento tem como objetivo apresentar os resultados das vistorias realizadas pela ARPE, "
-            f"em {data_vistoria}, no Sistema Viário Express Way referentes às Não Conformidades constantes do Relatório de Fiscalização "
-            f"Técnico-Operacional ARPE/CTR {ctr_num}."
-        )
+        for p_runs in get_cra_monitoramento_objective_section_paragraphs(ctr_num, n_curr_str, data_vistoria):
+            add_p(p_runs[0][0])
 
         # 3. RESULTADOS DAS VISTORIAS
         adicionar_titulo_secao(doc, f"3. RESULTADOS DAS VISTORIAS DAS NÃO CONFORMIDADES – {mes_ano_cap}")
@@ -319,11 +320,9 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         else:
             pistas_unicas = []
             for p in ncs_reais["Pista"].tolist():
-                p_str = str(p).strip() if not pd.isna(p) else ""
-                if not p_str:
-                    p_str = "Única"
-                if p_str not in pistas_unicas:
-                    pistas_unicas.append(p_str)
+                p_norm = _normalizar_pista(p)
+                if p_norm not in pistas_unicas:
+                    pistas_unicas.append(p_norm)
 
             for sub_idx, pista_val in enumerate(pistas_unicas, 1):
                 p_upper = pista_val.upper()
@@ -338,17 +337,16 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
                 else:
                     pista_display = p_upper
 
-                sub_title = f"3.{sub_idx} RODOVIA ESTADUAL PE - 009, {pista_display}"
-                adicionar_titulo_secao(doc, sub_title)
+                adicionar_titulo_secao(doc, f"3.{sub_idx} RODOVIA ESTADUAL PE - 009, {pista_display}")
                 doc.add_paragraph()
 
-                mask = ncs_reais["Pista"].apply(lambda x: (str(x).strip() if not pd.isna(x) else "") == (pista_val if pista_val != "Única" else ""))
+                mask = ncs_reais["Pista"].apply(lambda x: _normalizar_pista(x) == pista_val)
                 df_pista = ncs_reais[mask]
 
                 for row_idx, (_, nc_row) in enumerate(df_pista.reset_index(drop=True).iterrows()):
                     ident = str(nc_row.get("Identificação", "")).strip()
-                    
-                    # Logic to fallback to ident from previous doc just like CRC
+
+                    # Fallback seguro para id_nc anterior sem risco de NameError ou IndexError
                     if not ident or ident.lower().startswith("foto"):
                         if row_idx < len(ncs_from_prev):
                             ident = ncs_from_prev[row_idx]["id_nc"]
@@ -361,18 +359,12 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
 
                     if ident and not ident.lower().startswith("foto"):
                         add_p(ident, bold=True)
-                    
+
                     add_label_text("NÃO CONFORMIDADE: ", nc_desc if nc_desc else "A ser preenchido.")
                     add_label_text("POSICIONAMENTO CRA: ", determinacao if determinacao else "A ser preenchido.")
                     add_label_text("CONSTATAÇÃO: ", observacoes if observacoes else "A ser preenchido.")
 
-                    if analise_arpe:
-                        texto_analise = analise_arpe
-                    elif situacao:
-                        texto_analise = f"Não Conformidade {situacao.title()}."
-                    else:
-                        texto_analise = "A ser preenchido."
-
+                    texto_analise = analise_arpe if analise_arpe else (f"Não Conformidade {situacao.title()}." if situacao else "A ser preenchido.")
                     add_label_text("ANÁLISE ARPE: ", texto_analise)
                     doc.add_paragraph()
 
@@ -385,16 +377,13 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
             f"em continuidade às diligências necessárias ao monitoramento das respectivas soluções."
         )
 
-    # ------------------------------------------------------------------
-    # Renderização dos Quadros (Quadro 1 de 3 colunas)
-    # ------------------------------------------------------------------
     @property
     def quadros_section_title(self) -> str:
         return ""
 
-    def render_quadros(self, doc, row, nc_df, criar_tabela_quadros_fn):
+    def render_quadros(self, doc: Any, row: Any, nc_df: Any, criar_tabela_quadros_fn: Any) -> None:
         from utils import formatar_mes_ano
-        id_fisc = str(row.get("ID da Fiscalização", "")).strip()
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
         ctr_num = getattr(self, "ctr_num", "07/2025")
         try:
             mes_ano = formatar_mes_ano(row["Data"]).title()
@@ -424,54 +413,27 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         r_q2.font.name = "Aptos"
         r_q2.font.size = Pt(11)
 
-        doc_anterior_path = getattr(self, "documento_anterior", None)
-        ncs_from_prev = extrair_linhas_quadro1_anterior(doc_anterior_path)
+        # Extração das NCs anteriores via serviço tipado
+        doc_anterior = getattr(self, "documento_anterior", None)
+        itens_prev = extrair_linhas_quadro1_anterior(doc_anterior)
+        ncs_from_prev = [{"id_nc": it.id_nc, "info_ou_constatacao": it.info_ou_constatacao} for it in itens_prev]
 
-        headers = ["REFERÊNCIA", f"CONSTATAÇÃO / NÃO CONFORMIDADE RELATÓRIO ARPE/CTR {ctr_num}", "SITUAÇÃO"]
-        col_widths = [Inches(1.80), Inches(4.20), Inches(1.57)]
+        headers = get_cra_monitoramento_quadro1_headers(ctr_num)
+        col_widths = CRA_MONITORAMENTO_QUADRO1_COL_WIDTHS
         criar_tabela_quadro1_monitoramento(doc, headers, ncs_from_prev, ncs_reais, col_widths)
-
         doc.add_paragraph()
 
-    # ------------------------------------------------------------------
-    # Seção 5 — Conclusões e Recomendações
-    # ------------------------------------------------------------------
     @property
-    def finalizacao_sections_config(self) -> dict:
+    def finalizacao_sections_config(self) -> Dict[str, str]:
         return {"5": "conclusoes_monitoramento"}
 
-    def get_conclusions_monitoramento_paragraphs(self, total_ncs, data_extenso) -> list:
-        N_curr = getattr(self, "N_curr", "1")
-        n_curr_str = f"{N_curr}º" if N_curr != "X" else "1º"
+    def get_conclusions_monitoramento_paragraphs(self, total_ncs: int, data_extenso: str) -> List[Any]:
+        n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         ctr_num = getattr(self, "ctr_num", "07/2025")
+        return get_cra_monitoramento_conclusions_paragraphs(n_curr_str, ctr_num, data_extenso)
 
-        return [
-            [(
-                f"O resultado das vistorias realizadas nos dias {data_extenso} e das respectivas análises apresentadas neste "
-                f"{n_curr_str} Relatório de Monitoramento demonstram a evolução do tratamento das Não Conformidades identificadas no "
-                f"Relatório de Fiscalização Técnico-Operacional ARPE/CTR {ctr_num}. Recomenda-se que a Concessionária mantenha atualizado "
-                f"o cronograma das obras e soluções pendentes visando permitir à ARPE uma programação efetiva do monitoramento.",
-                False, False, None
-            )],
-            [(
-                f"Por fim, solicita-se dar conhecimento deste {n_curr_str} Relatório de Monitoramento do Relatório de Fiscalização "
-                f"Técnico-Operacional ARPE/CTR {ctr_num} à Diretoria de Desenvolvimento e Gestão Portuária de SUAPE para as devidas "
-                f"providências, em atendimento ao Convênio ARPE/Suape nº 003/2021.",
-                False, False, None
-            )],
-        ]
-
-    # ------------------------------------------------------------------
-    # Apêndice Fotográfico de Monitoramento
-    # ------------------------------------------------------------------
-    def render_apendices(self, doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos_fn):
-        from utils import adicionar_titulo_secao, formatar_mes_ano
-        from docx.shared import Pt
-
-        try:
-            mes_ano = formatar_mes_ano(row["Data"]).upper()
-        except Exception:
-            mes_ano = "ABRIL/2026"
+    def render_apendices(self, doc: Any, row: Any, ncs_reais: Any, pas_reais: Any, fotos_dir: Any, data_fisc: Any, ano: Any, criar_grade_fotos_fn: Any) -> None:
+        from utils import adicionar_titulo_secao
 
         p_ap = adicionar_titulo_secao(doc, f"APÊNDICE - MEMORIAL FOTOGRÁFICO - VISTORIAS REALIZADAS EM {data_fisc}")
         p_ap.paragraph_format.page_break_before = True
@@ -487,7 +449,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport):
         r_desc.font.name = "Aptos"
         r_desc.font.size = Pt(11)
 
-        local_val = row.get("Local", "")
+        local_val = row.get("Local", "") if hasattr(row, "get") else row["Local"]
         if not local_val or str(local_val).strip() in ("", "=Local="):
             local_val = "Rota do Atlântico"
 

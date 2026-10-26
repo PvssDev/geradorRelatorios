@@ -5,6 +5,8 @@ from ui.state import (
     salvar_estado_relatorio_ativo,
     carregar_estado_relatorio_ativo,
     verificar_e_alternar_relatorio,
+    ao_alternar_tipo_menu,
+    ao_alternar_categoria_menu,
     sincronizar_opcoes_nc,
     BASE_NC_OPTIONS
 )
@@ -15,6 +17,8 @@ __all__ = [
     "salvar_estado_relatorio_ativo",
     "carregar_estado_relatorio_ativo",
     "verificar_e_alternar_relatorio",
+    "ao_alternar_tipo_menu",
+    "ao_alternar_categoria_menu",
     "sincronizar_opcoes_nc",
     "BASE_NC_OPTIONS"
 ]
