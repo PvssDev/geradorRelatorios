@@ -34,7 +34,18 @@ from ui.state import (
     obter_termos_ui,
     salvar_estado_relatorio_ativo,
     enfileirar_acao_fs,
-    verificar_e_alternar_relatorio
+    verificar_e_alternar_relatorio,
+    resetar_estado_sessao_relatorio_ativo
+)
+from ui.controllers import ReportController
+from services.media_storage_service import (
+    salvar_fotos_disco,
+    carregar_fotos_disco,
+    limpar_fotos_disco,
+    salvar_documento_auxiliar_disco,
+    carregar_documento_auxiliar_disco,
+    limpar_documentos_auxiliares_disco,
+    obter_subpasta_relatorio,
 )
 from ui.modals import (
     mostrar_foto_modal,
@@ -183,39 +194,45 @@ with col_center_group:
     )
     
     st.markdown("<div id='main-nav-controls'></div>", unsafe_allow_html=True)
-    
+
+    def _ao_alternar_tipo_menu():
+        novo_tipo = st.session_state.get("widget_menu_tipo")
+        if not novo_tipo:
+            st.session_state.widget_menu_tipo = st.session_state.get("tipo_relatorio", "CRA")
+            return
+        if novo_tipo != st.session_state.get("tipo_relatorio"):
+            verificar_e_alternar_relatorio(novo_tipo, st.session_state.get("categoria_relatorio", "Fiscalização"))
+
+    def _ao_alternar_categoria_menu():
+        nova_cat = st.session_state.get("widget_menu_categoria")
+        if not nova_cat:
+            st.session_state.widget_menu_categoria = st.session_state.get("categoria_relatorio", "Fiscalização")
+            return
+        if nova_cat != st.session_state.get("categoria_relatorio"):
+            verificar_e_alternar_relatorio(st.session_state.get("tipo_relatorio", "CRA"), nova_cat)
+
     nav_spacer1, nav_col1, nav_col2, nav_spacer2 = st.columns([2.5, 3.5, 3.5, 2.5], vertical_alignment="center")
     with nav_col1:
-        tipo_sel = st.pills(
+        st.pills(
             "Tipo de Relatório", 
             ["CRA", "CRC", "SOCICAM"], 
             selection_mode="single", 
             default=st.session_state.tipo_relatorio, 
             key="widget_menu_tipo",
+            on_change=_ao_alternar_tipo_menu,
             label_visibility="collapsed"
         )
-        if tipo_sel is None:
-            st.session_state.widget_menu_tipo = st.session_state.tipo_relatorio
-            st.rerun()
-        elif tipo_sel != st.session_state.tipo_relatorio:
-            verificar_e_alternar_relatorio(tipo_sel, st.session_state.categoria_relatorio)
-            st.rerun()
             
     with nav_col2:
-        cat_sel = st.pills(
+        st.pills(
             "Categoria", 
             ["Fiscalização", "Monitoramento"], 
             selection_mode="single", 
             default=st.session_state.categoria_relatorio, 
             key="widget_menu_categoria",
+            on_change=_ao_alternar_categoria_menu,
             label_visibility="collapsed"
         )
-        if cat_sel is None:
-            st.session_state.widget_menu_categoria = st.session_state.categoria_relatorio
-            st.rerun()
-        elif cat_sel != st.session_state.categoria_relatorio:
-            verificar_e_alternar_relatorio(st.session_state.tipo_relatorio, cat_sel)
-            st.rerun()
 
 # Layout principal da aplicação
 with st.container():
@@ -232,8 +249,12 @@ with st.container():
         import uuid
         st.session_state._fs_session_id = uuid.uuid4().hex
 
+    fila_fs = st.session_state.get("_fs_action_queue", [])
+    if fila_fs:
+        pass
+
     fs_res = render_local_file_system_sync(
-        queue=st.session_state.get("_fs_action_queue", []),
+        queue=fila_fs,
         tipo=st.session_state.tipo_relatorio,
         cat=st.session_state.categoria_relatorio,
         session_id=st.session_state._fs_session_id,
@@ -249,6 +270,7 @@ with st.container():
         if current_fs_ts > last_fs_ts:
             st.session_state._last_fs_sync_timestamp = current_fs_ts
             res_action = fs_res.get("action")
+            ack_v = fs_res.get("ackVersion")
 
             # Remove da fila as ações já confirmadas pelo navegador
             ack_version = fs_res.get("ackVersion")
@@ -419,23 +441,13 @@ with st.container():
         with col_clear:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Alinhamento vertical
             st.markdown("<div style='white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; margin-bottom: 0.5rem;'>Limpar Fotos:</div>", unsafe_allow_html=True)
-            has_photos = len(uploaded_nc_photos) > 0 if uploaded_nc_photos else False
             if st.button("Limpar", icon=":material/ink_eraser:", key="btn_clear_uploads", use_container_width=True):
                 st.session_state.photos_uploader_version += 1
                 st.session_state.fill_photos = []
-                st.session_state._fotos_restauradas = []
                 st.session_state._uploader_fotos_anteriores = []
+                limpar_fotos_disco(st.session_state.tipo_relatorio, st.session_state.categoria_relatorio)
                 if "carousel_index" in st.session_state:
                     st.session_state.carousel_index = 0
-                st.session_state._pending_fs_action = {
-                    "action": "SYNC_MEDIA",
-                    "tipo": st.session_state.tipo_relatorio,
-                    "cat": st.session_state.categoria_relatorio,
-                    "photos_to_save": [],
-                    "active_photo_names": [],
-                    "version": st.session_state.get("_fs_sync_version", 0) + 1
-                }
-                st.session_state._fs_sync_version = st.session_state._pending_fs_action["version"]
                 st.rerun()
 
         # Guarda a foto que estava ativa no carrossel para não perder o foco após reordenação
@@ -447,66 +459,54 @@ with st.container():
 
         sort_option = st.session_state.fill_photos_sort_option
 
-        # Fotos atuais = fotos restauradas da pasta local + fotos presentes no uploader
+        # 1. PROCESSAMENTO DE UPLOAD DIRETO EM DISCO (COPIAR E COLAR NA PASTA MIDIA/FOTOS)
         uploads_atuais = list(uploaded_nc_photos or [])
         nomes_upload = [getattr(p, "name", "") for p in uploads_atuais if getattr(p, "name", "")]
-        nomes_upload_set = set(nomes_upload)
-        restauradas = [
-            r for r in st.session_state.get("_fotos_restauradas", [])
-            if r.name not in nomes_upload_set
-        ]
-        todas_fotos = restauradas + uploads_atuais
-
-        # Detecta o que mudou no uploader desde a última execução (adição / remoção)
         nomes_anteriores = st.session_state.get("_uploader_fotos_anteriores", [])
+
         novas_fotos = [p for p in uploads_atuais if getattr(p, "name", "") not in nomes_anteriores]
-        houve_remocao = any(n not in nomes_upload_set for n in nomes_anteriores)
+        houve_remocao = any(n not in set(nomes_upload) for n in nomes_anteriores)
 
         if novas_fotos or houve_remocao:
-            media_list = []
-            for p in novas_fotos:
-                try:
-                    raw = p.getvalue() if hasattr(p, "getvalue") else p.read()
-                    mime = getattr(p, "type", None) or "image/jpeg"
-                    media_list.append({
-                        "name": p.name,
-                        "size": getattr(p, "size", len(raw)),
-                        "type": mime,
-                        "base64": f"data:{mime};base64," + base64.b64encode(raw).decode("utf-8")
-                    })
-                except Exception:
-                    pass
+            # PRIMEIRO: Copia e cola fisicamente as fotos na pasta midia/fotos/
+            fotos_salvas = salvar_fotos_disco(
+                tipo_relatorio=st.session_state.tipo_relatorio,
+                categoria_relatorio=st.session_state.categoria_relatorio,
+                fotos_uploader=novas_fotos,
+                nomes_atuais_uploader=nomes_upload if houve_remocao else None,
+            )
             st.session_state._uploader_fotos_anteriores = nomes_upload
-            st.session_state._fotos_restauradas = restauradas
-            # Sincroniza com geradorRelatorio/[tipo_cat]/midia/fotos/ (grava novas e apaga as removidas)
-            enfileirar_acao_fs({
-                "action": "SYNC_MEDIA",
-                "tipo": st.session_state.tipo_relatorio,
-                "cat": st.session_state.categoria_relatorio,
-                "photos_to_save": media_list,
-                "active_photo_names": [p.name for p in todas_fotos],
-            })
-            st.session_state.fill_photos = todas_fotos
+            # SEGUNDO: Atualiza a lista oficial a partir dos arquivos salvos na pasta
+            st.session_state.fill_photos = fotos_salvas
             st.rerun()
+        elif not st.session_state.get("fill_photos"):
+            # Se a lista estiver vazia na sessão, carrega o que já estiver salvo na pasta midia/fotos/
+            st.session_state.fill_photos = carregar_fotos_disco(
+                st.session_state.tipo_relatorio,
+                st.session_state.categoria_relatorio
+            )
 
-        photos_to_sort = list(todas_fotos)
+        # 2. ORDENAÇÃO DAS FOTOS ATIVAS
+        photos_to_sort = list(st.session_state.get("fill_photos", []))
         if sort_option == "Nome (A-Z / 0-9)":
             photos_to_sort.sort(key=chave_ordenacao_natural)
         elif sort_option == "Nome (Z-A / 9-0)":
             photos_to_sort.sort(key=chave_ordenacao_natural, reverse=True)
-        # Se for "Ordem de Upload", preserva a ordem (restauradas primeiro, depois as do uploader)
         st.session_state.fill_photos = photos_to_sort
 
-        # Se havia uma foto ativa antes, restaura o índice para essa mesma foto na nova ordem
+        # Restaura o foco na foto ativa após ordenação
         if foto_ativa_anterior:
             for new_idx, photo in enumerate(photos_to_sort):
                 if photo.name == foto_ativa_anterior:
                     st.session_state.carousel_index = new_idx
                     break
-        if restauradas:
-            st.caption(f":material/folder_open: **{len(restauradas)} foto(s)** recuperadas da pasta local (midia/fotos/).")
 
-        # 1.1 Upload de Documentos Auxiliares
+        total_fotos = len(st.session_state.fill_photos)
+        if total_fotos > 0:
+            pasta_nome = obter_subpasta_relatorio(st.session_state.tipo_relatorio, st.session_state.categoria_relatorio)
+            st.caption(f":material/check_circle: **{total_fotos} foto(s)** salvas e ativas em `geradorRelatorios/{pasta_nome}/midia/fotos/`.")
+
+        # 1.1 Upload de Documentos Auxiliares (COPIAR E COLAR NA PASTA MIDIA/ARQUIVOS)
         uploaded_mon_anterior = None
         if is_monitoring:
             uploaded_mon_anterior = st.file_uploader(
@@ -515,6 +515,24 @@ with st.container():
                 help="Selecione o arquivo do monitoramento anterior (.doc, .docx)",
                 key=f"mon_anterior_uploader_{st.session_state.mon_uploader_version}"
             )
+            if uploaded_mon_anterior:
+                if st.session_state.get("_mon_doc_salvo_nome") != uploaded_mon_anterior.name:
+                    doc_salvo = salvar_documento_auxiliar_disco(
+                        st.session_state.tipo_relatorio,
+                        st.session_state.categoria_relatorio,
+                        uploaded_mon_anterior
+                    )
+                    st.session_state._mon_doc_salvo_nome = uploaded_mon_anterior.name
+                    st.session_state.uploaded_mon_anterior = doc_salvo
+                    st.rerun()
+            elif not st.session_state.get("uploaded_mon_anterior"):
+                doc_em_disco = carregar_documento_auxiliar_disco(
+                    st.session_state.tipo_relatorio,
+                    st.session_state.categoria_relatorio,
+                    extensoes=(".docx", ".doc")
+                )
+                if doc_em_disco:
+                    st.session_state.uploaded_mon_anterior = doc_em_disco
 
         uploaded_planilha_elegibilidade = None
         if st.session_state.get("tipo_relatorio", "CRA") == "CRA" and not is_monitoring:
@@ -527,51 +545,28 @@ with st.container():
                 key=f"planilha_elegibilidade_uploader_{st.session_state.planilha_elegibilidade_version}"
             )
             if uploaded_planilha_elegibilidade:
-                st.session_state._planilha_no_uploader = uploaded_planilha_elegibilidade.name
-                st.session_state.uploaded_planilha_elegibilidade = uploaded_planilha_elegibilidade
-                if st.session_state.get("_planilha_salva_local") != uploaded_planilha_elegibilidade.name:
-                    try:
-                        raw = uploaded_planilha_elegibilidade.getvalue()
-                        b64 = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + base64.b64encode(raw).decode("utf-8")
-                        st.session_state._planilha_salva_local = uploaded_planilha_elegibilidade.name
+                if st.session_state.get("_planilha_salva_nome") != uploaded_planilha_elegibilidade.name:
+                    planilha_salva = salvar_documento_auxiliar_disco(
+                        st.session_state.tipo_relatorio,
+                        st.session_state.categoria_relatorio,
+                        uploaded_planilha_elegibilidade
+                    )
+                    st.session_state._planilha_salva_nome = uploaded_planilha_elegibilidade.name
+                    st.session_state.uploaded_planilha_elegibilidade = planilha_salva
+                    st.rerun()
+            elif not st.session_state.get("uploaded_planilha_elegibilidade"):
+                planilha_em_disco = carregar_documento_auxiliar_disco(
+                    st.session_state.tipo_relatorio,
+                    st.session_state.categoria_relatorio,
+                    extensoes=(".xlsx", ".xls")
+                )
+                if planilha_em_disco:
+                    st.session_state.uploaded_planilha_elegibilidade = planilha_em_disco
 
-                        active_arq = [uploaded_planilha_elegibilidade.name]
-                        if st.session_state.get("_mon_doc_salvo_local"):
-                            active_arq.append(st.session_state._mon_doc_salvo_local)
-
-                        st.session_state._pending_fs_action = {
-                            "action": "SYNC_MEDIA",
-                            "tipo": st.session_state.tipo_relatorio,
-                            "cat": st.session_state.categoria_relatorio,
-                            "arquivos_to_save": [{
-                                "name": uploaded_planilha_elegibilidade.name,
-                                "size": len(raw),
-                                "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                "base64": b64
-                            }],
-                            "active_arquivo_names": active_arq,
-                            "version": st.session_state.get("_fs_sync_version", 0) + 1
-                        }
-                        st.session_state._fs_sync_version = st.session_state._pending_fs_action["version"]
-                        st.rerun()
-                    except Exception:
-                        pass
-            elif st.session_state.get("_planilha_no_uploader"):
-                # Usuário removeu a planilha do upload: remove também de midia/arquivos/
-                st.session_state._planilha_no_uploader = None
-                st.session_state._planilha_salva_local = None
-                st.session_state.uploaded_planilha_elegibilidade = None
-                active_arq = [st.session_state._mon_doc_salvo_local] if st.session_state.get("_mon_doc_salvo_local") else []
-                enfileirar_acao_fs({
-                    "action": "SYNC_MEDIA",
-                    "tipo": st.session_state.tipo_relatorio,
-                    "cat": st.session_state.categoria_relatorio,
-                    "arquivos_to_save": [],
-                    "active_arquivo_names": active_arq,
-                })
-                st.rerun()
-            elif st.session_state.get("uploaded_planilha_elegibilidade"):
-                st.caption(f":material/table_view: Planilha carregada da pasta local (midia/arquivos/): **{st.session_state.uploaded_planilha_elegibilidade.name}**")
+        if st.session_state.get("uploaded_planilha_elegibilidade"):
+            st.caption(f":material/table_view: Planilha salva em midia/arquivos/: **{st.session_state.uploaded_planilha_elegibilidade.name}**")
+        if is_monitoring and st.session_state.get("uploaded_mon_anterior"):
+            st.caption(f":material/description: Documento anterior salvo em midia/arquivos/: **{st.session_state.uploaded_mon_anterior.name}**")
 
         if "old_photos_to_match" not in st.session_state:
             st.session_state.old_photos_to_match = []
@@ -604,7 +599,7 @@ with st.container():
                     if st.session_state.get("_planilha_salva_local"):
                         active_arq.append(st.session_state._planilha_salva_local)
 
-                    st.session_state._pending_fs_action = {
+                    enfileirar_acao_fs({
                         "action": "SYNC_MEDIA",
                         "tipo": st.session_state.tipo_relatorio,
                         "cat": st.session_state.categoria_relatorio,
@@ -615,9 +610,7 @@ with st.container():
                             "base64": b64
                         }],
                         "active_arquivo_names": active_arq,
-                        "version": st.session_state.get("_fs_sync_version", 0) + 1
-                    }
-                    st.session_state._fs_sync_version = st.session_state._pending_fs_action["version"]
+                    })
                     st.rerun()
                 except Exception:
                     pass
@@ -1850,7 +1843,7 @@ with st.container():
                     
                 st.write("") # Espaçamento
         
-        col_relatorio, col_planilha, col_limpar = st.columns(3)
+        col_relatorio, col_planilha, col_limpar, col_reset = st.columns([3.4, 2.8, 2.0, 2.0], gap="small")
     
     # Inicializar estado para persistir os relatórios gerados via aba preenchimento
     if "relatorios_preenchimento_data" not in st.session_state:
@@ -1863,91 +1856,36 @@ with st.container():
             else:
                 with st.spinner("Gerando relatórios automaticamente..."):
                     st.session_state.relatorios_preenchimento_data = []
-                    excel_buffer = gerar_planilha_excel_buffer(
-                        st.session_state.temp_fiscalizacoes,
-                        st.session_state.temp_nc
-                    )
+                    try:
+                        tipo_key = st.session_state.get("tipo_relatorio", "CRA")
+                        cat_key = st.session_state.get("categoria_relatorio", "Fiscalização")
+                        otimizar_fotos = st.session_state.get("otimizar_fotos_relatorio", True)
+                        planilha_eleg_input = uploaded_planilha_elegibilidade or st.session_state.get("uploaded_planilha_elegibilidade")
 
-                    # 2. Criar diretório temporário para as fotos já enviadas
-                    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
-                        fotos_dir = os.path.join(temp_dir, "fotos")
-                        reports_dir = os.path.join(temp_dir, "reports")
-                        os.makedirs(fotos_dir, exist_ok=True)
-                        os.makedirs(reports_dir, exist_ok=True)
+                        arquivos_gerados, avisos_diag = ReportController.processar_geracao_relatorio(
+                            temp_fiscalizacoes=st.session_state.temp_fiscalizacoes,
+                            temp_nc=st.session_state.temp_nc,
+                            fill_photos=st.session_state.get("fill_photos", []),
+                            tipo_relatorio=tipo_key,
+                            categoria_relatorio=cat_key,
+                            uploaded_mon_anterior=uploaded_mon_anterior,
+                            uploaded_planilha_elegibilidade=planilha_eleg_input,
+                            otimizar_fotos=otimizar_fotos,
+                        )
 
-                        if "fill_photos" in st.session_state and st.session_state.fill_photos:
-                            otimizar_fotos = st.session_state.get("otimizar_fotos_relatorio", True)
-                            salvar_fotos_em_diretorio(
-                                st.session_state.fill_photos, 
-                                fotos_dir, 
-                                otimizar=otimizar_fotos, 
-                                target_size_kb=500
-                            )
+                        for aviso in avisos_diag:
+                            st.warning(aviso)
 
-                        # Diagnóstico: verificar fotos salvas vs fotos referenciadas nas NCs
-                        fotos_salvas = set(os.listdir(fotos_dir)) if os.path.isdir(fotos_dir) else set()
-                        fotos_referenciadas = set()
-                        for nc in st.session_state.temp_nc:
-                            foto_nome = nc.get("Foto", "")
-                            if foto_nome and isinstance(foto_nome, str) and foto_nome.strip():
-                                fotos_referenciadas.add(foto_nome.strip())
-
-                        if fotos_referenciadas and not fotos_salvas:
-                            st.warning(
-                                f"Diagnóstico de Fotos: As NCs referenciam {len(fotos_referenciadas)} foto(s), "
-                                f"mas nenhuma foto foi salva no diretório temporário. "
-                                f"Verifique se as fotos foram carregadas no uploader acima."
-                            )
-                        elif fotos_referenciadas:
-                            fotos_faltando = fotos_referenciadas - fotos_salvas
-                            if fotos_faltando:
-                                st.warning(
-                                    f"Diagnóstico de Fotos: {len(fotos_faltando)} foto(s) referenciada(s) nas NCs "
-                                    f"não foram encontrada(s) no diretório: {', '.join(sorted(fotos_faltando)[:5])}"
-                                    f"{'...' if len(fotos_faltando) > 5 else ''}"
-                                )
-
-                        try:
-                            tipo_key = st.session_state.get("tipo_relatorio", "CRA")
-                            if st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento":
-                                tipo_key = f"{tipo_key}_MONITORAMENTO"
-
-                            if tipo_key == "CRC_MONITORAMENTO" and not uploaded_mon_anterior:
-                                st.toast("Por favor, faça o upload do arquivo do monitoramento anterior (.docx) para gerar o relatório CRC Monitoramento.", icon=":material/error:")
-                                st.stop()
-
-                            planilha_eleg_input = uploaded_planilha_elegibilidade or st.session_state.get("uploaded_planilha_elegibilidade")
-                            import importlib
-                            import report
-                            importlib.reload(report)
-                            arquivos_gerados, _ = report.gerar_relatorio(
-                                caminho_planilha=excel_buffer,
-                                fotos_dir=fotos_dir,
-                                relatorios_dir=reports_dir,
-                                gerar_todos=True,
-                                tipo_relatorio=tipo_key,
-                                documento_anterior=uploaded_mon_anterior,
-                                planilha_elegibilidade=planilha_eleg_input
-                            )
-
-                            if not arquivos_gerados:
-                                st.warning("Nenhum relatório gerado.")
-                            else:
-                                for arquivo in arquivos_gerados:
-                                    nome_base = os.path.basename(arquivo)
-                                    with open(arquivo, "rb") as f:
-                                        st.session_state.relatorios_preenchimento_data.append({
-                                            "nome": nome_base,
-                                            "bytes": f.read()
-                                        })
-                                st.toast(f"{len(arquivos_gerados)} relatório(s) gerado(s) com sucesso!", icon=":material/check_circle:")
-                        except Exception as e:
-                            st.toast(f"Erro ao gerar relatórios: {e}", icon=":material/error:")
-                            st.exception(e)
-                        finally:
-                            import gc
-                            gc.collect()
-                            
+                        if not arquivos_gerados:
+                            st.warning("Nenhum relatório gerado.")
+                        else:
+                            st.session_state.relatorios_preenchimento_data = arquivos_gerados
+                            st.toast(f"{len(arquivos_gerados)} relatório(s) gerado(s) com sucesso!", icon=":material/check_circle:")
+                    except ValueError as ve:
+                        st.toast(str(ve), icon=":material/error:")
+                    except Exception as e:
+                        st.toast(f"Erro ao gerar relatórios: {e}", icon=":material/error:")
+                        st.exception(e)
     with col_planilha:
         disable_auto_fill = uploads_pendentes
         if st.button("Auto Preenchimento", icon=":material/magic_button:", disabled=disable_auto_fill, use_container_width=True, key="btn_auto_fill"):
@@ -1955,127 +1893,44 @@ with st.container():
                 st.toast(f"Não é possível realizar o auto preenchimento. Pendências: {', e '.join(mensagem_pendencias)}.", icon=":material/error:")
             else:
                 tipo_rel = st.session_state.get("tipo_relatorio", "CRA")
-                is_mon = st.session_state.get("categoria_relatorio", "Fiscalização") == "Monitoramento"
-                
-                # Definir valores padrão por tipo de relatório
-                if tipo_rel == "CRA":
-                    contrato = "CT. nº 043/2011"
-                    local_default = "Rota do Atlântico"
-                elif tipo_rel == "CRC":
-                    contrato = "CGPE-001/2006"
-                    local_default = "Sistema Viário do Paiva"
-                else: # SOCICAM
-                    contrato = "CT. nº 1.041.080/08"
-                    local_default = "=Local="
-
-                # Responsáveis
-                if st.session_state.pessoal_responsaveis:
-                    resp_nomes = ", ".join([r["nome"] for r in st.session_state.pessoal_responsaveis])
-                else:
-                    resp_nomes = "=Pessoal Responsável="
-
-                # Coordenador
-                if st.session_state.coordenadores:
-                    coord_nome = st.session_state.coordenadores[0]["nome"]
-                else:
-                    coord_nome = "=Coordenador="
-
-                # 1. Garante que exista pelo menos um registro de Fiscalização/Monitoramento
-                if not st.session_state.temp_fiscalizacoes:
-                    id_fisc_auto = f"=ID {term_fisc_prep}=" if term_fisc_prep else "=ID da Fiscalização="
-                    st.session_state.temp_fiscalizacoes.append({
-                        "ID da Fiscalização": id_fisc_auto,
-                        "Data": "=Data=",
-                        "Hora": "=Hora=" if tipo_rel == "CRA" else "",
-                        "Cidade": "=Cidade=" if tipo_rel == "CRA" else "",
-                        "Local": local_default,
-                        "Pessoal Responsável": resp_nomes,
-                        "Coordenador": coord_nome,
-                        "Contrato": contrato,
-                        "Período": "=Período=",
-                        "Relatório Gerado": False
-                    })
-                    id_vinculo = id_fisc_auto
-                    terminal_nc = local_default
-                else:
-                    id_vinculo = st.session_state.temp_fiscalizacoes[0]["ID da Fiscalização"]
-                    terminal_nc = st.session_state.temp_fiscalizacoes[0].get("Local", local_default)
-
-                # 2. Preencher Não Conformidades / Registros
-                st.session_state.temp_nc = []
-                
-                if is_mon and st.session_state.old_photos_to_match:
-                    for idx, item in enumerate(st.session_state.old_photos_to_match):
-                        foto_nova = st.session_state.fill_photos[idx % len(st.session_state.fill_photos)].name if st.session_state.fill_photos else ""
-                        foto_ant = item.get("old_photo_path", "")
-                        legenda_ant = item.get("old_legend", "")
-                        id_nc = item.get("id_nc", f"=Identificação {idx+1}=")
-                        trecho_val = item.get("trecho") or "=Trecho="
-                        pista_val = item.get("pista") or "=Pista="
-                        constatacao_val = item.get("constatacao") or "=CONSTATAÇÃO="
-                        
-                        if tipo_rel == "SOCICAM":
-                            pos_label = "=INFORMAÇÃO SOCICAM="
-                        elif tipo_rel == "CRA":
-                            pos_label = "=POSICIONAMENTO CRA="
-                        else:
-                            pos_label = "=POSICIONAMENTO CRC="
-
-                        rec = {
-                            "ID da Fiscalização": id_vinculo,
-                            "Nº": idx + 1,
-                            "Terminal": terminal_nc,
-                            "Pista": pista_val,
-                            "Trecho": trecho_val,
-                            "Não Conformidade": id_nc if tipo_rel in ["CRC", "SOCICAM", "CRA"] else "=Não Conformidade=",
-                            "Ponto de Atenção": "",
-                            "Foto": foto_nova,
-                            "Foto Anterior": foto_ant,
-                            "Legenda Anterior": legenda_ant,
-                            "Legenda da Foto": "=legenda da foto atual=",
-                            "Observações": constatacao_val if tipo_rel in ["CRC", "SOCICAM", "CRA"] else "=legenda da foto atual=",
-                            "Identificação": id_nc,
-                            "Direção (faixa)": "=Direção (faixa)=" if tipo_rel == "CRA" and not is_mon else "",
-                            "Fundamento da infração": "=Fundamento da infração=" if tipo_rel == "CRA" and not is_mon else "",
-                            "Determinação": pos_label if tipo_rel in ["CRC", "SOCICAM", "CRA"] else "=Determinação=",
-                            "Situação": "Pendente",
-                            "Análise ARPE": "=ANÁLISE ARPE="
-                        }
-                        st.session_state.temp_nc.append(rec)
-                elif st.session_state.fill_photos:
-                    for idx, photo in enumerate(st.session_state.fill_photos):
-                        i = idx + 1
-                        rec = {
-                            "ID da Fiscalização": id_vinculo,
-                            "Nº": i,
-                            "Terminal": terminal_nc,
-                            "Pista": "=Pista=" if tipo_rel == "CRA" else "",
-                            "Trecho": "=Trecho=" if tipo_rel == "CRA" else "",
-                            "Não Conformidade": "=Não Conformidade=",
-                            "Ponto de Atenção": "",
-                            "Foto": photo.name,
-                            "Foto Anterior": "",
-                            "Legenda Anterior": "",
-                            "Legenda da Foto": "=legenda da foto atual=",
-                            "Observações": "=Observações=",
-                            "Identificação": "=Não Conformidade=",
-                            "Direção (faixa)": "=Direção (faixa)=" if tipo_rel == "CRA" else "",
-                            "Fundamento da infração": "=Fundamento da infração=" if tipo_rel == "CRA" else "",
-                            "Determinação": "=Determinação=",
-                            "Situação": "Pendente",
-                            "Análise ARPE": "=Análise ARPE="
-                        }
-                        st.session_state.temp_nc.append(rec)
-
+                cat_rel = st.session_state.get("categoria_relatorio", "Fiscalização")
+                novas_fisc, novas_nc = ReportController.construir_auto_preenchimento(
+                    tipo_relatorio=tipo_rel,
+                    categoria_relatorio=cat_rel,
+                    term_fisc_prep=term_fisc_prep,
+                    pessoal_responsaveis=st.session_state.get("pessoal_responsaveis", []),
+                    coordenadores=st.session_state.get("coordenadores", []),
+                    temp_fiscalizacoes=st.session_state.get("temp_fiscalizacoes", []),
+                    fill_photos=st.session_state.get("fill_photos", []),
+                    old_photos_to_match=st.session_state.get("old_photos_to_match", []),
+                )
+                st.session_state.temp_fiscalizacoes = novas_fisc
+                st.session_state.temp_nc = novas_nc
                 st.session_state.nc_form_counter += 1
                 st.session_state.nc_form_step = 1
                 salvar_estado_relatorio_ativo()
                 st.session_state.pending_toast = {"msg": "Auto preenchimento realizado com sucesso!", "icon": ":material/check_circle:"}
                 st.rerun()
-            
     with col_limpar:
         if st.button("Limpar Registros", icon=":material/delete_forever:", type="secondary", use_container_width=True, key="btn_clear_all_data"):
             st.session_state.show_confirm_limpar_registros = True
+
+    with col_reset:
+        with st.popover("Limpar Estado", icon=":material/restart_alt:", use_container_width=True):
+            st.markdown("⚠️ **Resetar Relatório Atual**")
+            st.caption(
+                f"Apaga permanentemente o **arquivo de estado**, todas as **fotos** e **documentos auxiliares** salvos de **{st.session_state.tipo_relatorio} - {st.session_state.categoria_relatorio}**."
+            )
+            if st.button("Confirmar Limpeza Completa", icon=":material/delete_forever:", type="primary", use_container_width=True, key="btn_limpar_estado_relatorio"):
+                resetar_estado_sessao_relatorio_ativo(
+                    st.session_state.tipo_relatorio,
+                    st.session_state.categoria_relatorio
+                )
+                st.session_state.pending_toast = {
+                    "msg": f"Estado de {st.session_state.tipo_relatorio} ({st.session_state.categoria_relatorio}) resetado com sucesso!",
+                    "icon": ":material/check_circle:"
+                }
+                st.rerun()
 
     # Renderiza o modal de limpeza de registros isolada caso tenha sido solicitado
     if st.session_state.get("show_confirm_limpar_registros", False):
@@ -2083,6 +1938,7 @@ with st.container():
             tipo_relatorio=st.session_state.tipo_relatorio,
             categoria_relatorio=st.session_state.categoria_relatorio
         )
+
 
     # Exibir botões de download dos relatórios se gerados
     if st.session_state.relatorios_preenchimento_data:

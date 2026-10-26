@@ -1841,4 +1841,45 @@ div[class*="st-key-btn_container_perigo_excluir"] button:hover,
     transform: translateY(-1px) !important;
 }
 
+/* ==========================================
+   BOTÃO LIMPAR ESTADO DO RELATÓRIO (RESET COMPLETO)
+   ========================================== */
+.stApp div[class*="st-key-btn_limpar_estado"] button,
+.stApp .st-key-btn_limpar_estado button {
+    background: rgba(220, 38, 38, 0.08) !important;
+    color: #dc2626 !important;
+    border: 1.5px solid rgba(220, 38, 38, 0.35) !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+.stApp div[class*="st-key-btn_limpar_estado"] button *,
+.stApp .st-key-btn_limpar_estado button * {
+    color: #dc2626 !important;
+    fill: #dc2626 !important;
+    transition: all 0.25s ease !important;
+}
+
+.stApp div[class*="st-key-btn_limpar_estado"] button:hover,
+.stApp .st-key-btn_limpar_estado button:hover {
+    background-color: #dc2626 !important;
+    border-color: #b91c1c !important;
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+.stApp div[class*="st-key-btn_limpar_estado"] button:hover *,
+.stApp .st-key-btn_limpar_estado button:hover * {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+}
+
+.stApp div[class*="st-key-btn_limpar_estado"] button:active,
+.stApp .st-key-btn_limpar_estado button:active {
+    transform: translateY(0) scale(0.98) !important;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25) !important;
+}
+
+
 

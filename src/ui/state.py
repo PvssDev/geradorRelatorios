@@ -24,7 +24,10 @@ __all__ = [
     "salvar_estado_relatorio_ativo",
     "enfileirar_acao_fs",
     "verificar_e_alternar_relatorio",
-    "sincronizar_opcoes_nc"
+    "ao_alternar_tipo_menu",
+    "ao_alternar_categoria_menu",
+    "sincronizar_opcoes_nc",
+    "resetar_estado_sessao_relatorio_ativo"
 ]
 
 
@@ -191,8 +194,21 @@ def verificar_e_alternar_relatorio(novo_tipo: str, nova_categoria: str) -> None:
         # Atualiza para o novo par
         st.session_state.tipo_relatorio = novo_tipo
         st.session_state.categoria_relatorio = nova_categoria
-        st.session_state.widget_menu_tipo = novo_tipo
-        st.session_state.widget_menu_categoria = nova_categoria
+
+        # Sincroniza widgets de menu no session_state apenas se divergirem,
+        # prevenindo StreamlitAPIException caso o widget já tenha sido instanciado.
+        if st.session_state.get("widget_menu_tipo") != novo_tipo:
+            try:
+                st.session_state.widget_menu_tipo = novo_tipo
+            except Exception:
+                pass
+
+        if st.session_state.get("widget_menu_categoria") != nova_categoria:
+            try:
+                st.session_state.widget_menu_categoria = nova_categoria
+            except Exception:
+                pass
+
         st.session_state._ultimo_par_relatorio = novo_par
 
         # Carrega o cache do novo par selecionado
@@ -206,6 +222,26 @@ def verificar_e_alternar_relatorio(novo_tipo: str, nova_categoria: str) -> None:
             "tipo": novo_tipo,
             "cat": nova_categoria,
         })
+
+
+def ao_alternar_tipo_menu() -> None:
+    """Callback do widget st.pills de tipo de relatório."""
+    novo_tipo = st.session_state.get("widget_menu_tipo")
+    if not novo_tipo:
+        st.session_state.widget_menu_tipo = st.session_state.get("tipo_relatorio", "CRA")
+        return
+    if novo_tipo != st.session_state.get("tipo_relatorio"):
+        verificar_e_alternar_relatorio(novo_tipo, st.session_state.get("categoria_relatorio", "Fiscalização"))
+
+
+def ao_alternar_categoria_menu() -> None:
+    """Callback do widget st.pills de categoria de relatório."""
+    nova_cat = st.session_state.get("widget_menu_categoria")
+    if not nova_cat:
+        st.session_state.widget_menu_categoria = st.session_state.get("categoria_relatorio", "Fiscalização")
+        return
+    if nova_cat != st.session_state.get("categoria_relatorio"):
+        verificar_e_alternar_relatorio(st.session_state.get("tipo_relatorio", "CRA"), nova_cat)
 
 
 def sincronizar_opcoes_nc() -> None:
@@ -243,3 +279,49 @@ def sincronizar_opcoes_nc() -> None:
             socicam_options.append(val_to_add)
 
     st.session_state.socicam_nc_options = socicam_options
+
+
+def resetar_estado_sessao_relatorio_ativo(tipo_relatorio: str, categoria_relatorio: str) -> None:
+    """
+    Limpa todos os arquivos físicos no disco (JSON de estado, fotos e documentos auxiliares)
+    e reseta as variáveis do session_state correspondentes ao relatório selecionado.
+    """
+    from services.media_storage_service import limpar_estado_completo_relatorio_disco
+
+    # 1. Limpeza física no disco (JSON de estado, fotos e arquivos)
+    limpar_estado_completo_relatorio_disco(tipo_relatorio, categoria_relatorio)
+
+    # 2. Reset em memória no Streamlit
+    st.session_state.temp_fiscalizacoes = []
+    st.session_state.temp_nc = []
+    st.session_state.manual_relacao_map = {}
+    st.session_state.fill_photos = []
+    st.session_state._fotos_restauradas = []
+    st.session_state._uploader_fotos_anteriores = []
+    st.session_state.old_photos_to_match = []
+    st.session_state.uploaded_mon_anterior = None
+    st.session_state.uploaded_planilha_elegibilidade = None
+    st.session_state._mon_doc_salvo_nome = None
+    st.session_state._planilha_salva_nome = None
+
+    st.session_state.pista_persistida = ""
+    st.session_state.trecho_persistido = ""
+    st.session_state.codificacao_persistida = ""
+    st.session_state.fundamento_persistido = ""
+    st.session_state.determinacao_persistida = ""
+    st.session_state.faixa_persistida = ""
+
+    st.session_state.photos_uploader_version = st.session_state.get("photos_uploader_version", 0) + 1
+    st.session_state.mon_uploader_version = st.session_state.get("mon_uploader_version", 0) + 1
+    st.session_state.planilha_elegibilidade_version = st.session_state.get("planilha_elegibilidade_version", 0) + 1
+    st.session_state.carousel_index = 0
+    st.session_state.nc_form_step = 1
+    st.session_state.nc_form_counter = st.session_state.get("nc_form_counter", 0) + 1
+
+    # 3. Notifica sincronização de sistema de arquivos local se ativa
+    enfileirar_acao_fs({
+        "action": "CLEAR",
+        "tipo": tipo_relatorio,
+        "cat": categoria_relatorio,
+    })
+

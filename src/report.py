@@ -183,36 +183,47 @@ def gerar_relatorio(
         
         report_config = get_report(tipo_relatorio)
 
-        # Calcula o total de achados (soma de não conformidades com pontos de atenção no caso de CRA)
+        # Calcula o total de achados (soma de não conformidades com pontos de atenção no caso de CRA, CRC e SOCICAM)
         id_fisc_str = str(id_fisc).strip()
-        if not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
-            mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc_str
-            current_ncs = nc_df[mask_id].copy()
-            if current_ncs.empty and len(pendentes_unicos) == 1:
-                current_ncs = nc_df.copy()
-        elif not nc_df.empty:
-            current_ncs = nc_df.copy()
+        rep_key = getattr(report_config, "key", "")
+        if rep_key == "CRA":
+            from core.rules.cra_rules import classificar_achados_cra
+            total_achados = classificar_achados_cra(nc_df, id_fisc=id_fisc_str).total_achados
+        elif rep_key == "CRC":
+            from core.rules.crc_rules import classificar_achados_crc
+            total_achados = classificar_achados_crc(nc_df, id_fisc=id_fisc_str).total_achados
+        elif rep_key == "SOCICAM":
+            from core.rules.socicam_rules import classificar_achados_socicam
+            total_achados = classificar_achados_socicam(nc_df, id_fisc=id_fisc_str).total_achados
         else:
-            current_ncs = pd.DataFrame()
+            if not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
+                mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc_str
+                current_ncs = nc_df[mask_id].copy()
+                if current_ncs.empty and len(pendentes_unicos) == 1:
+                    current_ncs = nc_df.copy()
+            elif not nc_df.empty:
+                current_ncs = nc_df.copy()
+            else:
+                current_ncs = pd.DataFrame()
 
-        total_achados = 0
-        if not current_ncs.empty:
-            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
-            has_nc = 0
-            if col_nc:
-                has_nc = len(current_ncs[current_ncs[col_nc].fillna("").astype(str).str.strip() != ""])
-            if has_nc == 0:
-                cols_check = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Descrição da Evidência", "Descrição"] if c in current_ncs.columns]
-                if cols_check:
-                    mask_any = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
-                    has_nc = len(current_ncs[mask_any])
-                else:
-                    has_nc = len(current_ncs)
-            has_pa = 0
-            col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
-            if col_pa:
-                has_pa = len(current_ncs[current_ncs[col_pa].fillna("").astype(str).str.strip() != ""])
-            total_achados = has_nc + has_pa
+            total_achados = 0
+            if not current_ncs.empty:
+                col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
+                has_nc = 0
+                if col_nc:
+                    has_nc = len(current_ncs[current_ncs[col_nc].fillna("").astype(str).str.strip() != ""])
+                if has_nc == 0:
+                    cols_check = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Descrição da Evidência", "Descrição"] if c in current_ncs.columns]
+                    if cols_check:
+                        mask_any = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
+                        has_nc = len(current_ncs[mask_any])
+                    else:
+                        has_nc = len(current_ncs)
+                has_pa = 0
+                col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
+                if col_pa:
+                    has_pa = len(current_ncs[current_ncs[col_pa].fillna("").astype(str).str.strip() != ""])
+                total_achados = has_nc + has_pa
 
         # Primeira Página (Capa)
         is_monitoring = getattr(report_config, "is_monitoramento", False) or "MONITORAMENTO" in getattr(report_config, "key", "")

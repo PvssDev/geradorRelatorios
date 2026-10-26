@@ -408,6 +408,9 @@
       }
     };
 
+    // Notifica imediatamente que o componente está pronto para receber eventos
+    Streamlit.setComponentReady();
+
     let swiperInstance = null;
     let currentPhotosHash = "";
     let isInternalUpdate = false;
@@ -619,7 +622,7 @@
             <div class="slide-img-container">
               ${badgeCounter}
               ${badgeNc}
-              <img src="${photo.src}" class="slide-img" alt="${photo.name}" loading="lazy" />
+              <img src="${photo.src}" class="slide-img" alt="${photo.name}" decoding="async" />
               <div class="slide-overlay">
                 <span class="slide-title" title="${photo.name}">${photo.name}</span>
               </div>

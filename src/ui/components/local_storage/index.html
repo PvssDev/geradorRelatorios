@@ -183,6 +183,10 @@
       }
     };
 
+    // Notifica imediatamente que o componente está pronto para receber eventos
+    console.log("=== [ARPE-SYNC] COMPONENTE LOCAL STORAGE ATIVO (VERSAO_ATOB) ===");
+    Streamlit.setComponentReady();
+
     // Banco IndexedDB para guardar e restaurar o handle da pasta local selecionada
     const DB_NAME = "ARPE_Relatorios_DB";
     const DB_VERSION = 1;
@@ -289,6 +293,20 @@
       }
     }
 
+    // Converte string Base64 ou Data URL em Uint8Array diretamente em memória sem fetch()
+    function base64ToUint8Array(dataUrlOrBase64) {
+      if (!dataUrlOrBase64) return new Uint8Array(0);
+      const commaIdx = dataUrlOrBase64.indexOf(",");
+      const cleanB64 = commaIdx !== -1 ? dataUrlOrBase64.slice(commaIdx + 1) : dataUrlOrBase64;
+      const binaryString = atob(cleanB64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes;
+    }
+
     // Sincroniza arquivos em uma subpasta (grava novos e remove os excluídos no upload)
     async function syncFolderEntries(dirHandle, newFilesList, activeNamesList) {
       if (!dirHandle) return;
@@ -296,16 +314,22 @@
       // 1. Grava ou atualiza arquivos novos enviados
       if (newFilesList && newFilesList.length) {
         for (const item of newFilesList) {
+          if (!item.name || !item.base64) continue;
+          let writable = null;
           try {
-            if (!item.name || !item.base64) continue;
+            console.log(`[ARPE-SYNC] Gravando arquivo localmente: ${item.name}...`);
             const fileHandle = await dirHandle.getFileHandle(item.name, { create: true });
-            const writable = await fileHandle.createWritable();
-            const res = await fetch(item.base64);
-            const buf = await res.arrayBuffer();
-            await writable.write(buf);
+            writable = await fileHandle.createWritable();
+            const bytes = base64ToUint8Array(item.base64);
+            await writable.write(bytes);
             await writable.close();
+            writable = null;
+            console.log(`[ARPE-SYNC] Arquivo salvo com sucesso em disco: ${item.name} (${bytes.length} bytes)`);
           } catch (err) {
-            console.warn("Erro ao gravar arquivo em pasta local:", item.name, err);
+            console.error(`[ARPE-SYNC] Falha ao gravar arquivo em pasta local: ${item.name}`, err);
+            if (writable) {
+              try { await writable.abort(); } catch (_) {}
+            }
           }
         }
       }
@@ -319,15 +343,17 @@
               const entryNameLower = entry.name.toLowerCase().trim();
               if (!activeSet.has(entryNameLower)) {
                 try {
+                  console.log(`[ARPE-SYNC] Excluindo arquivo órfão do disco: ${entry.name}`);
                   await dirHandle.removeEntry(entry.name);
+                  console.log(`[ARPE-SYNC] Arquivo excluído com sucesso: ${entry.name}`);
                 } catch (delErr) {
-                  console.warn("Erro ao remover arquivo órfão da pasta local:", entry.name, delErr);
+                  console.error(`[ARPE-SYNC] Falha ao excluir arquivo órfão: ${entry.name}`, delErr);
                 }
               }
             }
           }
         } catch (e) {
-          console.warn("Erro ao varrer arquivos para sincronização:", e);
+          console.error("[ARPE-SYNC] Erro ao varrer arquivos para exclusão:", e);
         }
       }
     }
@@ -559,8 +585,12 @@
 
     // Sincroniza mídias (fotos e arquivos) nas respectivas pastas
     async function triggerSaveMedia(tipo, cat, photosToSave, activePhotoNames, arquivosToSave, activeArquivoNames) {
-      if (!activeDirectoryHandle) return;
+      if (!activeDirectoryHandle) {
+        console.warn("[ARPE-SYNC] Gravação de mídias ignorada: pasta local ainda não conectada.");
+        return;
+      }
       try {
+        console.log(`[ARPE-SYNC] triggerSaveMedia iniciado para ${tipo} ${cat}. Fotos: ${photosToSave ? photosToSave.length : 0}, Arquivos: ${arquivosToSave ? arquivosToSave.length : 0}`);
         const { fotosDirHandle, arquivosDirHandle } = await ensureHierarchy(activeDirectoryHandle, tipo, cat);
         if (photosToSave || activePhotoNames) {
           await syncFolderEntries(fotosDirHandle, photosToSave, activePhotoNames);
@@ -575,7 +605,7 @@
           setTimeout(() => { syncBadge.style.opacity = "1"; }, 300);
         }
       } catch (e) {
-        console.error("Erro sincronizando mídias locais:", e);
+        console.error("[ARPE-SYNC] Erro sincronizando mídias locais:", e);
       }
     }
 
@@ -584,6 +614,7 @@
       const action = item.action;
       const tipo = item.tipo || "CRA";
       const cat = item.cat || "Fiscalização";
+      console.log(`[ARPE-SYNC] Executando ação: ${action} (versão: ${item.version}) para ${tipo}_${cat}`);
       if (action === "SAVE") {
         await triggerSaveState(tipo, cat, item.state_data);
       } else if (action === "SYNC_MEDIA") {
@@ -607,10 +638,15 @@
     // Processa em série todas as ações ainda não executadas e devolve um ACK ao Streamlit
     function flushMessageQueue() {
       processingChain = processingChain.then(async () => {
-        if (!activeDirectoryHandle) return;
+        if (!activeDirectoryHandle) {
+          console.warn("[ARPE-SYNC] flushMessageQueue aguardando conexão da pasta local.");
+          return;
+        }
         const pending = (latestQueue || [])
           .filter(it => it && typeof it.version === "number" && it.version > lastProcessedVersion)
           .sort((a, b) => a.version - b.version);
+        
+        console.log(`[ARPE-SYNC] flushMessageQueue: ${pending.length} ação(ões) pendente(s) (última processada: v${lastProcessedVersion}).`);
         if (!pending.length) return;
 
         let loaded = false;
@@ -621,7 +657,7 @@
             if (kind === "LOADED") { loaded = true; cleared = false; }
             if (kind === "CLEARED") { cleared = true; loaded = false; lastLoadedPayload = null; }
           } catch (e) {
-            console.error("Erro processando ação local:", item.action, e);
+            console.error("[ARPE-SYNC] Erro processando ação local:", item.action, e);
           }
           lastProcessedVersion = item.version;
         }
@@ -650,8 +686,8 @@
 
     // Inicialização ao carregar o iframe
     async function init() {
-      Streamlit.setFrameHeight(75);
       Streamlit.setComponentReady();
+      Streamlit.setFrameHeight(75);
 
       try {
         const savedHandle = await loadDirectoryHandle();
@@ -689,6 +725,7 @@
           currentSessionId = args.sessionId;
           lastProcessedVersion = 0;
         }
+        console.log(`[ARPE-SYNC] streamlit:render recebido. Fila: ${latestQueue.length} item(ns). Sessão: ${args.sessionId || "default"} (última v${lastProcessedVersion})`);
         if (!latestQueue.length) return;
         if (latestQueue.every(it => it.version <= lastProcessedVersion)) {
           // Já processadas: apenas reconfirma para o Python limpar a fila
