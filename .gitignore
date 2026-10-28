@@ -38,6 +38,8 @@ downloads/
 temp/
 geradorRelatorios/
 *.spec
+.agents/
+.agents
 
 # Testes automatizados locais
 tests/
