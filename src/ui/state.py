@@ -1,4 +1,7 @@
-# -*- coding: utf-8 -*-
+import os
+import base64
+import mimetypes
+from typing import Optional, List, Dict, Any
 import streamlit as st
 from database.manager import (
     carregar_responsaveis,
@@ -23,6 +26,8 @@ __all__ = [
     "carregar_estado_relatorio_ativo",
     "salvar_estado_relatorio_ativo",
     "enfileirar_acao_fs",
+    "enfileirar_sincronizacao_midia",
+    "serializar_arquivo_para_payload_fs",
     "verificar_e_alternar_relatorio",
     "ao_alternar_tipo_menu",
     "ao_alternar_categoria_menu",
@@ -177,6 +182,96 @@ def enfileirar_acao_fs(acao: dict) -> None:
     fila = list(st.session_state.get("_fs_action_queue", []))
     fila.append(item)
     st.session_state._fs_action_queue = fila
+
+
+def serializar_arquivo_para_payload_fs(arquivo: Any) -> Optional[Dict[str, Any]]:
+    """Converte um arquivo enviado (UploadedFile, LocalMediaFile ou similar) em payload Base64 para Local Storage."""
+    if not arquivo:
+        return None
+    nome = getattr(arquivo, "name", None)
+    if not nome and isinstance(arquivo, str):
+        nome = os.path.basename(arquivo)
+    if not nome:
+        return None
+
+    # Se já for um RestoredLocalFile com Data URL prévia
+    if hasattr(arquivo, "b64_data") and getattr(arquivo, "b64_data"):
+        data_url = str(arquivo.b64_data)
+        size = getattr(arquivo, "size", 0)
+        mime = getattr(arquivo, "type", "application/octet-stream")
+        return {
+            "name": nome,
+            "size": size,
+            "type": mime,
+            "base64": data_url
+        }
+
+    raw_bytes = b""
+    if hasattr(arquivo, "seek"):
+        try:
+            arquivo.seek(0)
+        except Exception:
+            pass
+    if hasattr(arquivo, "getvalue"):
+        raw_bytes = arquivo.getvalue()
+    elif hasattr(arquivo, "read"):
+        raw_bytes = arquivo.read()
+        if hasattr(arquivo, "seek"):
+            try:
+                arquivo.seek(0)
+            except Exception:
+                pass
+    elif isinstance(arquivo, (bytes, bytearray)):
+        raw_bytes = bytes(arquivo)
+    elif hasattr(arquivo, "filepath") and os.path.exists(getattr(arquivo, "filepath")):
+        with open(getattr(arquivo, "filepath"), "rb") as f:
+            raw_bytes = f.read()
+    elif isinstance(arquivo, str) and os.path.exists(arquivo):
+        with open(arquivo, "rb") as f:
+            raw_bytes = f.read()
+
+    if not raw_bytes:
+        return None
+
+    mime, _ = mimetypes.guess_type(nome)
+    if not mime:
+        mime = getattr(arquivo, "type", "application/octet-stream") or "application/octet-stream"
+
+    b64_str = base64.b64encode(raw_bytes).decode("utf-8")
+    data_url = f"data:{mime};base64,{b64_str}"
+
+    return {
+        "name": nome,
+        "size": len(raw_bytes),
+        "type": mime,
+        "base64": data_url
+    }
+
+
+def enfileirar_sincronizacao_midia(
+    tipo: str,
+    cat: str,
+    photos_to_save: Optional[List[Dict[str, Any]]] = None,
+    active_photo_names: Optional[List[str]] = None,
+    arquivos_to_save: Optional[List[Dict[str, Any]]] = None,
+    active_arquivo_names: Optional[List[str]] = None,
+) -> None:
+    """Enfileira ação SYNC_MEDIA para sincronizar mídias na pasta física do usuário via File System Access API."""
+    acao = {
+        "action": "SYNC_MEDIA",
+        "tipo": tipo,
+        "cat": cat,
+    }
+    if photos_to_save is not None:
+        acao["photos_to_save"] = photos_to_save
+    if active_photo_names is not None:
+        acao["active_photo_names"] = active_photo_names
+    if arquivos_to_save is not None:
+        acao["arquivos_to_save"] = arquivos_to_save
+    if active_arquivo_names is not None:
+        acao["active_arquivo_names"] = active_arquivo_names
+
+    enfileirar_acao_fs(acao)
 
 
 def verificar_e_alternar_relatorio(novo_tipo: str, nova_categoria: str) -> None:

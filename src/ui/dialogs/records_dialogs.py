@@ -58,6 +58,7 @@ def confirmar_limpar_registros_modal(tipo_relatorio: str, categoria_relatorio: s
     """
     import time
     from services.session_cache_service import limpar_sessao_local
+    from services.media_storage_service import limpar_estado_completo_relatorio_disco
 
     st.markdown(
         f"Você está prestes a resetar e **apagar todos os registros** de:<br/>"
@@ -146,8 +147,8 @@ def confirmar_limpar_registros_modal(tipo_relatorio: str, categoria_relatorio: s
                             st.session_state.uploaded_mon_anterior = None
                         st.session_state.old_photos_to_match = []
 
-                        # Apaga o arquivo de cache correspondente em geradorRelatorios/
-                        limpar_sessao_local(tipo_relatorio, categoria_relatorio)
+                        # Apaga o arquivo de cache e mídias correspondentes no disco local do usuário
+                        limpar_estado_completo_relatorio_disco(tipo_relatorio, categoria_relatorio)
 
                         # Enfileira remoção das subpastas midia e estado na máquina física do usuário
                         from ui.state import enfileirar_acao_fs

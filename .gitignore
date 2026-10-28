@@ -12,7 +12,6 @@ ENV/
 
 # IDEs e configurações locais
 .cursor/
-.agents/
 .vscode/
 .idea/
 .pytest_cache/

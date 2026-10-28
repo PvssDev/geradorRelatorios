@@ -16,9 +16,9 @@ from typing import List, Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
-# Pasta base do repositório
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-CACHE_DIR = os.path.join(BASE_DIR, "geradorRelatorios")
+# Pasta local de cache e mídias na máquina do usuário (fora do código do projeto)
+USER_HOME = os.path.expanduser("~")
+CACHE_DIR = os.path.join(USER_HOME, "geradorRelatorios")
 
 # Extensões válidas de imagem
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
