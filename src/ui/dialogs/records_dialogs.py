@@ -174,6 +174,41 @@ def confirmar_limpar_registros_modal(tipo_relatorio: str, categoria_relatorio: s
 
 
 
+@st.dialog("Atenção: Limpar Registros e Estado", icon=":material/warning:")
+def confirmar_reset_estado_modal(tipo_relatorio: str, categoria_relatorio: str):
+    """
+    Modal unificado nativo para resetar permanentemente o estado, fotos e mídias
+    do relatório ativo tanto no navegador quanto na máquina física do usuário.
+    """
+    from ui.state import resetar_estado_sessao_relatorio_ativo
+
+    st.markdown(
+        f"Você está prestes a **resetar o estado completo** de:<br/>"
+        f"<h3 style='color: #b91c1c; margin: 4px 0;'>{tipo_relatorio} — {categoria_relatorio}</h3>"
+        f"Esta ação apagará permanentemente o **arquivo de estado**, todas as **fotos** e **documentos auxiliares** "
+        f"salvos desta modalidade, tanto no navegador quanto na pasta local física.",
+        unsafe_allow_html=True
+    )
+    st.write("")
+
+    col_sim, col_nao = st.columns(2)
+    with col_sim:
+        with st.container(key="btn_container_perigo_excluir"):
+            if st.button("Sim, Limpar Tudo", icon=":material/delete_forever:", type="primary", use_container_width=True, key="btn_confirm_reset_estado_action"):
+                resetar_estado_sessao_relatorio_ativo(tipo_relatorio, categoria_relatorio)
+                st.session_state.show_confirm_reset_estado = False
+                st.session_state.pending_toast = {
+                    "msg": f"Estado de {tipo_relatorio} ({categoria_relatorio}) resetado com sucesso!",
+                    "icon": ":material/check_circle:"
+                }
+                st.rerun()
+    with col_nao:
+        if st.button("Cancelar", icon=":material/close:", use_container_width=True, key="btn_cancel_reset_estado"):
+            st.session_state.show_confirm_reset_estado = False
+            st.rerun()
+
+
+
 def formatar_sigla_nc(sigla: str) -> str:
     """Retorna a sigla formatada com a sua descrição completa para exibição no seletor."""
     if not sigla:
@@ -595,18 +630,29 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                             nc_target["Identificação"] = ident
                             nc_target["Direção (faixa)"] = edit_direcao
 
-                            # Recalcular legenda formatada para CRA
+                            # Recalcular legenda formatada para CRA (sincronizando grupo relacionado se existir)
+                            from utils import carregar_mapa_siglas_completo
+                            from core.rules.cra_rules import sincronizar_legendas_grupo_cra
                             data_foto = nc_target.get("Data da Foto") or extrair_data_original_foto(nc_target.get("Foto"))
-                            nova_legenda = formatar_legenda_foto(
-                                num=nc_target.get("Nº", 1),
-                                codificacao=edit_codificacao or nc_target.get("Codificação", ""),
-                                siglas_ou_ncs=edit_pa_desc if edit_is_pa else edit_nc_desc,
-                                faixa=edit_direcao,
-                                data_foto=data_foto
-                            )
-                            nc_target["Observações"] = nova_legenda
-                            if "Legenda da Foto" in nc_target:
-                                nc_target["Legenda da Foto"] = nova_legenda
+                            nc_target["Data da Foto"] = data_foto
+                            grp_edit = str(nc_target.get("grupo_relacao") or "").strip()
+                            if grp_edit:
+                                sincronizar_legendas_grupo_cra(
+                                    st.session_state.temp_nc,
+                                    grp_edit,
+                                    mapa_siglas=carregar_mapa_siglas_completo(),
+                                )
+                            else:
+                                nova_legenda = formatar_legenda_foto(
+                                    num=nc_target.get("Nº", 1),
+                                    codificacao=edit_codificacao or nc_target.get("Codificação", ""),
+                                    siglas_ou_ncs=edit_pa_desc if edit_is_pa else edit_nc_desc,
+                                    faixa=edit_direcao,
+                                    data_foto=data_foto
+                                )
+                                nc_target["Observações"] = nova_legenda
+                                if "Legenda da Foto" in nc_target:
+                                    nc_target["Legenda da Foto"] = nova_legenda
                             nc_target["Fundamento da infração"] = edit_fundamento
                             nc_target["Determinação"] = edit_determinacao
                             st.session_state.relatorios_preenchimento_data = []

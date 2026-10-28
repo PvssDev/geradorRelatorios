@@ -8,6 +8,11 @@ from utils import (
     combinar_faixas_relacionadas,
     calcular_codificacao_cra,
     obter_proximo_numero_sequencial_cra,
+    carregar_mapa_siglas_completo,
+)
+from core.rules.cra_rules import (
+    consolidar_dados_legenda_grupo_cra,
+    sincronizar_legendas_grupo_cra,
 )
 from services.image_service import (
     extrair_data_original_foto,
@@ -16,6 +21,7 @@ from services.image_service import (
     foto_esta_em_nc,
     extrair_nome_foto,
 )
+from sections.quadros.quadros import MAP_SIGLAS, expandir_siglas
 
 @st.dialog("Visualização Completa da Imagem", width="large", icon=":material/zoom_in:")
 def mostrar_foto_modal(uploaded_file):
@@ -111,7 +117,66 @@ def galeria_fotos_modal(fotos=None, target_index_key="carousel_index"):
                         badge_str = f" {' '.join(badges)}" if badges else ""
 
                         st.caption(f"**#{orig_idx + 1}** {nome_curto}{badge_str}")
-                        
+
+                        # Botão X no canto superior direito para excluir a foto
+                        del_container = st.container(key=f"btn_gal_del_container_{orig_idx}")
+                        with del_container:
+                            if st.button(":material/close:", key=f"btn_gal_del_{orig_idx}", help=f"Excluir foto {nome}"):
+                                from services.media_storage_service import remover_foto_disco
+                                from ui.state import enfileirar_sincronizacao_midia
+
+                                tipo = st.session_state.get("tipo_relatorio", "CRA")
+                                cat = st.session_state.get("categoria_relatorio", "Fiscalização")
+
+                                # 0. Registra no conjunto de fotos excluídas da galeria para impedir ressuscitação pelo uploader
+                                if "_fotos_excluidas_galeria" not in st.session_state or not isinstance(st.session_state._fotos_excluidas_galeria, set):
+                                    st.session_state._fotos_excluidas_galeria = set()
+                                st.session_state._fotos_excluidas_galeria.add(nome)
+
+                                # 1. Apaga do disco local do backend
+                                remover_foto_disco(tipo, cat, nome)
+
+                                # 2. Atualiza a lista na sessão (fill_photos)
+                                fotos_atuais = st.session_state.get("fill_photos", [])
+                                novas_fotos = [
+                                    p for p in fotos_atuais
+                                    if (getattr(p, "name", None) or (os.path.basename(p) if isinstance(p, str) else str(p))) != nome
+                                ]
+                                st.session_state.fill_photos = novas_fotos
+
+                                # 3. Atualiza fotos restauradas e lista de uploaders
+                                if "_fotos_restauradas" in st.session_state and st.session_state._fotos_restauradas:
+                                    st.session_state._fotos_restauradas = [
+                                        p for p in st.session_state._fotos_restauradas
+                                        if (getattr(p, "name", None) or (os.path.basename(p) if isinstance(p, str) else str(p))) != nome
+                                    ]
+
+                                nomes_restantes = [
+                                    getattr(p, "name", os.path.basename(p) if isinstance(p, str) else str(p))
+                                    for p in novas_fotos
+                                ]
+                                st.session_state._uploader_fotos_anteriores = nomes_restantes
+
+                                # 4. Enfileira a remoção na File System Access API (máquina física do usuário)
+                                enfileirar_sincronizacao_midia(
+                                    tipo=tipo,
+                                    cat=cat,
+                                    photos_to_save=[],
+                                    active_photo_names=nomes_restantes,
+                                )
+
+                                # 5. Ajusta índices de visualização caso necessário
+                                if target_index_key in st.session_state:
+                                    st.session_state[target_index_key] = max(0, min(st.session_state[target_index_key], len(novas_fotos) - 1))
+                                if "carousel_index" in st.session_state:
+                                    st.session_state.carousel_index = max(0, min(st.session_state.carousel_index, len(novas_fotos) - 1))
+                                if "monitoring_new_photo_index" in st.session_state:
+                                    st.session_state.monitoring_new_photo_index = max(0, min(st.session_state.monitoring_new_photo_index, len(novas_fotos) - 1))
+
+                                st.toast(f"Foto '{nome}' removida com sucesso!", icon=":material/delete:")
+                                st.rerun()
+
+                        # Botão transparente de clique sobre o card para selecionar
                         if st.button("", key=f"btn_gal_pick_{orig_idx}_{target_index_key}"):
                             st.session_state[target_index_key] = orig_idx
                             st.rerun()
@@ -369,18 +434,37 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
             id_vinculo=target_id,
             tipo_registro=rel_tipo
         )
-        cod_prev_rel = calcular_codificacao_cra(base_limpa_prev, data_fisc=target_fisc_data, seq_idx=seq_prev)
         data_prev_rel = extrair_data_original_foto(foto_atual)
         faixa_combinada_prev = combinar_faixas_relacionadas(ant_faixa, rel_faixa)
+
+        ant_recs_prev = [
+            r for r in st.session_state.temp_nc
+            if (ant_grp_id and r.get("grupo_relacao") == ant_grp_id)
+            or (ant_nome and extrair_nome_foto(r.get("Foto")).lower() == ant_nome.lower())
+        ] or [last_nc]
+
+        sim_new_recs = [
+            {
+                "Codificação": calcular_codificacao_cra(base_limpa_prev, data_fisc=target_fisc_data, seq_idx=seq_prev + idx),
+                "Não Conformidade": s if rel_tipo == "Não Conformidade" else "",
+                "Ponto de Atenção": s if rel_tipo == "Ponto de Atenção" else "",
+                "Direção (faixa)": rel_faixa,
+            }
+            for idx, s in enumerate(rel_siglas or [])
+        ]
+        cod_grupo_prev, siglas_grupo_prev, faixa_grupo_prev = consolidar_dados_legenda_grupo_cra(
+            ant_recs_prev + sim_new_recs
+        )
+        faixa_efetiva_prev = faixa_grupo_prev or faixa_combinada_prev
         leg_prev = formatar_legenda_foto(
             num=foto_num_atual,
-            codificacao=cod_prev_rel,
-            siglas_ou_ncs=rel_siglas,
-            faixa=faixa_combinada_prev,
+            codificacao=cod_grupo_prev,
+            siglas_ou_ncs=siglas_grupo_prev,
+            faixa=faixa_efetiva_prev,
             data_foto=data_prev_rel
         )
-        st.caption(f":material/subtitles: **Legenda:** {leg_prev}")
-        if faixa_combinada_prev == "FED":
+        st.caption(f":material/subtitles: **Legenda (unificada do grupo):** {leg_prev}")
+        if faixa_efetiva_prev == "FED":
             st.caption(":material/sync_alt: **Faixa Combinada:** Como uma foto é da Esquerda e a outra da Direita, a legenda de ambas terá a sigla **FED**.")
 
     # Botões de Ação
@@ -392,53 +476,43 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                 st.error("Selecione ao menos uma sigla para confirmar a relação.")
                 return
 
-            foto_para_salvar = extrair_nome_foto(foto_atual) or foto_atual
-            faixa_combinada = combinar_faixas_relacionadas(ant_faixa, rel_faixa)
-            # No Quadro 2 a faixa deve aparecer por extenso
-            faixa_extenso = {"FE": "Esquerda", "FD": "Direita", "FED": "Esquerda e Direita"}.get(faixa_combinada, faixa_combinada)
-
-            # Colocar estado relacionado nas duas fotos que estão relacionadas:
-            # atualiza o registro base anterior (e todos os itens do mesmo grupo) para is_relacionado = True
-            # e atualiza a faixa e a legenda de ambos para a faixa combinada (ex: FED)
-            for rec in st.session_state.temp_nc:
-                if (ant_grp_id and rec.get("grupo_relacao") == ant_grp_id) or (ant_nome and extrair_nome_foto(rec.get("Foto")).lower() == ant_nome.lower()):
-                    rec["is_relacionado"] = True
-                    rec["Direção (faixa)"] = faixa_extenso
-                    r_cod = str(rec.get("Codificação") or rec.get("Trecho") or "")
-                    r_siglas = rec.get("Não Conformidade") or rec.get("Ponto de Atenção") or ""
-                    r_data = rec.get("Data da Foto") or extrair_data_original_foto(rec.get("Foto"))
-                    r_leg = formatar_legenda_foto(
-                        num=rec.get("Nº", 1),
-                        codificacao=r_cod,
-                        siglas_ou_ncs=r_siglas,
-                        faixa=faixa_combinada,
-                        data_foto=r_data
-                    )
-                    rec["Observações"] = r_leg
-                    rec["Legenda da Foto"] = r_leg
-
             if is_cra_fisc:
                 base_raw = rel_cod.strip() if rel_cod.strip() else ant_cod
                 if not base_raw:
                     st.error("A codificação é obrigatória! Por favor, preencha o campo Codificação para confirmar a relação.")
                     return
 
+            foto_para_salvar = extrair_nome_foto(foto_atual) or foto_atual
+            faixa_combinada = combinar_faixas_relacionadas(ant_faixa, rel_faixa)
+            # No Quadro 2 a faixa deve aparecer por extenso
+            faixa_extenso = {"FE": "Esquerda", "FD": "Direita", "FED": "Esquerda e Direita"}.get(faixa_combinada, faixa_combinada)
+            grp_rel_efetivo = ant_grp_id or f"grp_{target_id}_{ant_num}_{st.session_state.nc_form_counter}"
+
+            # Marca o registro anterior (e todos os itens do mesmo grupo) como relacionado
+            for rec in st.session_state.temp_nc:
+                if (ant_grp_id and rec.get("grupo_relacao") == ant_grp_id) or (ant_nome and extrair_nome_foto(rec.get("Foto")).lower() == ant_nome.lower()):
+                    rec["grupo_relacao"] = grp_rel_efetivo
+                    rec["is_relacionado"] = True
+                    rec["Direção (faixa)"] = faixa_extenso
+                    if not rec.get("Data da Foto"):
+                        rec["Data da Foto"] = extrair_data_original_foto(rec.get("Foto"))
+                    if not is_cra_fisc:
+                        r_cod = str(rec.get("Codificação") or rec.get("Trecho") or "")
+                        r_siglas = rec.get("Não Conformidade") or rec.get("Ponto de Atenção") or ""
+                        r_leg = formatar_legenda_foto(
+                            num=rec.get("Nº", 1),
+                            codificacao=r_cod,
+                            siglas_ou_ncs=r_siglas,
+                            faixa=faixa_combinada,
+                            data_foto=rec.get("Data da Foto")
+                        )
+                        rec["Observações"] = r_leg
+                        rec["Legenda da Foto"] = r_leg
+
+            if is_cra_fisc:
+                base_raw = rel_cod.strip() if rel_cod.strip() else ant_cod
                 base_limpa = base_raw.split("/")[0] if "/" in base_raw else base_raw
                 data_foto_rel = extrair_data_original_foto(foto_para_salvar)
-
-                seq_primeira = obter_proximo_numero_sequencial_cra(
-                    st.session_state.temp_nc,
-                    id_vinculo=target_id,
-                    tipo_registro=rel_tipo
-                )
-                cod_legenda_rel = calcular_codificacao_cra(base_limpa, data_fisc=target_fisc_data, seq_idx=seq_primeira)
-                legenda_relacionada = formatar_legenda_foto(
-                    num=foto_num_atual,
-                    codificacao=cod_legenda_rel,
-                    siglas_ou_ncs=rel_siglas,
-                    faixa=faixa_combinada,
-                    data_foto=data_foto_rel
-                )
 
                 for sigla in rel_siglas:
                     seq_tipo = obter_proximo_numero_sequencial_cra(
@@ -460,8 +534,8 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                         "Foto": foto_para_salvar,
                         "Foto Anterior": "",
                         "Legenda Anterior": "",
-                        "Observações": legenda_relacionada,
-                        "Legenda da Foto": legenda_relacionada,
+                        "Observações": "",
+                        "Legenda da Foto": "",
                         "Identificação": identificacao,
                         "Direção (faixa)": faixa_extenso,
                         "Fundamento da infração": last_nc.get("Fundamento da infração", ""),
@@ -469,10 +543,17 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
                         "Situação": last_nc.get("Situação", "Pendente"),
                         "Análise ARPE": "",
                         "is_relacionado": True,
-                        "grupo_relacao": ant_grp_id,
+                        "grupo_relacao": grp_rel_efetivo,
                         "Data da Foto": data_foto_rel
                     }
                     st.session_state.temp_nc.append(new_nc)
+
+                # Unifica a legenda (codificação contraída + todas as NCs/PAs + faixa combinada) em ambas as fotos do grupo
+                sincronizar_legendas_grupo_cra(
+                    st.session_state.temp_nc,
+                    grp_rel_efetivo,
+                    mapa_siglas=carregar_mapa_siglas_completo(),
+                )
             else:
                 nc_desc_str = ", ".join(rel_siglas) if rel_tipo == "Não Conformidade" else ""
                 pa_desc_str = ", ".join(rel_siglas) if rel_tipo == "Ponto de Atenção" else ""

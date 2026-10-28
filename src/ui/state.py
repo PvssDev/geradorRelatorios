@@ -139,6 +139,16 @@ def carregar_estado_relatorio_ativo() -> None:
             st.session_state.determinacao_persistida = dados.get("determinacao_persistida", "")
         if "faixa_persistida" in dados:
             st.session_state.faixa_persistida = dados.get("faixa_persistida", "")
+    else:
+        st.session_state.temp_fiscalizacoes = []
+        st.session_state.temp_nc = []
+        st.session_state.manual_relacao_map = {}
+        st.session_state.pista_persistida = ""
+        st.session_state.trecho_persistido = ""
+        st.session_state.codificacao_persistida = ""
+        st.session_state.fundamento_persistido = ""
+        st.session_state.determinacao_persistida = ""
+        st.session_state.faixa_persistida = ""
 
 
 def salvar_estado_relatorio_ativo(media_to_save: list = None) -> None:
@@ -276,17 +286,41 @@ def enfileirar_sincronizacao_midia(
 
 def verificar_e_alternar_relatorio(novo_tipo: str, nova_categoria: str) -> None:
     """
-    Ao alternar entre uma das 6 possibilidades de relatório, salva o relatório atual
-    e carrega os dados do novo relatório selecionado a partir do seu cache local.
+    Ao alternar entre uma das 6 possibilidades de relatório:
+    1. Salva o relatório atual antes de alternar;
+    2. Reseta as variáveis transitórias em memória e os uploaders do navegador;
+    3. Atualiza o tipo e categoria ativos;
+    4. Carrega o estado e as fotos da nova modalidade (se houver, restaura; se vazia, permanece limpa).
     """
     par_atual = (st.session_state.get("tipo_relatorio"), st.session_state.get("categoria_relatorio"))
     novo_par = (novo_tipo, nova_categoria)
 
     if par_atual != novo_par:
-        # Salva o estado atual antes de alternar
+        from services.media_storage_service import carregar_fotos_disco
+
+        # 1. Salva o estado atual antes de alternar
         salvar_estado_relatorio_ativo()
 
-        # Atualiza para o novo par
+        # 2. Reseta as variáveis transitórias em memória
+        st.session_state.temp_fiscalizacoes = []
+        st.session_state.temp_nc = []
+        st.session_state.manual_relacao_map = {}
+        st.session_state.fill_photos = []
+        st.session_state._fotos_restauradas = []
+        st.session_state._uploader_fotos_anteriores = []
+        st.session_state._fotos_excluidas_galeria = set()
+        st.session_state.uploaded_mon_anterior = None
+        st.session_state.uploaded_planilha_elegibilidade = None
+        st.session_state.old_photos_to_match = []
+        st.session_state.carousel_index = 0
+        st.session_state.nc_form_step = 1
+
+        # Reseta os uploaders (incrementa a versão para o browser descartar os arquivos antigos)
+        st.session_state.photos_uploader_version = st.session_state.get("photos_uploader_version", 0) + 1
+        st.session_state.mon_uploader_version = st.session_state.get("mon_uploader_version", 0) + 1
+        st.session_state.planilha_elegibilidade_version = st.session_state.get("planilha_elegibilidade_version", 0) + 1
+
+        # 3. Atualiza para o novo par
         st.session_state.tipo_relatorio = novo_tipo
         st.session_state.categoria_relatorio = nova_categoria
 
@@ -306,12 +340,17 @@ def verificar_e_alternar_relatorio(novo_tipo: str, nova_categoria: str) -> None:
 
         st.session_state._ultimo_par_relatorio = novo_par
 
-        # Carrega o cache do novo par selecionado
+        # 4. Carrega o estado JSON da nova modalidade
         carregar_estado_relatorio_ativo()
-        st.session_state.nc_form_step = 1
-        st.session_state.carousel_index = 0
 
-        # Enfileira leitura da pasta física do usuário para o novo par
+        # 5. Carrega as fotos da nova modalidade salvas em disco (se existirem)
+        fotos_salvas = carregar_fotos_disco(novo_tipo, nova_categoria)
+        if fotos_salvas:
+            st.session_state.fill_photos = fotos_salvas
+            st.session_state._fotos_restauradas = fotos_salvas
+            st.session_state._uploader_fotos_anteriores = []
+
+        # 6. Enfileira leitura da pasta física do usuário para o novo par
         enfileirar_acao_fs({
             "action": "LOAD",
             "tipo": novo_tipo,
@@ -393,6 +432,7 @@ def resetar_estado_sessao_relatorio_ativo(tipo_relatorio: str, categoria_relator
     st.session_state.fill_photos = []
     st.session_state._fotos_restauradas = []
     st.session_state._uploader_fotos_anteriores = []
+    st.session_state._fotos_excluidas_galeria = set()
     st.session_state.old_photos_to_match = []
     st.session_state.uploaded_mon_anterior = None
     st.session_state.uploaded_planilha_elegibilidade = None

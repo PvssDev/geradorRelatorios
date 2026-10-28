@@ -11,6 +11,7 @@ from ui.dialogs.photo_dialogs import (
 from ui.dialogs.records_dialogs import (
     confirmar_exclusao_nc_modal,
     confirmar_limpar_registros_modal,
+    confirmar_reset_estado_modal,
     formatar_sigla_nc,
     obter_lista_siglas_atuais,
     editar_registros_relatorio_modal,
@@ -31,6 +32,7 @@ __all__ = [
     "relacionar_foto_modal",
     "confirmar_exclusao_nc_modal",
     "confirmar_limpar_registros_modal",
+    "confirmar_reset_estado_modal",
     "formatar_sigla_nc",
     "obter_lista_siglas_atuais",
     "editar_registros_relatorio_modal",

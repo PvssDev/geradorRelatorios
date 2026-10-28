@@ -65,6 +65,7 @@ from ui.modals import (
     confirmar_exclusao_lote_modal,
     confirmar_exclusao_nc_modal,
     confirmar_limpar_registros_modal,
+    confirmar_reset_estado_modal,
     gerenciar_responsaveis_modal,
     gerenciar_coordenadores_modal,
     gerenciar_contratos_modal,
@@ -79,9 +80,12 @@ from utils import (
     calcular_codificacao_cra,
     extrair_ano,
     obter_proximo_numero_sequencial_cra,
+    formatar_codificacoes_contraidas,
     formatar_legenda_foto,
     converter_faixa_para_sigla,
-    combinar_faixas_relacionadas
+    combinar_faixas_relacionadas,
+    carregar_mapa_siglas_completo,
+    sincronizar_legendas_grupo_cra,
 )
 from ui.components.swiper import render_swiper_carousel
 from ui.components.local_storage import render_local_file_system_sync, RestoredLocalFile
@@ -132,41 +136,82 @@ def inject_tooltips_script():
     <script>
     (function() {{
         const siglaMap = {siglas_json};
-        
-        function setTooltips() {{
-            const doc = window.parent.document;
-            if (!doc) return;
-            
-            const pills = doc.querySelectorAll('button[data-testid*="pills"] p');
-            pills.forEach(p => {{
-                const sigla = p.innerText.trim();
-                if (siglaMap[sigla]) {{
-                    const btn = p.closest('button');
-                    if (btn && btn.getAttribute('title') !== siglaMap[sigla]) {{
-                        btn.setAttribute('title', siglaMap[sigla]);
-                    }}
-                }}
-            }});
-            
-            const tags = doc.querySelectorAll('div[data-baseweb="tag"] span[title]');
-            tags.forEach(span => {{
-                let key = span.getAttribute('title');
-                if (siglaMap[key]) {{
-                    const tagDiv = span.closest('div[data-baseweb="tag"]');
-                    if (tagDiv && tagDiv.getAttribute('title') !== siglaMap[key]) {{
-                        tagDiv.setAttribute('title', siglaMap[key]);
-                    }}
-                }}
-            }});
+        const parentWin = window.parent;
+        if (!parentWin || !parentWin.document) return;
+        const doc = parentWin.document;
+
+        // Desconecta qualquer observer anterior para evitar acúmulo de listeners na main thread
+        if (parentWin.__arpeTooltipObserver) {{
+            try {{ parentWin.__arpeTooltipObserver.disconnect(); }} catch (e) {{}}
+            parentWin.__arpeTooltipObserver = null;
         }}
-        
-        if (window.parent && window.parent.document) {{
-            const observer = new MutationObserver(setTooltips);
-            if (window.parent.document.body) {{
-                observer.observe(window.parent.document.body, {{ childList: true, subtree: true }});
-                setTooltips();
+        if (parentWin.__arpeTooltipDebounce) {{
+            clearTimeout(parentWin.__arpeTooltipDebounce);
+            parentWin.__arpeTooltipDebounce = null;
+        }}
+
+        function setTooltips() {{
+            try {{
+                const pills = doc.querySelectorAll('button[data-testid*="pills"] p');
+                for (let i = 0; i < pills.length; i++) {{
+                    const p = pills[i];
+                    const sigla = p.innerText ? p.innerText.trim() : "";
+                    if (sigla && siglaMap[sigla]) {{
+                        const btn = p.closest('button');
+                        if (btn && btn.getAttribute('title') !== siglaMap[sigla]) {{
+                            btn.setAttribute('title', siglaMap[sigla]);
+                        }}
+                    }}
+                }}
+                
+                const tags = doc.querySelectorAll('div[data-baseweb="tag"] span[title]');
+                for (let i = 0; i < tags.length; i++) {{
+                    const span = tags[i];
+                    const key = span.getAttribute('title');
+                    if (key && siglaMap[key]) {{
+                        const tagDiv = span.closest('div[data-baseweb="tag"]');
+                        if (tagDiv && tagDiv.getAttribute('title') !== siglaMap[key]) {{
+                            tagDiv.setAttribute('title', siglaMap[key]);
+                        }}
+                    }}
+                }}
+            }} catch (e) {{
+                // Proteção contra manipulações concorrentes durante transições de modal
             }}
         }}
+
+        // Throttling/Debouncing: aguarda 120ms de estabilidade do DOM antes de varrer seletores
+        function debouncedSetTooltips() {{
+            if (parentWin.__arpeTooltipDebounce) {{
+                clearTimeout(parentWin.__arpeTooltipDebounce);
+            }}
+            parentWin.__arpeTooltipDebounce = setTimeout(() => {{
+                setTooltips();
+                parentWin.__arpeTooltipDebounce = null;
+            }}, 120);
+        }}
+
+        // Alvo de observação prioritário: restrito ao container da aplicação
+        const targetNode = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.body;
+        if (targetNode) {{
+            const observer = new MutationObserver((mutations) => {{
+                let shouldUpdate = false;
+                for (let i = 0; i < mutations.length; i++) {{
+                    if (mutations[i].addedNodes.length > 0 || mutations[i].removedNodes.length > 0) {{
+                        shouldUpdate = true;
+                        break;
+                    }}
+                }}
+                if (shouldUpdate) {{
+                    debouncedSetTooltips();
+                }}
+            }});
+
+            observer.observe(targetNode, {{ childList: true, subtree: true }});
+            parentWin.__arpeTooltipObserver = observer;
+        }}
+
+        debouncedSetTooltips();
     }})();
     </script>
     """
@@ -395,6 +440,10 @@ with st.container():
 
                 st.rerun()
 
+            elif res_action == "REQUEST_CLEAR_STATE":
+                st.session_state.show_confirm_reset_estado = True
+                st.rerun()
+
             elif res_action == "CLEARED_ON_DISK":
                 st.session_state.temp_fiscalizacoes = []
                 st.session_state.temp_nc = []
@@ -490,6 +539,7 @@ with st.container():
                 st.session_state.fill_photos = []
                 st.session_state._uploader_fotos_anteriores = []
                 st.session_state._fotos_restauradas = []
+                st.session_state._fotos_excluidas_galeria = set()
                 limpar_fotos_disco(st.session_state.tipo_relatorio, st.session_state.categoria_relatorio)
                 enfileirar_sincronizacao_midia(
                     tipo=st.session_state.tipo_relatorio,
@@ -511,7 +561,8 @@ with st.container():
         sort_option = st.session_state.fill_photos_sort_option
 
         # 1. PROCESSAMENTO DE UPLOAD DIRETO EM DISCO (COPIAR E COLAR NA PASTA MIDIA/FOTOS)
-        uploads_atuais = list(uploaded_nc_photos or [])
+        nomes_excluidos = set(st.session_state.get("_fotos_excluidas_galeria", set()))
+        uploads_atuais = [p for p in (uploaded_nc_photos or []) if getattr(p, "name", "") not in nomes_excluidos]
         nomes_upload = [getattr(p, "name", "") for p in uploads_atuais if getattr(p, "name", "")]
         nomes_anteriores = st.session_state.get("_uploader_fotos_anteriores", [])
 
@@ -1457,7 +1508,18 @@ with st.container():
                             id_vinculo=id_vinculo,
                             tipo_registro=tipo_registro
                         )
-                        cod_preview = codificacao.strip() if "/" in codificacao.strip() else calcular_codificacao_cra(codificacao, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview)
+                        cod_in_prev = codificacao.strip()
+                        qtd_siglas_prev = max(1, len(siglas_ativas)) if siglas_ativas else 1
+                        if "/" in cod_in_prev and qtd_siglas_prev == 1:
+                            cod_preview = cod_in_prev
+                        elif qtd_siglas_prev > 1:
+                            if "/" in cod_in_prev:
+                                cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=idx_p + 1) for idx_p in range(qtd_siglas_prev)]
+                            else:
+                                cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview + idx_p) for idx_p in range(qtd_siglas_prev)]
+                            cod_preview = formatar_codificacoes_contraidas(cods_prev_list)
+                        else:
+                            cod_preview = calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview)
                         st.caption(f":material/tag: Código gerado para este item: **{cod_preview}**")
 
                         if st.session_state.fill_photos:
@@ -1509,27 +1571,7 @@ with st.container():
                                     cod_input = codificacao.strip()
                                     data_foto_val = extrair_data_original_foto(foto_default)
 
-                                    seq_idx_primeira = obter_proximo_numero_sequencial_cra(
-                                        st.session_state.temp_nc,
-                                        id_vinculo=id_vinculo,
-                                        tipo_registro=tipo_registro
-                                    )
-                                    if not cod_input:
-                                        cod_legenda = ""
-                                    elif "/" in cod_input and len(siglas_ativas) == 1:
-                                        cod_legenda = cod_input
-                                    else:
-                                        cod_legenda = calcular_codificacao_cra(cod_input, data_fisc=data_fisc_vinculo, seq_idx=seq_idx_primeira)
-
-                                    legenda_completa = formatar_legenda_foto(
-                                        num=foto_num,
-                                        codificacao=cod_legenda,
-                                        siglas_ou_ncs=siglas_ativas,
-                                        faixa=direcao_faixa,
-                                        data_foto=data_foto_val
-                                    )
-                                    
-                                    for sigla in siglas_ativas:
+                                    for idx_s, sigla in enumerate(siglas_ativas):
                                         seq_idx = obter_proximo_numero_sequencial_cra(
                                             st.session_state.temp_nc,
                                             id_vinculo=id_vinculo,
@@ -1539,6 +1581,8 @@ with st.container():
                                             cod_formatado = ""
                                         elif "/" in cod_input and len(siglas_ativas) == 1:
                                             cod_formatado = cod_input
+                                        elif "/" in cod_input:
+                                            cod_formatado = calcular_codificacao_cra(cod_input, data_fisc=data_fisc_vinculo, seq_idx=idx_s + 1)
                                         else:
                                             cod_formatado = calcular_codificacao_cra(cod_input, data_fisc=data_fisc_vinculo, seq_idx=seq_idx)
                                         
@@ -1556,8 +1600,8 @@ with st.container():
                                             "Foto": foto_default,
                                             "Foto Anterior": "",
                                             "Legenda Anterior": "",
-                                            "Observações": legenda_completa,
-                                            "Legenda da Foto": legenda_completa,
+                                            "Observações": "",
+                                            "Legenda da Foto": "",
                                             "Identificação": identificacao,
                                             "Direção (faixa)": direcao_faixa,
                                             "Fundamento da infração": fundamento_infracao,
@@ -1569,6 +1613,12 @@ with st.container():
                                             "Data da Foto": data_foto_val
                                         }
                                         st.session_state.temp_nc.append(rec)
+
+                                    sincronizar_legendas_grupo_cra(
+                                        st.session_state.temp_nc,
+                                        grp_id,
+                                        mapa_siglas=carregar_mapa_siglas_completo(),
+                                    )
                                 else:
                                     nc_desc_str = ", ".join(nc_descricao) if nc_descricao else ""
                                     pa_desc_str = ", ".join(ponto_atencao) if ponto_atencao else ""
@@ -1909,7 +1959,7 @@ with st.container():
                     
                 st.write("") # Espaçamento
         
-        col_relatorio, col_planilha, col_limpar, col_reset = st.columns([3.4, 2.8, 2.0, 2.0], gap="small")
+        col_relatorio, col_planilha, col_limpar = st.columns([4.2, 3.4, 2.4], gap="small")
     
     # Inicializar estado para persistir os relatórios gerados via aba preenchimento
     if "relatorios_preenchimento_data" not in st.session_state:
@@ -1981,26 +2031,16 @@ with st.container():
         if st.button("Limpar Registros", icon=":material/delete_forever:", type="secondary", use_container_width=True, key="btn_clear_all_data"):
             st.session_state.show_confirm_limpar_registros = True
 
-    with col_reset:
-        with st.popover("Limpar Estado", icon=":material/restart_alt:", use_container_width=True):
-            st.markdown("⚠️ **Resetar Relatório Atual**")
-            st.caption(
-                f"Apaga permanentemente o **arquivo de estado**, todas as **fotos** e **documentos auxiliares** salvos de **{st.session_state.tipo_relatorio} - {st.session_state.categoria_relatorio}**."
-            )
-            if st.button("Confirmar Limpeza Completa", icon=":material/delete_forever:", type="primary", use_container_width=True, key="btn_limpar_estado_relatorio"):
-                resetar_estado_sessao_relatorio_ativo(
-                    st.session_state.tipo_relatorio,
-                    st.session_state.categoria_relatorio
-                )
-                st.session_state.pending_toast = {
-                    "msg": f"Estado de {st.session_state.tipo_relatorio} ({st.session_state.categoria_relatorio}) resetado com sucesso!",
-                    "icon": ":material/check_circle:"
-                }
-                st.rerun()
-
     # Renderiza o modal de limpeza de registros isolada caso tenha sido solicitado
     if st.session_state.get("show_confirm_limpar_registros", False):
         confirmar_limpar_registros_modal(
+            tipo_relatorio=st.session_state.tipo_relatorio,
+            categoria_relatorio=st.session_state.categoria_relatorio
+        )
+
+    # Renderiza o modal nativo de reset completo de estado quando solicitado
+    if st.session_state.get("show_confirm_reset_estado", False):
+        confirmar_reset_estado_modal(
             tipo_relatorio=st.session_state.tipo_relatorio,
             categoria_relatorio=st.session_state.categoria_relatorio
         )

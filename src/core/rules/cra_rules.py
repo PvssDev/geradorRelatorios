@@ -5,7 +5,7 @@ Totalmente puro e desacoplado de Streamlit, python-docx e sistema de arquivos.
 """
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import pandas as pd
 
@@ -368,4 +368,261 @@ def separar_achados_df_cra(
 
     resumo = classificar_achados_cra(df, id_fisc=id_fisc)
     return ncs_df, pas_df, resumo
+
+
+MAP_SIGLAS_CRA: Dict[str, str] = {
+    "FI": "Fissuras",
+    "TTC": "Trincas isoladas transversais curtas",
+    "TTL": "Trincas isoladas transversais longas",
+    "TLC": "Trincas isoladas longitudinais curtas",
+    "TLL": "Trincas isoladas longitudinais longas",
+    "J": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+    "JE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
+    "TRR": "Trincas isoladas no revestimento devido à retração térmica ou dissecação da base (solo-cimento) ou do revestimento",
+    "TB": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+    "TBE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
+    "ALP": "Afundamento local plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
+    "ATP": "Afundamento da trilha plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
+    "ALC": "Afundamento local de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
+    "ATC": "Afundamento da trilha de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
+    "O": "Ondulação/Corrugação, caracterizada por ondulações transversais causadas por instabilidade da mistura betuminosa constituinte do revestimento ou da base",
+    "E": "Escorregamento do revestimento betuminoso",
+    "EX": "Exsudação do ligante betuminoso no revestimento",
+    "D": "Desgaste acentuado na superfície do revestimento",
+    "P": "buracos decorrentes da desagregação do revestimento e às vezes de camadas inferiores",
+    "R": "Remendo",
+}
+
+
+def converter_faixa_para_sigla_cra(faixa: Optional[str]) -> str:
+    """
+    Converte a descrição da faixa para sua respectiva sigla oficial no CRA:
+    - Faixa da Esquerda / Esquerda -> FE
+    - Faixa da Direita / Direita -> FD
+    - Faixa Esquerda e Direita / Esquerda e Direita / Ambas / FED -> FED
+    """
+    if not faixa:
+        return ""
+    texto = str(faixa).strip()
+    if not texto or texto.lower() in ("none", "nan", "null", "-", "não informado"):
+        return ""
+
+    u = texto.upper()
+    if u.startswith("NA "):
+        u = u[3:].strip()
+    elif u.startswith("NO "):
+        u = u[3:].strip()
+
+    if u in ("FE", "FD", "FED"):
+        return u
+
+    tem_esq = ("ESQ" in u) or ("FE" in u.split()) or (u == "E")
+    tem_dir = ("DIR" in u) or ("FD" in u.split()) or (u == "D")
+
+    if (tem_esq and tem_dir) or "FED" in u or "AMBAS" in u:
+        return "FED"
+    if tem_esq:
+        return "FE"
+    if tem_dir:
+        return "FD"
+
+    return u
+
+
+def combinar_faixas_relacionadas_cra(faixa1: Optional[str], faixa2: Optional[str]) -> str:
+    """
+    Combina as faixas de fotos relacionadas em um mesmo grupo:
+    - Se uma for Esquerda (FE) e a outra Direita (FD), retorna 'FED'.
+    - Se ambas forem Esquerda, retorna 'FE'.
+    - Se ambas forem Direita, retorna 'FD'.
+    - Se qualquer uma já for 'FED', retorna 'FED'.
+    """
+    s1 = converter_faixa_para_sigla_cra(faixa1)
+    s2 = converter_faixa_para_sigla_cra(faixa2)
+
+    if not s1 and not s2:
+        return ""
+    if not s1:
+        return s2
+    if not s2:
+        return s1
+
+    if s1 == "FED" or s2 == "FED":
+        return "FED"
+
+    if (s1 == "FE" and s2 == "FD") or (s1 == "FD" and s2 == "FE"):
+        return "FED"
+
+    if s1 == s2:
+        return s1
+
+    tem_esq = s1 in ("FE", "FED") or s2 in ("FE", "FED")
+    tem_dir = s1 in ("FD", "FED") or s2 in ("FD", "FED")
+    if tem_esq and tem_dir:
+        return "FED"
+
+    return s1 or s2
+
+
+def formatar_legenda_foto_cra(
+    num: Union[int, str],
+    codificacao: str,
+    siglas_ou_ncs: Union[Sequence[str], Set[str], str],
+    faixa: Optional[str],
+    data_foto: Optional[str],
+    mapa_siglas: Optional[Dict[str, str]] = None,
+) -> str:
+    """
+    Formata a legenda do Apêndice Fotográfico CRA de forma pura e determinística:
+    - Código unitário: 'Foto 1 – CRA.ST601.2790-2794/2026.001 Desc1 (S1) e Desc2 (S2) na FE (19/08/2026).'
+    - Código contraído: 'Foto 1 – CRA.ST601.2790-2794/2026.001 e 002. Desc1 (S1) e Desc2 (S2) na FE (19/08/2026).'
+    """
+    try:
+        num_clean = str(num).strip()
+        num_int = int(num_clean)
+        num_str = str(num_int)
+    except Exception:
+        num_str = str(num).strip() or "1"
+    prefixo = f"Foto {num_str} – "
+
+    cod_clean = str(codificacao or "").strip()
+    cod_part = f"{cod_clean} " if cod_clean else ""
+
+    if isinstance(siglas_ou_ncs, str):
+        siglas_lista = [s.strip() for s in siglas_ou_ncs.split(",") if s.strip()]
+    elif isinstance(siglas_ou_ncs, (list, tuple, set)):
+        siglas_lista = [str(s).strip() for s in siglas_ou_ncs if str(s).strip()]
+    else:
+        siglas_lista = []
+
+    mapa = mapa_siglas if mapa_siglas is not None else MAP_SIGLAS_CRA
+    descs: List[str] = []
+    for s in siglas_lista:
+        if s in mapa:
+            d_raw = str(mapa[s]).strip().rstrip(".")
+            sufixo_sigla = f"({s})"
+            d = d_raw if d_raw.endswith(sufixo_sigla) else f"{d_raw} {sufixo_sigla}"
+        elif s.upper() in mapa:
+            s_up = s.upper()
+            d_raw = str(mapa[s_up]).strip().rstrip(".")
+            sufixo_sigla = f"({s_up})"
+            d = d_raw if d_raw.endswith(sufixo_sigla) else f"{d_raw} {sufixo_sigla}"
+        else:
+            d = s.strip().rstrip(".")
+
+        if d and d not in descs:
+            descs.append(d)
+
+    if not descs:
+        desc_part = ""
+    elif len(descs) == 1:
+        desc_part = descs[0]
+    elif len(descs) == 2:
+        desc_part = f"{descs[0]} e {descs[1]}"
+    else:
+        desc_part = f"{', '.join(descs[:-1])} e {descs[-1]}"
+
+    sigla_faixa = converter_faixa_para_sigla_cra(faixa)
+    faixa_part = f" na {sigla_faixa}" if sigla_faixa else ""
+
+    corpo_legenda = f"{cod_part}{desc_part}{faixa_part}".strip().rstrip(".")
+    data_clean = str(data_foto or "").strip().strip("()")
+    if data_clean and data_clean.lower() not in ("none", "nan", ""):
+        if corpo_legenda:
+            corpo = f"{corpo_legenda} ({data_clean})."
+        else:
+            corpo = f"({data_clean})."
+    else:
+        corpo = f"{corpo_legenda}." if corpo_legenda else ""
+
+    return f"{prefixo}{corpo}"
+
+
+def consolidar_dados_legenda_grupo_cra(
+    related_records: Sequence[Dict[str, Any]]
+) -> Tuple[str, List[str], str]:
+    """
+    Consolida em passagem única O(K) os dados compartilhados por todas as fotos/registros
+    de um mesmo grupo de relação no CRA:
+    1. Codificação contraída de todos os registros do grupo (ex: 'CRA.ST.../2026.001 e 002.').
+    2. Lista unificada e ordenada (sem duplicatas) de todas as siglas de NC/PA do grupo.
+    3. Sigla de faixa combinada ('FE', 'FD' ou 'FED') considerando todos os registros do grupo.
+    """
+    if not related_records:
+        return "", [], ""
+
+    cods: List[str] = []
+    siglas: List[str] = []
+    faixa_combinada = ""
+
+    for rec in related_records:
+        cod_raw = str(rec.get("Codificação") or rec.get("Trecho") or "").strip()
+        if cod_raw and cod_raw.lower() not in ("nan", "none") and cod_raw not in cods:
+            cods.append(cod_raw)
+
+        for col_achado in ("Não Conformidade", "Ponto de Atenção"):
+            val_achado = str(rec.get(col_achado) or "").strip()
+            if val_achado and val_achado.lower() not in ("nan", "none"):
+                for token in val_achado.split(","):
+                    t_clean = token.strip()
+                    if t_clean and t_clean not in siglas:
+                        siglas.append(t_clean)
+
+        faixa_rec = rec.get("Direção (faixa)", "")
+        faixa_combinada = combinar_faixas_relacionadas_cra(faixa_combinada, faixa_rec)
+
+    codificacao_grupo = formatar_codificacoes_contraidas_cra(cods)
+    return codificacao_grupo, siglas, faixa_combinada
+
+
+def sincronizar_legendas_grupo_cra(
+    registros: List[Dict[str, Any]],
+    grupo_id: str,
+    mapa_siglas: Optional[Dict[str, str]] = None,
+) -> None:
+    """
+    Sincroniza in-place as legendas ('Observações' e 'Legenda da Foto') e a faixa combinada
+    de todos os registros pertencentes ao mesmo grupo_relacao, garantindo que fotos
+    relacionadas exibam exatamente o mesmo corpo descritivo e codificação contraída.
+    """
+    grp_clean = str(grupo_id or "").strip()
+    if not registros or not grp_clean:
+        return
+
+    grupo_recs = [
+        r for r in registros
+        if str(r.get("grupo_relacao") or "").strip() == grp_clean
+    ]
+    if not grupo_recs:
+        return
+
+    cod_grupo, siglas_grupo, faixa_grupo = consolidar_dados_legenda_grupo_cra(grupo_recs)
+    faixa_extenso_map = {
+        "FE": "Esquerda",
+        "FD": "Direita",
+        "FED": "Esquerda e Direita",
+    }
+
+    tem_relacao = any(bool(r.get("is_relacionado")) for r in grupo_recs)
+    fotos_distintas = {
+        str(r.get("Foto") or r.get("Fotos") or "").strip().lower()
+        for r in grupo_recs
+        if str(r.get("Foto") or r.get("Fotos") or "").strip()
+    }
+
+    for rec in grupo_recs:
+        if (tem_relacao or len(fotos_distintas) > 1) and faixa_grupo in faixa_extenso_map:
+            rec["Direção (faixa)"] = faixa_extenso_map[faixa_grupo]
+
+        legenda_sync = formatar_legenda_foto_cra(
+            num=rec.get("Nº", 1),
+            codificacao=cod_grupo,
+            siglas_ou_ncs=siglas_grupo,
+            faixa=faixa_grupo or rec.get("Direção (faixa)", ""),
+            data_foto=str(rec.get("Data da Foto") or ""),
+            mapa_siglas=mapa_siglas,
+        )
+        rec["Observações"] = legenda_sync
+        rec["Legenda da Foto"] = legenda_sync
+
 
