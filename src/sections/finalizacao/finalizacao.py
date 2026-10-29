@@ -348,6 +348,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 
                 if str(tipo_relatorio).upper() == "CRA":
                     label_item = cod_grupo_cra if cod_grupo_cra else "Codificação Não Informada"
+                elif obs_text.lower().startswith("foto ") or obs_text.lower().startswith("foto\xa0"):
+                    label_item = ident or nc_txt or "Item"
                 else:
                     label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or "Item")
                     

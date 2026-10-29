@@ -332,7 +332,7 @@ def relacionar_foto_modal(foto_atual, last_nc, is_cra_fisc=True, target_fisc_dat
             st.markdown(f"**Tipo:** *{ant_tipo}*")
             siglas_exibidas = ", ".join(ant_siglas_lista) if ant_siglas_lista else "-"
             st.markdown(f"**Sigla(s):** **{siglas_exibidas}**")
-            if is_cra_fisc and ant_siglas_lista:
+            if ant_siglas_lista:
                 exp = expandir_siglas(", ".join(ant_siglas_lista))
                 if exp:
                     st.caption(f":material/description: {exp}")

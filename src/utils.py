@@ -435,12 +435,16 @@ def formatar_legenda_foto(
 
 
 
-def sincronizar_legendas_grupo_cra(fotos_info: dict, mapa_siglas: dict | None = None) -> None:
+def sincronizar_legendas_grupo_cra(
+    registros: list,
+    grupo_id: str,
+    mapa_siglas: dict | None = None
+) -> None:
     """
-    Sincroniza e consolida as legendas de fotos relacionadas no dicionário fotos_info.
+    Sincroniza e consolida as legendas de fotos relacionadas no grupo.
     Delega diretamente para core.rules.cra_rules.sincronizar_legendas_grupo_cra.
     """
     from core.rules.cra_rules import sincronizar_legendas_grupo_cra as _sinc
     if mapa_siglas is None:
         mapa_siglas = carregar_mapa_siglas_completo()
-    _sinc(fotos_info, mapa_siglas=mapa_siglas)
+    _sinc(registros, grupo_id, mapa_siglas=mapa_siglas)

@@ -339,6 +339,9 @@ with st.container():
             if res_action == "LOADED_FROM_DISK":
                 saved_state = fs_res.get("state")
                 if saved_state and isinstance(saved_state, dict):
+                    from ui.state import validar_integridade_estado_concessao
+                    if not validar_integridade_estado_concessao(st.session_state.tipo_relatorio, saved_state):
+                        saved_state = {}
                     st.session_state.temp_fiscalizacoes = saved_state.get("temp_fiscalizacoes", [])
                     st.session_state.temp_nc = saved_state.get("temp_nc", [])
                     st.session_state.manual_relacao_map = saved_state.get("manual_relacao_map", {})
@@ -1483,43 +1486,53 @@ with st.container():
                     nc_descricao = _nc_descricao_pills
                     ponto_atencao = _ponto_atencao_pills
 
+                    is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
                     is_cra_fisc = st.session_state.get("tipo_relatorio", "CRA") == "CRA"
+                    is_crc_fisc = st.session_state.get("tipo_relatorio", "") == "CRC"
                     siglas_ativas = nc_descricao if tipo_registro == "Não Conformidade" else ponto_atencao
-                    if is_cra_fisc and siglas_ativas:
+                    if siglas_ativas:
                         desc_exp = expandir_siglas(", ".join(siglas_ativas))
                         st.caption(f":material/info: **Descrição:** {desc_exp}")
 
-                # 3. BLOCO INFERIOR: Codificação (Legenda e Trecho removidos na Fiscalização CRA)
+                # 3. BLOCO INFERIOR: Codificação (Legenda e Trecho removidos na Fiscalização)
                 with st.container(key=f"fisc_form_bottom_{st.session_state.nc_form_counter}"):
-                    if not is_cra_fisc:
-                        nc_legenda = st.text_area("Legenda", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva a legenda correspondente...")
+                    nc_legenda = ""
+
+                    if is_socicam:
+                        cod_placeholder = "Setor ou código da ocorrência (ex: Plataformas, Sanitários)..."
+                    elif is_crc_fisc:
+                        cod_placeholder = "Codificação CRC (ex: CRC.SH015.0646+0648/2026.001)..."
                     else:
-                        nc_legenda = ""
+                        cod_placeholder = "Codificação da ocorrência (ex: CRA.ST601.2790-2794/2026.001)..."
 
                     codificacao = st.text_input(
-                        "Codificação",
+                        "Codificação / Localização" if is_socicam else "Codificação",
                         key=f"nc_cod_{st.session_state.nc_form_counter}",
-                        placeholder="Codificação da ocorrência (ex: CRA.ST601.2790-2794/2026.001)..."
+                        placeholder=cod_placeholder
                     )
                     
-                    if is_cra_fisc and codificacao.strip():
-                        seq_tipo_preview = obter_proximo_numero_sequencial_cra(
-                            st.session_state.get("temp_nc", []),
-                            id_vinculo=id_vinculo,
-                            tipo_registro=tipo_registro
-                        )
+                    if codificacao.strip():
                         cod_in_prev = codificacao.strip()
                         qtd_siglas_prev = max(1, len(siglas_ativas)) if siglas_ativas else 1
-                        if "/" in cod_in_prev and qtd_siglas_prev == 1:
-                            cod_preview = cod_in_prev
-                        elif qtd_siglas_prev > 1:
-                            if "/" in cod_in_prev:
-                                cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=idx_p + 1) for idx_p in range(qtd_siglas_prev)]
+                        if is_cra_fisc:
+                            seq_tipo_preview = obter_proximo_numero_sequencial_cra(
+                                st.session_state.get("temp_nc", []),
+                                id_vinculo=id_vinculo,
+                                tipo_registro=tipo_registro
+                            )
+                            if "/" in cod_in_prev and qtd_siglas_prev == 1:
+                                cod_preview = cod_in_prev
+                            elif qtd_siglas_prev > 1:
+                                if "/" in cod_in_prev:
+                                    cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=idx_p + 1) for idx_p in range(qtd_siglas_prev)]
+                                else:
+                                    cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview + idx_p) for idx_p in range(qtd_siglas_prev)]
+                                cod_preview = formatar_codificacoes_contraidas(cods_prev_list)
                             else:
-                                cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview + idx_p) for idx_p in range(qtd_siglas_prev)]
-                            cod_preview = formatar_codificacoes_contraidas(cods_prev_list)
+                                cod_preview = calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview)
                         else:
-                            cod_preview = calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview)
+                            cod_preview = cod_in_prev
+
                         st.caption(f":material/tag: Código gerado para este item: **{cod_preview}**")
 
                         if st.session_state.fill_photos:
@@ -1528,11 +1541,12 @@ with st.container():
                         else:
                             foto_num_preview = 1
                         data_foto_preview = extrair_data_original_foto(foto_default)
+                        faixa_preview = direcao_faixa if not is_socicam else ""
                         legenda_preview = formatar_legenda_foto(
                             num=foto_num_preview,
                             codificacao=cod_preview,
                             siglas_ou_ncs=siglas_ativas,
-                            faixa=direcao_faixa,
+                            faixa=faixa_preview,
                             data_foto=data_foto_preview
                         )
                         st.caption(f":material/subtitles: **Legenda:** {legenda_preview}")
@@ -1629,12 +1643,13 @@ with st.container():
                                     data_foto_val = extrair_data_original_foto(foto_default)
 
                                     siglas_list = nc_descricao if tipo_registro == "Não Conformidade" else ponto_atencao
+                                    faixa_rec = direcao_faixa if not is_socicam else ""
                                     if not nc_legenda or not nc_legenda.strip():
                                         nc_legenda = formatar_legenda_foto(
                                             num=novo_nc_num,
                                             codificacao=cod_formatado,
                                             siglas_ou_ncs=siglas_list,
-                                            faixa=direcao_faixa,
+                                            faixa=faixa_rec,
                                             data_foto=data_foto_val
                                         )
 
@@ -1653,7 +1668,7 @@ with st.container():
                                         "Observações": nc_legenda,
                                         "Legenda da Foto": nc_legenda,
                                         "Identificação": identificacao,
-                                        "Direção (faixa)": direcao_faixa,
+                                        "Direção (faixa)": faixa_rec,
                                         "Fundamento da infração": fundamento_infracao,
                                         "Determinação": determinacao,
                                         "Situação": situacao,
@@ -2033,6 +2048,7 @@ with st.container():
 
     # Renderiza o modal de limpeza de registros isolada caso tenha sido solicitado
     if st.session_state.get("show_confirm_limpar_registros", False):
+        st.session_state.show_confirm_limpar_registros = False
         confirmar_limpar_registros_modal(
             tipo_relatorio=st.session_state.tipo_relatorio,
             categoria_relatorio=st.session_state.categoria_relatorio
@@ -2040,6 +2056,7 @@ with st.container():
 
     # Renderiza o modal nativo de reset completo de estado quando solicitado
     if st.session_state.get("show_confirm_reset_estado", False):
+        st.session_state.show_confirm_reset_estado = False
         confirmar_reset_estado_modal(
             tipo_relatorio=st.session_state.tipo_relatorio,
             categoria_relatorio=st.session_state.categoria_relatorio

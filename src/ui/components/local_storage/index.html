@@ -277,7 +277,7 @@
         </svg>
         Sincronizado
       </div>
-      <button id="btnConnect" class="btn-action">
+      <button id="btnConnect" type="button" class="btn-action">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
           <line x1="12" y1="11" x2="12" y2="17"></line>
@@ -285,7 +285,7 @@
         </svg>
         <span id="btnText">Selecionar Pasta Local</span>
       </button>
-      <button id="btnClearState" class="btn-action btn-danger" title="Apaga permanentemente o estado, fotos e mídias do relatório atual">
+      <button id="btnClearState" type="button" class="btn-action btn-danger" title="Apaga permanentemente o estado, fotos e mídias do relatório atual">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
           <path d="M3 3v5h5"></path>
@@ -647,7 +647,11 @@
     // Handler para o Botão Limpar Estado (dispara o st.dialog nativo com backdrop de tela cheia)
     const btnClearState = document.getElementById("btnClearState");
     if (btnClearState) {
-      btnClearState.addEventListener("click", () => {
+      btnClearState.addEventListener("click", (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         Streamlit.setComponentValue({
           action: "REQUEST_CLEAR_STATE",
           timestamp: Date.now()

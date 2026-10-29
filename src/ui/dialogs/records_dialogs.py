@@ -473,7 +473,7 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                         obs_atual = nc_target.get("Observações", nc_target.get("Legenda da Foto", ""))
                         edit_observacoes = st.text_area("Legenda da Foto Atual", value=str(obs_atual), height=80, key=f"{nc_key_prefix}_observacoes")
 
-                        if st.session_state.get("tipo_relatorio", "CRA") == "CRA":
+                        if st.session_state.get("tipo_relatorio", "CRA") in ["CRA", "CRC"]:
                             dir_val = nc_target.get("Direção (faixa)", "")
                             dir_val_str = "" if (dir_val is None or str(dir_val).strip().lower() in ["nan", "none", "null"]) else str(dir_val).strip()
                             sigla_curr = converter_faixa_para_sigla(dir_val_str)
@@ -643,11 +643,13 @@ def editar_registros_relatorio_modal(aba_inicial="fisc", is_monitoring=False, te
                                     mapa_siglas=carregar_mapa_siglas_completo(),
                                 )
                             else:
+                                is_soc = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
+                                faixa_save = edit_direcao if not is_soc else ""
                                 nova_legenda = formatar_legenda_foto(
                                     num=nc_target.get("Nº", 1),
                                     codificacao=edit_codificacao or nc_target.get("Codificação", ""),
                                     siglas_ou_ncs=edit_pa_desc if edit_is_pa else edit_nc_desc,
-                                    faixa=edit_direcao,
+                                    faixa=faixa_save,
                                     data_foto=data_foto
                                 )
                                 nc_target["Observações"] = nova_legenda

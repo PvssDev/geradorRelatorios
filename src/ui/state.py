@@ -20,6 +20,7 @@ BASE_NC_OPTIONS = [
 ]
 
 __all__ = [
+    "validar_integridade_estado_concessao",
     "BASE_NC_OPTIONS",
     "obter_termos_ui",
     "inicializar_estado_sessao",
@@ -118,12 +119,59 @@ def inicializar_estado_sessao() -> None:
         )
 
 
+def validar_integridade_estado_concessao(tipo: str, dados: dict) -> bool:
+    """
+    Valida se os dados persistidos correspondem estritamente à concessionária ativa.
+    Impede que dados residuais ou contaminações cruzadas (ex: CRA dentro de SOCICAM)
+    sejam carregados indevidamente no session_state.
+    """
+    if not dados or not isinstance(dados, dict):
+        return True
+
+    fisc_list = dados.get("temp_fiscalizacoes", [])
+    if not fisc_list:
+        return True
+
+    tipo_upper = str(tipo or "").upper().strip()
+    for f in fisc_list:
+        loc = str(f.get("Local", "") or "").lower()
+        contrato = str(f.get("Contrato", "") or "").lower()
+
+        if tipo_upper == "SOCICAM":
+            # SOCICAM opera exclusivamente terminais rodoviários e contrato 1.041.080/08
+            if any(termo in loc for termo in ["rota do atlântico", "rota dos coqueiros", "pe-024"]) or any(termo in contrato for termo in ["043/2011", "cgpe"]):
+                return False
+        elif tipo_upper == "CRA":
+            # CRA opera a Rota do Atlântico
+            if any(termo in loc for termo in ["terminal rodoviário", "tip", "rota dos coqueiros"]) or "1.041.080/08" in contrato:
+                return False
+        elif tipo_upper == "CRC":
+            # CRC opera a Rota dos Coqueiros
+            if any(termo in loc for termo in ["terminal rodoviário", "tip", "rota do atlântico"]) or "1.041.080/08" in contrato:
+                return False
+
+    return True
+
+
 def carregar_estado_relatorio_ativo() -> None:
     """Carrega dados salvos em disco (geradorRelatorios/) para o tipo e categoria atuais."""
     tipo = st.session_state.get("tipo_relatorio", "CRA")
     cat = st.session_state.get("categoria_relatorio", "Fiscalização")
     dados = carregar_sessao_local(tipo, cat)
     if dados and isinstance(dados, dict):
+        if not validar_integridade_estado_concessao(tipo, dados):
+            limpar_sessao_local(tipo, cat)
+            st.session_state.temp_fiscalizacoes = []
+            st.session_state.temp_nc = []
+            st.session_state.manual_relacao_map = {}
+            st.session_state.pista_persistida = ""
+            st.session_state.trecho_persistido = ""
+            st.session_state.codificacao_persistida = ""
+            st.session_state.fundamento_persistido = ""
+            st.session_state.determinacao_persistida = ""
+            st.session_state.faixa_persistida = ""
+            return
+
         st.session_state.temp_fiscalizacoes = dados.get("temp_fiscalizacoes", [])
         st.session_state.temp_nc = dados.get("temp_nc", [])
         st.session_state.manual_relacao_map = dados.get("manual_relacao_map", {})
