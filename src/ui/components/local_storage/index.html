@@ -129,6 +129,22 @@
       background-color: #cbd5e1;
       color: #0f172a;
     }
+    .btn-action.btn-danger {
+      background-color: #fff1f2;
+      color: #e11d48;
+      border: 1px solid #fecdd3;
+      box-shadow: 0 1px 3px rgba(225, 29, 72, 0.1);
+    }
+    .btn-action.btn-danger:hover {
+      background-color: #ffe4e6;
+      color: #be123c;
+      border-color: #fda4af;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(225, 29, 72, 0.18);
+    }
+    .btn-action.btn-danger:active {
+      transform: scale(0.98);
+    }
     .sync-indicator {
       font-size: 11.5px;
       color: #16a34a;
@@ -136,6 +152,108 @@
       display: flex;
       align-items: center;
       gap: 4px;
+    }
+
+    /* Modal de confirmação */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(1, 26, 51, 0.35);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .modal-backdrop.show {
+      display: flex;
+    }
+    .modal-card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid rgba(225, 29, 72, 0.2);
+      box-shadow: 0 16px 36px rgba(1, 26, 51, 0.25);
+      max-width: 440px;
+      width: 100%;
+      padding: 18px 20px;
+      animation: scaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .modal-icon-danger {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: #fff1f2;
+      color: #e11d48;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .modal-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .modal-desc {
+      font-size: 12.5px;
+      color: #64748b;
+      line-height: 1.45;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .btn-modal-cancel {
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-modal-cancel:hover {
+      background: #f1f5f9;
+      color: #1e293b;
+    }
+    .btn-modal-confirm {
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: 1px solid #be123c;
+      background: #e11d48;
+      color: #ffffff;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(225, 29, 72, 0.3);
+      transition: all 0.15s ease;
+    }
+    .btn-modal-confirm:hover {
+      background: #be123c;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes scaleUp {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
     }
   </style>
 </head>
@@ -159,7 +277,7 @@
         </svg>
         Sincronizado
       </div>
-      <button id="btnConnect" class="btn-action">
+      <button id="btnConnect" type="button" class="btn-action">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
           <line x1="12" y1="11" x2="12" y2="17"></line>
@@ -167,8 +285,17 @@
         </svg>
         <span id="btnText">Selecionar Pasta Local</span>
       </button>
+      <button id="btnClearState" type="button" class="btn-action btn-danger" title="Apaga permanentemente o estado, fotos e mídias do relatório atual">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+          <path d="M3 3v5h5"></path>
+        </svg>
+        <span>Limpar Estado</span>
+      </button>
     </div>
   </div>
+
+
 
   <script>
     const Streamlit = {
@@ -516,6 +643,21 @@
         }
       }
     });
+
+    // Handler para o Botão Limpar Estado (dispara o st.dialog nativo com backdrop de tela cheia)
+    const btnClearState = document.getElementById("btnClearState");
+    if (btnClearState) {
+      btnClearState.addEventListener("click", (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        Streamlit.setComponentValue({
+          action: "REQUEST_CLEAR_STATE",
+          timestamp: Date.now()
+        });
+      });
+    }
 
     // Função para carregar estado e mídias da pasta local e enviar ao Streamlit
     async function triggerLoadState(tipoArg, catArg, silent) {

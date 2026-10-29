@@ -4,7 +4,21 @@
 /* ==========================================
    TIPOGRAFIA E GLOBAL SETTINGS
    ========================================== */
-html, body, .stApp, [data-testid="stAppViewContainer"], p, h1, h2, h3, h4, h5, h6, label, button, input, textarea {
+html,
+body,
+.stApp,
+[data-testid="stAppViewContainer"],
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label,
+button,
+input,
+textarea {
     font-family: 'Outfit', 'Work Sans', sans-serif !important;
 }
 
@@ -20,17 +34,22 @@ html, body, .stApp, [data-testid="stAppViewContainer"], p, h1, h2, h3, h4, h5, h
     width: 8px;
     height: 8px;
 }
+
 ::-webkit-scrollbar-track {
     background: #D7D8D9;
     border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb {
     background: #2F5173;
     border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
     background: #0D2740;
-}/* style.css - Folha de estilos personalizada do aplicativo */
+}
+
+/* style.css - Folha de estilos personalizada do aplicativo */
 
 /* ==========================================
    CORREÇÃO GLOBAL DE OVERFLOW
@@ -51,7 +70,7 @@ header[data-testid="stHeader"],
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    z-index: 999999 !important;
+    z-index: 99990 !important;
     background-color: rgba(215, 230, 240, 0.92) !important;
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
@@ -1074,11 +1093,20 @@ button[data-testid="stImageZoomButton"] {
 /* ==========================================
    ESTILIZAÇÃO E SCROLL CONSISTENTE EM MODAIS (st.dialog)
    ========================================== */
+/* ==========================================
+   BACKDROP DO STREAMLIT NATIVO (100% FLUIDO / ZERO REFLOW / NATIVE BASEWEB)
+   ========================================== */
+/* Mira exclusivamente no backdrop nativo do BaseWeb, sem alterar position/transform do pai */
+div[data-baseweb="modal"]>div:first-child {
+    background-color: rgba(1, 26, 51, 0.35) !important;
+}
+
+/* Janela do Modal (st.dialog) centralizada nativamente pelo Streamlit */
 div[data-baseweb="modal"] div[role="dialog"] {
     background-color: #D7D8D9 !important;
     border: 2px solid #2F5173 !important;
     border-radius: 14px !important;
-    box-shadow: 0 16px 40px rgba(1, 26, 51, 0.40) !important;
+    box-shadow: 0 16px 40px rgba(1, 26, 51, 0.35) !important;
     max-height: 85vh !important;
     overflow-y: auto !important;
     padding-bottom: 30px !important;
@@ -1235,9 +1263,9 @@ div[class*="st-key-gal_card_curr_nc_"] [data-testid="stIconMaterial"] {
     fill: #ff4b4b !important;
 }
 
-/* Botão invisível sobreposto em toda a área do card para capturar o clique */
+/* Botão invisível sobreposto em toda a área do card para capturar o clique (exceto o botão de excluir) */
 div[class*="st-key-btn_gal_pick_"],
-div[class*="st-key-gal_card"] div[data-testid="stButton"] {
+div[class*="st-key-gal_card"] div[data-testid="stButton"]:not([class*="btn_gal_del"]):not(:has(button[key*="btn_gal_del_"])) {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
@@ -1251,7 +1279,7 @@ div[class*="st-key-gal_card"] div[data-testid="stButton"] {
 }
 
 div[class*="st-key-btn_gal_pick_"] button,
-div[class*="st-key-gal_card"] div[data-testid="stButton"]>button {
+div[class*="st-key-gal_card"] div[data-testid="stButton"]:not([class*="btn_gal_del"]):not(:has(button[key*="btn_gal_del_"]))>button {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
@@ -1271,6 +1299,120 @@ div[class*="st-key-gal_card"] div[data-testid="stButton"]>button {
 }
 
 /* ==========================================
+   BOTÃO DE EXCLUIR FOTO NA GALERIA (X DISCRETO - CENTRALIZADO & BRANCO PURO)
+   ========================================== */
+div[class*="st-key-btn_gal_del_container_"],
+div[class*="st-key-btn_gal_del_"] {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    max-width: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+    z-index: 25 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+div[class*="st-key-btn_gal_del_container_"] button,
+div[class*="st-key-btn_gal_del_"] button,
+button[key*="btn_gal_del_"] {
+    position: relative !important;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    max-width: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+    border-radius: 50% !important;
+    background: rgba(15, 23, 42, 0.50) !important;
+    border: 1px solid rgba(255, 255, 255, 0.30) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    opacity: 0.88 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.30) !important;
+    cursor: pointer !important;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    z-index: 25 !important;
+    overflow: hidden !important;
+}
+
+/* Força zeramento completo de margens/paddings e cor branca pura para todos os filhos */
+div[class*="st-key-btn_gal_del_container_"] button *,
+div[class*="st-key-btn_gal_del_"] button *,
+button[key*="btn_gal_del_"] * {
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #ffffff !important;
+    fill: #ffffff !important;
+    line-height: 1 !important;
+}
+
+/* O container interno do Streamlit vira flexbox 100% centralizado sem interferência de baseline */
+div[class*="st-key-btn_gal_del_container_"] button div,
+div[class*="st-key-btn_gal_del_"] button div,
+div[class*="st-key-btn_gal_del_container_"] button p,
+div[class*="st-key-btn_gal_del_"] button p,
+button[key*="btn_gal_del_"] div,
+button[key*="btn_gal_del_"] p {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ícone 'X' em BRANCO com alinhamento vertical rigorosamente centralizado */
+div[class*="st-key-btn_gal_del_container_"] button [data-testid="stIconMaterial"],
+div[class*="st-key-btn_gal_del_"] button [data-testid="stIconMaterial"],
+div[class*="st-key-btn_gal_del_container_"] button span,
+div[class*="st-key-btn_gal_del_"] button span,
+button[key*="btn_gal_del_"] [data-testid="stIconMaterial"],
+button[key*="btn_gal_del_"] span {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 15px !important;
+    line-height: 1 !important;
+    color: #ffffff !important;
+    fill: #ffffff !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: center !important;
+    transform: translateY(-0.5px) !important;
+}
+
+/* Hover suave com realce avermelhado */
+div[class*="st-key-btn_gal_del_container_"] button:hover,
+div[class*="st-key-btn_gal_del_"] button:hover,
+button[key*="btn_gal_del_"]:hover {
+    background: rgba(225, 29, 72, 0.92) !important;
+    border-color: rgba(255, 255, 255, 0.85) !important;
+    opacity: 1 !important;
+    transform: scale(1.10) !important;
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.45) !important;
+}
+
+div[class*="st-key-btn_gal_del_container_"] button:hover *,
+div[class*="st-key-btn_gal_del_"] button:hover *,
+button[key*="btn_gal_del_"]:hover * {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+}
+
+/* ==========================================
    ANIMAÇÕES DOS TOASTS (POPUPS)
    Animação suave de entrada (bounce) e saída (slide out)
    ========================================== */
@@ -1279,18 +1421,22 @@ div[class*="st-key-gal_card"] div[data-testid="stButton"]>button {
         transform: translateX(120%) scale(0.9);
         opacity: 0;
     }
+
     8% {
         transform: translateX(-5%) scale(1.02);
         opacity: 1;
     }
+
     12% {
         transform: translateX(0) scale(1);
         opacity: 1;
     }
+
     90% {
         transform: translateX(0) scale(1);
         opacity: 1;
     }
+
     100% {
         transform: translateX(120%) scale(0.9);
         opacity: 0;
@@ -1320,13 +1466,16 @@ div[data-testid="stToast"] div[data-testid="stMarkdownContainer"] p {
 /* Ocultar o botão (X) de fechar do popup */
 div[data-testid="stToast"] button {
     display: none !important;
-}/* FIX PARA INPUT DE DATA E CONTORNOS ADICIONAIS */
-div[data-testid="stDateInput"] > div,
-div[data-testid="stTimeInput"] > div {
+}
+
+/* FIX PARA INPUT DE DATA E CONTORNOS ADICIONAIS */
+div[data-testid="stDateInput"]>div,
+div[data-testid="stTimeInput"]>div {
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
 }
+
 div[data-testid="stDateInput"] input,
 div[data-testid="stTimeInput"] input {
     background-color: transparent !important;
@@ -1341,11 +1490,13 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] {
     color: #D7D8D9 !important;
     border-radius: 4px !important;
 }
+
 div[data-testid="stMultiSelect"] span[data-baseweb="tag"] *,
 div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
     color: #D7D8D9 !important;
     fill: #D7D8D9 !important;
 }
+
 /* ==========================================
    NAVEGAÇÃO PRINCIPAL (TIPO DE RELATÓRIO E CATEGORIA)
    Design moderno, animado, com cores adaptativas por tipo
@@ -1356,6 +1507,7 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
     display: flex !important;
     justify-content: flex-end !important;
 }
+
 .stApp div[class*="st-key-widget_menu_categoria"] {
     display: flex !important;
     justify-content: flex-start !important;
@@ -1364,9 +1516,12 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
 .stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"],
 .stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] {
     display: flex !important;
-    flex-direction: row !important; /* FORÇA LINHA HORIZONTAL */
-    flex-wrap: nowrap !important; /* BLOQUEIO TOTAL DE QUEBRA DE LINHA */
-    min-width: max-content !important; /* IMPEDE COMPRESSÃO DO CONTAINER */
+    flex-direction: row !important;
+    /* FORÇA LINHA HORIZONTAL */
+    flex-wrap: nowrap !important;
+    /* BLOQUEIO TOTAL DE QUEBRA DE LINHA */
+    min-width: max-content !important;
+    /* IMPEDE COMPRESSÃO DO CONTAINER */
     gap: 12px !important;
     background: rgba(255, 255, 255, 0.45) !important;
     padding: 8px !important;
@@ -1377,7 +1532,8 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
     -webkit-backdrop-filter: blur(8px) !important;
     position: relative !important;
     z-index: 1 !important;
-    width: fit-content !important; /* Evita que ocupe 100% da coluna */
+    width: fit-content !important;
+    /* Evita que ocupe 100% da coluna */
 }
 
 /* Pseudo-elemento que funcionará como o fundo deslizante */
@@ -1399,7 +1555,8 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
 .stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button,
 .stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button {
     position: relative !important;
-    z-index: 2 !important; /* Fica acima do slider */
+    z-index: 2 !important;
+    /* Fica acima do slider */
     border-radius: 8px !important;
     border: none !important;
     background: transparent !important;
@@ -1418,17 +1575,19 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
 
 /* Força os botões de Tipo a terem espaço suficiente para 'SOCICAM' e NÃO REDIMENSIONAR NUNCA */
 .stApp div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"] button {
-    flex: 0 0 105px !important; /* Não cresce, não encolhe, base 105px */
+    flex: 0 0 105px !important;
+    /* Não cresce, não encolhe, base 105px */
     width: 105px !important;
-    min-width: 105px !important; 
+    min-width: 105px !important;
     max-width: 105px !important;
 }
 
 /* Força os botões de Categoria a terem espaço suficiente para 'Monitoramento' e NÃO REDIMENSIONAR NUNCA */
 .stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button {
-    flex: 0 0 155px !important; /* Não cresce, não encolhe, base 155px */
+    flex: 0 0 155px !important;
+    /* Não cresce, não encolhe, base 155px */
     width: 155px !important;
-    min-width: 155px !important; 
+    min-width: 155px !important;
     max-width: 155px !important;
 }
 
@@ -1445,7 +1604,7 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
 .stApp div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"] button:hover:not([aria-checked="true"]):not([kind="pillsActive"]) {
     background: rgba(255, 255, 255, 0.7) !important;
     transform: translateY(-1px) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Botão Ativo (texto e remoção do fundo nativo) */
@@ -1456,8 +1615,10 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
-    transform: translateY(-2px) !important; /* Leve elevação do texto */
-    pointer-events: none !important; /* Impede clique no botão já selecionado, bloqueando a desmarcação */
+    transform: translateY(-2px) !important;
+    /* Leve elevação do texto */
+    pointer-events: none !important;
+    /* Impede clique no botão já selecionado, bloqueando a desmarcação */
     cursor: default !important;
 }
 
@@ -1472,17 +1633,21 @@ div[data-testid="stMultiSelect"] div[data-baseweb="tag"] * {
    ANIMAÇÃO DE DESLIZAMENTO - TIPO (3 ITENS)
    ============================ */
 div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]::before {
-    width: calc((100% - 16px - 24px) / 3) !important; /* (100% do container - padding laterais - 2 gaps) / 3 */
+    width: calc((100% - 16px - 24px) / 3) !important;
+    /* (100% do container - padding laterais - 2 gaps) / 3 */
     left: 8px !important;
 }
+
 div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button:nth-child(1)[aria-checked="true"])::before,
 div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(1))::before {
     transform: translateX(0) !important;
 }
+
 div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button:nth-child(2)[aria-checked="true"])::before,
 div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(2))::before {
     transform: translateX(calc(100% + 12px)) !important;
 }
+
 div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button:nth-child(3)[aria-checked="true"])::before,
 div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(3))::before {
     transform: translateX(calc(200% + 24px)) !important;
@@ -1492,13 +1657,16 @@ div[class*="st-key-widget_menu_tipo"] div[data-testid="stButtonGroup"]:has(butto
    ANIMAÇÃO DE DESLIZAMENTO - CATEGORIA (2 ITENS)
    ============================ */
 div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]::before {
-    width: calc((100% - 16px - 12px) / 2) !important; /* (100% do container - padding laterais - 1 gap) / 2 */
+    width: calc((100% - 16px - 12px) / 2) !important;
+    /* (100% do container - padding laterais - 1 gap) / 2 */
     left: 8px !important;
 }
+
 div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button:nth-child(1)[aria-checked="true"])::before,
 div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(1))::before {
     transform: translateX(0) !important;
 }
+
 div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button:nth-child(2)[aria-checked="true"])::before,
 div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(button[kind="pillsActive"]:nth-child(2))::before {
     transform: translateX(calc(100% + 12px)) !important;
@@ -1509,8 +1677,8 @@ div[class*="st-key-widget_menu_categoria"] div[data-testid="stButtonGroup"]:has(
    Garante que nenhuma letra se separe de uma palavra em botões, tags e labels
    ========================================== */
 button,
-div.stButton > button,
-div.stDownloadButton > button,
+div.stButton>button,
+div.stDownloadButton>button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"],
 div[data-testid="stButtonGroup"] button {
@@ -1522,8 +1690,8 @@ div[data-testid="stButtonGroup"] button {
 }
 
 button *,
-div.stButton > button *,
-div.stDownloadButton > button *,
+div.stButton>button *,
+div.stDownloadButton>button *,
 [data-testid="stBaseButton-secondary"] *,
 [data-testid="stBaseButton-primary"] *,
 div[data-testid="stButtonGroup"] button * {
@@ -1662,6 +1830,7 @@ div[class*="st-key-mon_new_btn_row"] button span,
 
 /* Em tela estreita / celular (<= 768px): Ampliar e Galeria um abaixo do outro */
 @media (max-width: 768px) {
+
     div[class*="st-key-mon_old_btn_row"] div[data-testid="stHorizontalBlock"],
     div[class*="st-key-mon_new_btn_row"] div[data-testid="stHorizontalBlock"],
     .st-key-fisc_carousel_controls div[data-testid="stHorizontalBlock"] {
@@ -1703,6 +1872,7 @@ div[class*="st-key-corpo_relatorio"] [data-testid="stWidgetLabel"] p {
         line-height: 0 !important;
         white-space: nowrap !important;
     }
+
     div[class*="st-key-corpo_relatorio_socicam"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p::after {
         content: "SOCICAM" !important;
         font-size: 14px !important;
@@ -1719,6 +1889,7 @@ div[class*="st-key-corpo_relatorio"] [data-testid="stWidgetLabel"] p {
         line-height: 0 !important;
         white-space: nowrap !important;
     }
+
     div[class*="st-key-corpo_relatorio_crc"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p::after {
         content: "CRC" !important;
         font-size: 14px !important;
@@ -1735,6 +1906,7 @@ div[class*="st-key-corpo_relatorio"] [data-testid="stWidgetLabel"] p {
         line-height: 0 !important;
         white-space: nowrap !important;
     }
+
     div[class*="st-key-corpo_relatorio_cra"] div[class*="st-key-pos_crc_step1"] [data-testid="stWidgetLabel"] p::after {
         content: "CRA" !important;
         font-size: 14px !important;
@@ -1751,6 +1923,7 @@ div[class*="st-key-corpo_relatorio"] [data-testid="stWidgetLabel"] p {
     div[class*="st-key-corpo_relatorio"] div[data-testid="stHorizontalBlock"] {
         flex-direction: column !important;
     }
+
     div[class*="st-key-corpo_relatorio"] div[data-testid="column"] {
         width: 100% !important;
         flex: 1 1 100% !important;
@@ -1880,6 +2053,3 @@ div[class*="st-key-btn_container_perigo_excluir"] button:hover,
     transform: translateY(0) scale(0.98) !important;
     box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25) !important;
 }
-
-
-

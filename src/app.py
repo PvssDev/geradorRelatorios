@@ -29,11 +29,23 @@ from services.image_service import (
     verificar_foto_elegivel_relacionar,
     extrair_data_original_foto
 )
+import sys
+import importlib
+
+for _mod_name in ["ui.state", "ui", "services.media_storage_service", "services.session_cache_service"]:
+    if _mod_name in sys.modules:
+        try:
+            importlib.reload(sys.modules[_mod_name])
+        except Exception:
+            pass
+
 from ui.state import (
     inicializar_estado_sessao,
     obter_termos_ui,
     salvar_estado_relatorio_ativo,
     enfileirar_acao_fs,
+    enfileirar_sincronizacao_midia,
+    serializar_arquivo_para_payload_fs,
     verificar_e_alternar_relatorio,
     resetar_estado_sessao_relatorio_ativo
 )
@@ -53,6 +65,7 @@ from ui.modals import (
     confirmar_exclusao_lote_modal,
     confirmar_exclusao_nc_modal,
     confirmar_limpar_registros_modal,
+    confirmar_reset_estado_modal,
     gerenciar_responsaveis_modal,
     gerenciar_coordenadores_modal,
     gerenciar_contratos_modal,
@@ -67,9 +80,12 @@ from utils import (
     calcular_codificacao_cra,
     extrair_ano,
     obter_proximo_numero_sequencial_cra,
+    formatar_codificacoes_contraidas,
     formatar_legenda_foto,
     converter_faixa_para_sigla,
-    combinar_faixas_relacionadas
+    combinar_faixas_relacionadas,
+    carregar_mapa_siglas_completo,
+    sincronizar_legendas_grupo_cra,
 )
 from ui.components.swiper import render_swiper_carousel
 from ui.components.local_storage import render_local_file_system_sync, RestoredLocalFile
@@ -120,41 +136,82 @@ def inject_tooltips_script():
     <script>
     (function() {{
         const siglaMap = {siglas_json};
-        
-        function setTooltips() {{
-            const doc = window.parent.document;
-            if (!doc) return;
-            
-            const pills = doc.querySelectorAll('button[data-testid*="pills"] p');
-            pills.forEach(p => {{
-                const sigla = p.innerText.trim();
-                if (siglaMap[sigla]) {{
-                    const btn = p.closest('button');
-                    if (btn && btn.getAttribute('title') !== siglaMap[sigla]) {{
-                        btn.setAttribute('title', siglaMap[sigla]);
-                    }}
-                }}
-            }});
-            
-            const tags = doc.querySelectorAll('div[data-baseweb="tag"] span[title]');
-            tags.forEach(span => {{
-                let key = span.getAttribute('title');
-                if (siglaMap[key]) {{
-                    const tagDiv = span.closest('div[data-baseweb="tag"]');
-                    if (tagDiv && tagDiv.getAttribute('title') !== siglaMap[key]) {{
-                        tagDiv.setAttribute('title', siglaMap[key]);
-                    }}
-                }}
-            }});
+        const parentWin = window.parent;
+        if (!parentWin || !parentWin.document) return;
+        const doc = parentWin.document;
+
+        // Desconecta qualquer observer anterior para evitar acúmulo de listeners na main thread
+        if (parentWin.__arpeTooltipObserver) {{
+            try {{ parentWin.__arpeTooltipObserver.disconnect(); }} catch (e) {{}}
+            parentWin.__arpeTooltipObserver = null;
         }}
-        
-        if (window.parent && window.parent.document) {{
-            const observer = new MutationObserver(setTooltips);
-            if (window.parent.document.body) {{
-                observer.observe(window.parent.document.body, {{ childList: true, subtree: true }});
-                setTooltips();
+        if (parentWin.__arpeTooltipDebounce) {{
+            clearTimeout(parentWin.__arpeTooltipDebounce);
+            parentWin.__arpeTooltipDebounce = null;
+        }}
+
+        function setTooltips() {{
+            try {{
+                const pills = doc.querySelectorAll('button[data-testid*="pills"] p');
+                for (let i = 0; i < pills.length; i++) {{
+                    const p = pills[i];
+                    const sigla = p.innerText ? p.innerText.trim() : "";
+                    if (sigla && siglaMap[sigla]) {{
+                        const btn = p.closest('button');
+                        if (btn && btn.getAttribute('title') !== siglaMap[sigla]) {{
+                            btn.setAttribute('title', siglaMap[sigla]);
+                        }}
+                    }}
+                }}
+                
+                const tags = doc.querySelectorAll('div[data-baseweb="tag"] span[title]');
+                for (let i = 0; i < tags.length; i++) {{
+                    const span = tags[i];
+                    const key = span.getAttribute('title');
+                    if (key && siglaMap[key]) {{
+                        const tagDiv = span.closest('div[data-baseweb="tag"]');
+                        if (tagDiv && tagDiv.getAttribute('title') !== siglaMap[key]) {{
+                            tagDiv.setAttribute('title', siglaMap[key]);
+                        }}
+                    }}
+                }}
+            }} catch (e) {{
+                // Proteção contra manipulações concorrentes durante transições de modal
             }}
         }}
+
+        // Throttling/Debouncing: aguarda 120ms de estabilidade do DOM antes de varrer seletores
+        function debouncedSetTooltips() {{
+            if (parentWin.__arpeTooltipDebounce) {{
+                clearTimeout(parentWin.__arpeTooltipDebounce);
+            }}
+            parentWin.__arpeTooltipDebounce = setTimeout(() => {{
+                setTooltips();
+                parentWin.__arpeTooltipDebounce = null;
+            }}, 120);
+        }}
+
+        // Alvo de observação prioritário: restrito ao container da aplicação
+        const targetNode = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.body;
+        if (targetNode) {{
+            const observer = new MutationObserver((mutations) => {{
+                let shouldUpdate = false;
+                for (let i = 0; i < mutations.length; i++) {{
+                    if (mutations[i].addedNodes.length > 0 || mutations[i].removedNodes.length > 0) {{
+                        shouldUpdate = true;
+                        break;
+                    }}
+                }}
+                if (shouldUpdate) {{
+                    debouncedSetTooltips();
+                }}
+            }});
+
+            observer.observe(targetNode, {{ childList: true, subtree: true }});
+            parentWin.__arpeTooltipObserver = observer;
+        }}
+
+        debouncedSetTooltips();
     }})();
     </script>
     """
@@ -282,6 +339,9 @@ with st.container():
             if res_action == "LOADED_FROM_DISK":
                 saved_state = fs_res.get("state")
                 if saved_state and isinstance(saved_state, dict):
+                    from ui.state import validar_integridade_estado_concessao
+                    if not validar_integridade_estado_concessao(st.session_state.tipo_relatorio, saved_state):
+                        saved_state = {}
                     st.session_state.temp_fiscalizacoes = saved_state.get("temp_fiscalizacoes", [])
                     st.session_state.temp_nc = saved_state.get("temp_nc", [])
                     st.session_state.manual_relacao_map = saved_state.get("manual_relacao_map", {})
@@ -313,10 +373,12 @@ with st.container():
                     elif category == "arquivo" or any(lower_name.endswith(ext) for ext in [".xlsx", ".xls"]):
                         st.session_state.uploaded_planilha_elegibilidade = RestoredLocalFile(name, size, mime, b64)
                         st.session_state._planilha_salva_local = name
+                        st.session_state._planilha_salva_nome = name
                     elif category == "arquivo" or any(lower_name.endswith(ext) for ext in [".docx", ".doc"]):
                         doc_file = RestoredLocalFile(name, size, mime, b64)
                         st.session_state.uploaded_mon_anterior = doc_file
                         st.session_state._mon_doc_salvo_local = name
+                        st.session_state._mon_doc_salvo_nome = name
                         if is_monitoring:
                             try:
                                 from monitoramento_utils import extrair_ncs_e_fotos_anterior
@@ -346,9 +408,43 @@ with st.container():
                             except Exception:
                                 pass
 
-                st.session_state._fotos_restauradas = restored_photos
-                st.session_state.fill_photos = restored_photos
+                if restored_photos:
+                    st.session_state._fotos_restauradas = restored_photos
+                    st.session_state.fill_photos = restored_photos
+                elif st.session_state.get("fill_photos"):
+                    # Pasta conectada estava vazia, mas já há fotos na sessão: sincroniza para a nova pasta
+                    current_photos = list(st.session_state.fill_photos)
+                    photos_payload = [serializar_arquivo_para_payload_fs(f) for f in current_photos if serializar_arquivo_para_payload_fs(f)]
+                    if photos_payload:
+                        enfileirar_sincronizacao_midia(
+                            tipo=st.session_state.tipo_relatorio,
+                            cat=st.session_state.categoria_relatorio,
+                            photos_to_save=photos_payload,
+                            active_photo_names=[p["name"] for p in photos_payload],
+                        )
 
+                # Se a sessão já tinha documentos ativos e a pasta não tinha, sincroniza para a pasta recém-conectada também
+                arqs_to_sync = []
+                if st.session_state.get("uploaded_planilha_elegibilidade"):
+                    p_payload = serializar_arquivo_para_payload_fs(st.session_state.uploaded_planilha_elegibilidade)
+                    if p_payload:
+                        arqs_to_sync.append(p_payload)
+                if st.session_state.get("uploaded_mon_anterior"):
+                    m_payload = serializar_arquivo_para_payload_fs(st.session_state.uploaded_mon_anterior)
+                    if m_payload:
+                        arqs_to_sync.append(m_payload)
+                if arqs_to_sync and not any(item.get("category") == "arquivo" for item in media_list):
+                    enfileirar_sincronizacao_midia(
+                        tipo=st.session_state.tipo_relatorio,
+                        cat=st.session_state.categoria_relatorio,
+                        arquivos_to_save=arqs_to_sync,
+                        active_arquivo_names=[a["name"] for a in arqs_to_sync],
+                    )
+
+                st.rerun()
+
+            elif res_action == "REQUEST_CLEAR_STATE":
+                st.session_state.show_confirm_reset_estado = True
                 st.rerun()
 
             elif res_action == "CLEARED_ON_DISK":
@@ -445,7 +541,15 @@ with st.container():
                 st.session_state.photos_uploader_version += 1
                 st.session_state.fill_photos = []
                 st.session_state._uploader_fotos_anteriores = []
+                st.session_state._fotos_restauradas = []
+                st.session_state._fotos_excluidas_galeria = set()
                 limpar_fotos_disco(st.session_state.tipo_relatorio, st.session_state.categoria_relatorio)
+                enfileirar_sincronizacao_midia(
+                    tipo=st.session_state.tipo_relatorio,
+                    cat=st.session_state.categoria_relatorio,
+                    photos_to_save=[],
+                    active_photo_names=[],
+                )
                 if "carousel_index" in st.session_state:
                     st.session_state.carousel_index = 0
                 st.rerun()
@@ -460,7 +564,8 @@ with st.container():
         sort_option = st.session_state.fill_photos_sort_option
 
         # 1. PROCESSAMENTO DE UPLOAD DIRETO EM DISCO (COPIAR E COLAR NA PASTA MIDIA/FOTOS)
-        uploads_atuais = list(uploaded_nc_photos or [])
+        nomes_excluidos = set(st.session_state.get("_fotos_excluidas_galeria", set()))
+        uploads_atuais = [p for p in (uploaded_nc_photos or []) if getattr(p, "name", "") not in nomes_excluidos]
         nomes_upload = [getattr(p, "name", "") for p in uploads_atuais if getattr(p, "name", "")]
         nomes_anteriores = st.session_state.get("_uploader_fotos_anteriores", [])
 
@@ -478,13 +583,25 @@ with st.container():
             st.session_state._uploader_fotos_anteriores = nomes_upload
             # SEGUNDO: Atualiza a lista oficial a partir dos arquivos salvos na pasta
             st.session_state.fill_photos = fotos_salvas
-            st.rerun()
-        elif not st.session_state.get("fill_photos"):
-            # Se a lista estiver vazia na sessão, carrega o que já estiver salvo na pasta midia/fotos/
-            st.session_state.fill_photos = carregar_fotos_disco(
-                st.session_state.tipo_relatorio,
-                st.session_state.categoria_relatorio
+
+            # TERCEIRO: Sincroniza com a pasta local física via File System Access API
+            photos_payload = []
+            for f in novas_fotos:
+                p_item = serializar_arquivo_para_payload_fs(f)
+                if p_item:
+                    photos_payload.append(p_item)
+
+            enfileirar_sincronizacao_midia(
+                tipo=st.session_state.tipo_relatorio,
+                cat=st.session_state.categoria_relatorio,
+                photos_to_save=photos_payload,
+                active_photo_names=nomes_upload,
             )
+            st.rerun()
+        elif not uploads_atuais and not st.session_state.get("_fotos_restauradas"):
+            # Se não há uploads ativos no uploader e nem fotos restauradas pelo Local Storage, a lista é vazia
+            if st.session_state.get("fill_photos"):
+                st.session_state.fill_photos = []
 
         # 2. ORDENAÇÃO DAS FOTOS ATIVAS
         photos_to_sort = list(st.session_state.get("fill_photos", []))
@@ -503,8 +620,7 @@ with st.container():
 
         total_fotos = len(st.session_state.fill_photos)
         if total_fotos > 0:
-            pasta_nome = obter_subpasta_relatorio(st.session_state.tipo_relatorio, st.session_state.categoria_relatorio)
-            st.caption(f":material/check_circle: **{total_fotos} foto(s)** salvas e ativas em `geradorRelatorios/{pasta_nome}/midia/fotos/`.")
+            st.caption(f":material/check_circle: **{total_fotos} foto(s)** ativas no carrossel de registros.")
 
         # 1.1 Upload de Documentos Auxiliares (COPIAR E COLAR NA PASTA MIDIA/ARQUIVOS)
         uploaded_mon_anterior = None
@@ -523,16 +639,40 @@ with st.container():
                         uploaded_mon_anterior
                     )
                     st.session_state._mon_doc_salvo_nome = uploaded_mon_anterior.name
+                    st.session_state._mon_doc_salvo_local = uploaded_mon_anterior.name
                     st.session_state.uploaded_mon_anterior = doc_salvo
+
+                    # Sincroniza com Local Storage
+                    arq_payload = serializar_arquivo_para_payload_fs(uploaded_mon_anterior)
+                    active_arq = [uploaded_mon_anterior.name]
+                    if st.session_state.get("_planilha_salva_nome"):
+                        active_arq.append(st.session_state._planilha_salva_nome)
+
+                    enfileirar_sincronizacao_midia(
+                        tipo=st.session_state.tipo_relatorio,
+                        cat=st.session_state.categoria_relatorio,
+                        arquivos_to_save=[arq_payload] if arq_payload else [],
+                        active_arquivo_names=active_arq,
+                    )
                     st.rerun()
-            elif not st.session_state.get("uploaded_mon_anterior"):
-                doc_em_disco = carregar_documento_auxiliar_disco(
-                    st.session_state.tipo_relatorio,
-                    st.session_state.categoria_relatorio,
-                    extensoes=(".docx", ".doc")
+            elif st.session_state.get("_mon_doc_salvo_nome") and not uploaded_mon_anterior:
+                # Usuário removeu o documento anterior do upload: remove também da pasta local
+                st.session_state._mon_doc_salvo_nome = None
+                st.session_state._mon_doc_salvo_local = None
+                st.session_state.uploaded_mon_anterior = None
+                st.session_state.old_photos_to_match = []
+                limpar_documentos_auxiliares_disco(st.session_state.tipo_relatorio, st.session_state.categoria_relatorio, extensoes=(".docx", ".doc"))
+                active_arq = [st.session_state._planilha_salva_nome] if st.session_state.get("_planilha_salva_nome") else []
+                enfileirar_sincronizacao_midia(
+                    tipo=st.session_state.tipo_relatorio,
+                    cat=st.session_state.categoria_relatorio,
+                    arquivos_to_save=[],
+                    active_arquivo_names=active_arq,
                 )
-                if doc_em_disco:
-                    st.session_state.uploaded_mon_anterior = doc_em_disco
+                st.rerun()
+            elif not st.session_state.get("_mon_doc_salvo_local"):
+                if st.session_state.get("uploaded_mon_anterior") and not getattr(st.session_state.get("uploaded_mon_anterior"), "b64_data", None):
+                    st.session_state.uploaded_mon_anterior = None
 
         uploaded_planilha_elegibilidade = None
         if st.session_state.get("tipo_relatorio", "CRA") == "CRA" and not is_monitoring:
@@ -552,69 +692,49 @@ with st.container():
                         uploaded_planilha_elegibilidade
                     )
                     st.session_state._planilha_salva_nome = uploaded_planilha_elegibilidade.name
+                    st.session_state._planilha_salva_local = uploaded_planilha_elegibilidade.name
                     st.session_state.uploaded_planilha_elegibilidade = planilha_salva
+
+                    # Sincroniza com Local Storage
+                    arq_payload = serializar_arquivo_para_payload_fs(uploaded_planilha_elegibilidade)
+                    active_arq = [uploaded_planilha_elegibilidade.name]
+                    if st.session_state.get("_mon_doc_salvo_nome"):
+                        active_arq.append(st.session_state._mon_doc_salvo_nome)
+
+                    enfileirar_sincronizacao_midia(
+                        tipo=st.session_state.tipo_relatorio,
+                        cat=st.session_state.categoria_relatorio,
+                        arquivos_to_save=[arq_payload] if arq_payload else [],
+                        active_arquivo_names=active_arq,
+                    )
                     st.rerun()
-            elif not st.session_state.get("uploaded_planilha_elegibilidade"):
-                planilha_em_disco = carregar_documento_auxiliar_disco(
-                    st.session_state.tipo_relatorio,
-                    st.session_state.categoria_relatorio,
-                    extensoes=(".xlsx", ".xls")
+            elif st.session_state.get("_planilha_salva_nome") and not uploaded_planilha_elegibilidade:
+                # Usuário removeu a planilha do upload: remove também da pasta local
+                st.session_state._planilha_salva_nome = None
+                st.session_state._planilha_salva_local = None
+                st.session_state.uploaded_planilha_elegibilidade = None
+                limpar_documentos_auxiliares_disco(st.session_state.tipo_relatorio, st.session_state.categoria_relatorio, extensoes=(".xlsx", ".xls"))
+                active_arq = [st.session_state._mon_doc_salvo_nome] if st.session_state.get("_mon_doc_salvo_nome") else []
+                enfileirar_sincronizacao_midia(
+                    tipo=st.session_state.tipo_relatorio,
+                    cat=st.session_state.categoria_relatorio,
+                    arquivos_to_save=[],
+                    active_arquivo_names=active_arq,
                 )
-                if planilha_em_disco:
-                    st.session_state.uploaded_planilha_elegibilidade = planilha_em_disco
+                st.rerun()
+            elif not st.session_state.get("_planilha_salva_local"):
+                if st.session_state.get("uploaded_planilha_elegibilidade") and not getattr(st.session_state.get("uploaded_planilha_elegibilidade"), "b64_data", None):
+                    st.session_state.uploaded_planilha_elegibilidade = None
 
         if st.session_state.get("uploaded_planilha_elegibilidade"):
-            st.caption(f":material/table_view: Planilha salva em midia/arquivos/: **{st.session_state.uploaded_planilha_elegibilidade.name}**")
+            st.caption(f":material/table_view: Planilha ativa: **{st.session_state.uploaded_planilha_elegibilidade.name}**")
         if is_monitoring and st.session_state.get("uploaded_mon_anterior"):
-            st.caption(f":material/description: Documento anterior salvo em midia/arquivos/: **{st.session_state.uploaded_mon_anterior.name}**")
+            st.caption(f":material/description: Documento anterior ativo: **{st.session_state.uploaded_mon_anterior.name}**")
 
         if "old_photos_to_match" not in st.session_state:
             st.session_state.old_photos_to_match = []
 
-        if is_monitoring and not uploaded_mon_anterior and st.session_state.get("_mon_doc_no_uploader"):
-            # Usuário removeu o documento anterior do upload: remove também de midia/arquivos/
-            st.session_state._mon_doc_no_uploader = None
-            st.session_state._mon_doc_salvo_local = None
-            st.session_state.uploaded_mon_anterior = None
-            st.session_state.old_photos_to_match = []
-            active_arq = [st.session_state._planilha_salva_local] if st.session_state.get("_planilha_salva_local") else []
-            enfileirar_acao_fs({
-                "action": "SYNC_MEDIA",
-                "tipo": st.session_state.tipo_relatorio,
-                "cat": st.session_state.categoria_relatorio,
-                "arquivos_to_save": [],
-                "active_arquivo_names": active_arq,
-            })
-            st.rerun()
-
         if is_monitoring and uploaded_mon_anterior:
-            st.session_state._mon_doc_no_uploader = uploaded_mon_anterior.name
-            if st.session_state.get("_mon_doc_salvo_local") != uploaded_mon_anterior.name:
-                try:
-                    raw = uploaded_mon_anterior.getvalue()
-                    b64 = "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64," + base64.b64encode(raw).decode("utf-8")
-                    st.session_state._mon_doc_salvo_local = uploaded_mon_anterior.name
-
-                    active_arq = [uploaded_mon_anterior.name]
-                    if st.session_state.get("_planilha_salva_local"):
-                        active_arq.append(st.session_state._planilha_salva_local)
-
-                    enfileirar_acao_fs({
-                        "action": "SYNC_MEDIA",
-                        "tipo": st.session_state.tipo_relatorio,
-                        "cat": st.session_state.categoria_relatorio,
-                        "arquivos_to_save": [{
-                            "name": uploaded_mon_anterior.name,
-                            "size": len(raw),
-                            "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            "base64": b64
-                        }],
-                        "active_arquivo_names": active_arq,
-                    })
-                    st.rerun()
-                except Exception:
-                    pass
-
             last_parsed_key = f"last_parsed_{uploaded_mon_anterior.name}_{uploaded_mon_anterior.size}"
             if st.session_state.get("last_parsed_file") != last_parsed_key or not st.session_state.get("old_photos_to_match"):
                 from monitoramento_utils import extrair_ncs_e_fotos_anterior
@@ -1366,32 +1486,53 @@ with st.container():
                     nc_descricao = _nc_descricao_pills
                     ponto_atencao = _ponto_atencao_pills
 
+                    is_socicam = st.session_state.get("tipo_relatorio", "") == "SOCICAM"
                     is_cra_fisc = st.session_state.get("tipo_relatorio", "CRA") == "CRA"
+                    is_crc_fisc = st.session_state.get("tipo_relatorio", "") == "CRC"
                     siglas_ativas = nc_descricao if tipo_registro == "Não Conformidade" else ponto_atencao
-                    if is_cra_fisc and siglas_ativas:
+                    if siglas_ativas:
                         desc_exp = expandir_siglas(", ".join(siglas_ativas))
                         st.caption(f":material/info: **Descrição:** {desc_exp}")
 
-                # 3. BLOCO INFERIOR: Codificação (Legenda e Trecho removidos na Fiscalização CRA)
+                # 3. BLOCO INFERIOR: Codificação (Legenda e Trecho removidos na Fiscalização)
                 with st.container(key=f"fisc_form_bottom_{st.session_state.nc_form_counter}"):
-                    if not is_cra_fisc:
-                        nc_legenda = st.text_area("Legenda", key=f"nc_obs_{st.session_state.nc_form_counter}", placeholder="Escreva a legenda correspondente...")
+                    nc_legenda = ""
+
+                    if is_socicam:
+                        cod_placeholder = "Setor ou código da ocorrência (ex: Plataformas, Sanitários)..."
+                    elif is_crc_fisc:
+                        cod_placeholder = "Codificação CRC (ex: CRC.SH015.0646+0648/2026.001)..."
                     else:
-                        nc_legenda = ""
+                        cod_placeholder = "Codificação da ocorrência (ex: CRA.ST601.2790-2794/2026.001)..."
 
                     codificacao = st.text_input(
-                        "Codificação",
+                        "Codificação / Localização" if is_socicam else "Codificação",
                         key=f"nc_cod_{st.session_state.nc_form_counter}",
-                        placeholder="Codificação da ocorrência (ex: CRA.ST601.2790-2794/2026.001)..."
+                        placeholder=cod_placeholder
                     )
                     
-                    if is_cra_fisc and codificacao.strip():
-                        seq_tipo_preview = obter_proximo_numero_sequencial_cra(
-                            st.session_state.get("temp_nc", []),
-                            id_vinculo=id_vinculo,
-                            tipo_registro=tipo_registro
-                        )
-                        cod_preview = codificacao.strip() if "/" in codificacao.strip() else calcular_codificacao_cra(codificacao, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview)
+                    if codificacao.strip():
+                        cod_in_prev = codificacao.strip()
+                        qtd_siglas_prev = max(1, len(siglas_ativas)) if siglas_ativas else 1
+                        if is_cra_fisc:
+                            seq_tipo_preview = obter_proximo_numero_sequencial_cra(
+                                st.session_state.get("temp_nc", []),
+                                id_vinculo=id_vinculo,
+                                tipo_registro=tipo_registro
+                            )
+                            if "/" in cod_in_prev and qtd_siglas_prev == 1:
+                                cod_preview = cod_in_prev
+                            elif qtd_siglas_prev > 1:
+                                if "/" in cod_in_prev:
+                                    cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=idx_p + 1) for idx_p in range(qtd_siglas_prev)]
+                                else:
+                                    cods_prev_list = [calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview + idx_p) for idx_p in range(qtd_siglas_prev)]
+                                cod_preview = formatar_codificacoes_contraidas(cods_prev_list)
+                            else:
+                                cod_preview = calcular_codificacao_cra(cod_in_prev, data_fisc=data_fisc_vinculo, seq_idx=seq_tipo_preview)
+                        else:
+                            cod_preview = cod_in_prev
+
                         st.caption(f":material/tag: Código gerado para este item: **{cod_preview}**")
 
                         if st.session_state.fill_photos:
@@ -1400,11 +1541,12 @@ with st.container():
                         else:
                             foto_num_preview = 1
                         data_foto_preview = extrair_data_original_foto(foto_default)
+                        faixa_preview = direcao_faixa if not is_socicam else ""
                         legenda_preview = formatar_legenda_foto(
                             num=foto_num_preview,
                             codificacao=cod_preview,
                             siglas_ou_ncs=siglas_ativas,
-                            faixa=direcao_faixa,
+                            faixa=faixa_preview,
                             data_foto=data_foto_preview
                         )
                         st.caption(f":material/subtitles: **Legenda:** {legenda_preview}")
@@ -1443,27 +1585,7 @@ with st.container():
                                     cod_input = codificacao.strip()
                                     data_foto_val = extrair_data_original_foto(foto_default)
 
-                                    seq_idx_primeira = obter_proximo_numero_sequencial_cra(
-                                        st.session_state.temp_nc,
-                                        id_vinculo=id_vinculo,
-                                        tipo_registro=tipo_registro
-                                    )
-                                    if not cod_input:
-                                        cod_legenda = ""
-                                    elif "/" in cod_input and len(siglas_ativas) == 1:
-                                        cod_legenda = cod_input
-                                    else:
-                                        cod_legenda = calcular_codificacao_cra(cod_input, data_fisc=data_fisc_vinculo, seq_idx=seq_idx_primeira)
-
-                                    legenda_completa = formatar_legenda_foto(
-                                        num=foto_num,
-                                        codificacao=cod_legenda,
-                                        siglas_ou_ncs=siglas_ativas,
-                                        faixa=direcao_faixa,
-                                        data_foto=data_foto_val
-                                    )
-                                    
-                                    for sigla in siglas_ativas:
+                                    for idx_s, sigla in enumerate(siglas_ativas):
                                         seq_idx = obter_proximo_numero_sequencial_cra(
                                             st.session_state.temp_nc,
                                             id_vinculo=id_vinculo,
@@ -1473,6 +1595,8 @@ with st.container():
                                             cod_formatado = ""
                                         elif "/" in cod_input and len(siglas_ativas) == 1:
                                             cod_formatado = cod_input
+                                        elif "/" in cod_input:
+                                            cod_formatado = calcular_codificacao_cra(cod_input, data_fisc=data_fisc_vinculo, seq_idx=idx_s + 1)
                                         else:
                                             cod_formatado = calcular_codificacao_cra(cod_input, data_fisc=data_fisc_vinculo, seq_idx=seq_idx)
                                         
@@ -1490,8 +1614,8 @@ with st.container():
                                             "Foto": foto_default,
                                             "Foto Anterior": "",
                                             "Legenda Anterior": "",
-                                            "Observações": legenda_completa,
-                                            "Legenda da Foto": legenda_completa,
+                                            "Observações": "",
+                                            "Legenda da Foto": "",
                                             "Identificação": identificacao,
                                             "Direção (faixa)": direcao_faixa,
                                             "Fundamento da infração": fundamento_infracao,
@@ -1503,6 +1627,12 @@ with st.container():
                                             "Data da Foto": data_foto_val
                                         }
                                         st.session_state.temp_nc.append(rec)
+
+                                    sincronizar_legendas_grupo_cra(
+                                        st.session_state.temp_nc,
+                                        grp_id,
+                                        mapa_siglas=carregar_mapa_siglas_completo(),
+                                    )
                                 else:
                                     nc_desc_str = ", ".join(nc_descricao) if nc_descricao else ""
                                     pa_desc_str = ", ".join(ponto_atencao) if ponto_atencao else ""
@@ -1513,12 +1643,13 @@ with st.container():
                                     data_foto_val = extrair_data_original_foto(foto_default)
 
                                     siglas_list = nc_descricao if tipo_registro == "Não Conformidade" else ponto_atencao
+                                    faixa_rec = direcao_faixa if not is_socicam else ""
                                     if not nc_legenda or not nc_legenda.strip():
                                         nc_legenda = formatar_legenda_foto(
                                             num=novo_nc_num,
                                             codificacao=cod_formatado,
                                             siglas_ou_ncs=siglas_list,
-                                            faixa=direcao_faixa,
+                                            faixa=faixa_rec,
                                             data_foto=data_foto_val
                                         )
 
@@ -1537,7 +1668,7 @@ with st.container():
                                         "Observações": nc_legenda,
                                         "Legenda da Foto": nc_legenda,
                                         "Identificação": identificacao,
-                                        "Direção (faixa)": direcao_faixa,
+                                        "Direção (faixa)": faixa_rec,
                                         "Fundamento da infração": fundamento_infracao,
                                         "Determinação": determinacao,
                                         "Situação": situacao,
@@ -1843,7 +1974,7 @@ with st.container():
                     
                 st.write("") # Espaçamento
         
-        col_relatorio, col_planilha, col_limpar, col_reset = st.columns([3.4, 2.8, 2.0, 2.0], gap="small")
+        col_relatorio, col_planilha, col_limpar = st.columns([4.2, 3.4, 2.4], gap="small")
     
     # Inicializar estado para persistir os relatórios gerados via aba preenchimento
     if "relatorios_preenchimento_data" not in st.session_state:
@@ -1915,26 +2046,18 @@ with st.container():
         if st.button("Limpar Registros", icon=":material/delete_forever:", type="secondary", use_container_width=True, key="btn_clear_all_data"):
             st.session_state.show_confirm_limpar_registros = True
 
-    with col_reset:
-        with st.popover("Limpar Estado", icon=":material/restart_alt:", use_container_width=True):
-            st.markdown("⚠️ **Resetar Relatório Atual**")
-            st.caption(
-                f"Apaga permanentemente o **arquivo de estado**, todas as **fotos** e **documentos auxiliares** salvos de **{st.session_state.tipo_relatorio} - {st.session_state.categoria_relatorio}**."
-            )
-            if st.button("Confirmar Limpeza Completa", icon=":material/delete_forever:", type="primary", use_container_width=True, key="btn_limpar_estado_relatorio"):
-                resetar_estado_sessao_relatorio_ativo(
-                    st.session_state.tipo_relatorio,
-                    st.session_state.categoria_relatorio
-                )
-                st.session_state.pending_toast = {
-                    "msg": f"Estado de {st.session_state.tipo_relatorio} ({st.session_state.categoria_relatorio}) resetado com sucesso!",
-                    "icon": ":material/check_circle:"
-                }
-                st.rerun()
-
     # Renderiza o modal de limpeza de registros isolada caso tenha sido solicitado
     if st.session_state.get("show_confirm_limpar_registros", False):
+        st.session_state.show_confirm_limpar_registros = False
         confirmar_limpar_registros_modal(
+            tipo_relatorio=st.session_state.tipo_relatorio,
+            categoria_relatorio=st.session_state.categoria_relatorio
+        )
+
+    # Renderiza o modal nativo de reset completo de estado quando solicitado
+    if st.session_state.get("show_confirm_reset_estado", False):
+        st.session_state.show_confirm_reset_estado = False
+        confirmar_reset_estado_modal(
             tipo_relatorio=st.session_state.tipo_relatorio,
             categoria_relatorio=st.session_state.categoria_relatorio
         )

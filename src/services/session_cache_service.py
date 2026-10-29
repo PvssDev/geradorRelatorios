@@ -13,9 +13,9 @@ from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Pasta de fácil acesso na raiz do projeto
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-CACHE_DIR = os.path.join(BASE_DIR, "geradorRelatorios")
+# Pasta local de cache na máquina do usuário (fora do código do projeto)
+USER_HOME = os.path.expanduser("~")
+CACHE_DIR = os.path.join(USER_HOME, "geradorRelatorios")
 
 # Mapeamento padronizado das 6 combinações
 MAPA_ARQUIVOS_CACHE = {

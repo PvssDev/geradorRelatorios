@@ -390,72 +390,20 @@ def carregar_mapa_siglas_completo() -> dict:
 
 def converter_faixa_para_sigla(faixa: str | None) -> str:
     """
-    Converte a descrição da faixa para sua respectiva sigla oficial:
-    - Faixa da Esquerda / Esquerda -> FE
-    - Faixa da Direita / Direita -> FD
-    - Faixa Esquerda e Direita / Esquerda e Direita / Ambas / FED -> FED
+    Converte a descrição da faixa para sua respectiva sigla oficial (FE, FD, FED).
+    Delega diretamente para o módulo de domínio puro core.rules.cra_rules.
     """
-    if not faixa:
-        return ""
-    texto = str(faixa).strip()
-    if not texto or texto.lower() in ("none", "nan", "null", "-", "não informado"):
-        return ""
-
-    u = texto.upper()
-    if u.startswith("NA "):
-        u = u[3:].strip()
-    elif u.startswith("NO "):
-        u = u[3:].strip()
-
-    if u in ("FE", "FD", "FED"):
-        return u
-
-    tem_esq = ("ESQ" in u) or ("FE" in u.split()) or (u == "E")
-    tem_dir = ("DIR" in u) or ("FD" in u.split()) or (u == "D")
-
-    if (tem_esq and tem_dir) or "FED" in u or "AMBAS" in u:
-        return "FED"
-    if tem_esq:
-        return "FE"
-    if tem_dir:
-        return "FD"
-
-    return u
+    from core.rules.cra_rules import converter_faixa_para_sigla_cra
+    return converter_faixa_para_sigla_cra(faixa)
 
 
 def combinar_faixas_relacionadas(faixa1: str | None, faixa2: str | None) -> str:
     """
-    Combina as faixas de fotos que se juntam:
-    - Se uma for Esquerda (FE) e a outra Direita (FD), o resultado é 'FED'.
-    - Se ambas forem Esquerda, o resultado é 'FE'.
-    - Se ambas forem Direita, o resultado é 'FD'.
-    - Se qualquer uma já for 'FED', o resultado é 'FED'.
+    Combina as faixas de fotos relacionadas (FE, FD, FED).
+    Delega diretamente para o módulo de domínio puro core.rules.cra_rules.
     """
-    s1 = converter_faixa_para_sigla(faixa1)
-    s2 = converter_faixa_para_sigla(faixa2)
-
-    if not s1 and not s2:
-        return ""
-    if not s1:
-        return s2
-    if not s2:
-        return s1
-
-    if s1 == "FED" or s2 == "FED":
-        return "FED"
-
-    if (s1 == "FE" and s2 == "FD") or (s1 == "FD" and s2 == "FE"):
-        return "FED"
-
-    if s1 == s2:
-        return s1
-
-    tem_esq = s1 in ("FE", "FED") or s2 in ("FE", "FED")
-    tem_dir = s1 in ("FD", "FED") or s2 in ("FD", "FED")
-    if tem_esq and tem_dir:
-        return "FED"
-
-    return s1 or s2
+    from core.rules.cra_rules import combinar_faixas_relacionadas_cra
+    return combinar_faixas_relacionadas_cra(faixa1, faixa2)
 
 
 def formatar_legenda_foto(
@@ -466,67 +414,37 @@ def formatar_legenda_foto(
     data_foto: str
 ) -> str:
     """
-    Formata a legenda da foto seguindo o padrão oficial:
-    foto 01 - (codificação). (descrição das não conformidades) na (sigla da faixa (FE/FD/FED)). (DATA do metadado)
+    Formata a legenda da foto seguindo o padrão oficial do CRA:
+    Foto 1 – (codificação) (descrições com siglas) na (FE/FD/FED) (DATA).
+    Delega diretamente para o módulo de domínio puro core.rules.cra_rules.
     """
-    # 1. Prefixo da foto (ex: 'foto 01 - ')
-    try:
-        num_clean = str(num).strip()
-        num_int = int(num_clean)
-        num_str = f"{num_int:02d}"
-    except Exception:
-        num_str = str(num).strip().zfill(2) if str(num).strip() else "01"
-    prefixo = f"foto {num_str} - "
-
-    # 2. Codificação (ex: 'CRA.ST601.2790-2794/2026.001. ')
-    cod_clean = str(codificacao or "").strip().rstrip(".")
-    cod_part = f"{cod_clean}. " if cod_clean else ""
-
-    # 3. Descrições das Não Conformidades (ex: 'desc1 e desc2' ou 'desc1, desc2 e desc3')
-    if isinstance(siglas_ou_ncs, str):
-        siglas_lista = [s.strip() for s in siglas_ou_ncs.split(",") if s.strip()]
-    elif isinstance(siglas_ou_ncs, (list, tuple, set)):
-        siglas_lista = [str(s).strip() for s in siglas_ou_ncs if str(s).strip()]
-    else:
-        siglas_lista = []
-
+    from core.rules.cra_rules import formatar_legenda_foto_cra
     mapa = carregar_mapa_siglas_completo()
-    descs = []
-    for s in siglas_lista:
-        d = mapa.get(s, s).strip().rstrip(".")
-        if d and d not in descs:
-            descs.append(d)
-
-    if not descs:
-        desc_part = ""
-    elif len(descs) == 1:
-        desc_part = descs[0]
-    elif len(descs) == 2:
-        desc_part = f"{descs[0]} e {descs[1]}"
-    else:
-        desc_part = f"{', '.join(descs[:-1])} e {descs[-1]}"
-
-    # 4. Faixa em siglas (ex: ' na FE', ' na FD', ' na FED')
-    sigla_faixa = converter_faixa_para_sigla(faixa)
-    if not sigla_faixa:
-        faixa_part = ""
-    else:
-        faixa_part = f" na {sigla_faixa}"
-
-    # 5. Data do metadado (ex: '. (14/10/2026)')
-    corpo_legenda = f"{cod_part}{desc_part}{faixa_part}".strip().rstrip(".")
-    data_clean = str(data_foto or "").strip().strip("()")
-    if data_clean and data_clean.lower() not in ("none", "nan", ""):
-        if corpo_legenda:
-            corpo = f"{corpo_legenda}. ({data_clean})"
-        else:
-            corpo = f"({data_clean})"
-    else:
-        corpo = f"{corpo_legenda}." if corpo_legenda else ""
-
-    return f"{prefixo}{corpo}"
+    return formatar_legenda_foto_cra(
+        num=num,
+        codificacao=codificacao,
+        siglas_ou_ncs=siglas_ou_ncs,
+        faixa=faixa,
+        data_foto=data_foto,
+        mapa_siglas=mapa,
+    )
 
 
 
 
 
+
+
+def sincronizar_legendas_grupo_cra(
+    registros: list,
+    grupo_id: str,
+    mapa_siglas: dict | None = None
+) -> None:
+    """
+    Sincroniza e consolida as legendas de fotos relacionadas no grupo.
+    Delega diretamente para core.rules.cra_rules.sincronizar_legendas_grupo_cra.
+    """
+    from core.rules.cra_rules import sincronizar_legendas_grupo_cra as _sinc
+    if mapa_siglas is None:
+        mapa_siglas = carregar_mapa_siglas_completo()
+    _sinc(registros, grupo_id, mapa_siglas=mapa_siglas)

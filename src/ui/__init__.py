@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from ui.state import (
     inicializar_estado_sessao,
     obter_termos_ui,
@@ -8,7 +7,10 @@ from ui.state import (
     ao_alternar_tipo_menu,
     ao_alternar_categoria_menu,
     sincronizar_opcoes_nc,
-    BASE_NC_OPTIONS
+    BASE_NC_OPTIONS,
+    enfileirar_acao_fs,
+    enfileirar_sincronizacao_midia,
+    serializar_arquivo_para_payload_fs,
 )
 
 __all__ = [
@@ -20,5 +22,8 @@ __all__ = [
     "ao_alternar_tipo_menu",
     "ao_alternar_categoria_menu",
     "sincronizar_opcoes_nc",
-    "BASE_NC_OPTIONS"
+    "BASE_NC_OPTIONS",
+    "enfileirar_acao_fs",
+    "enfileirar_sincronizacao_midia",
+    "serializar_arquivo_para_payload_fs",
 ]

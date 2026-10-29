@@ -16,9 +16,9 @@ from typing import List, Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
-# Pasta base do repositório
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-CACHE_DIR = os.path.join(BASE_DIR, "geradorRelatorios")
+# Pasta local de cache e mídias na máquina do usuário (fora do código do projeto)
+USER_HOME = os.path.expanduser("~")
+CACHE_DIR = os.path.join(USER_HOME, "geradorRelatorios")
 
 # Extensões válidas de imagem
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
@@ -240,6 +240,36 @@ def limpar_fotos_disco(tipo_relatorio: str, categoria_relatorio: str) -> None:
         logger.error(f"Erro ao limpar fotos em disco de {fotos_dir}: {e}")
 
 
+def remover_foto_disco(
+    tipo_relatorio: str,
+    categoria_relatorio: str,
+    nome_foto: str,
+) -> bool:
+    """Remove pontualmente uma foto física da subpasta midia/fotos/ do relatório ativo.
+
+    Args:
+        tipo_relatorio: Ex: 'CRA', 'CRC', 'SOCICAM'
+        categoria_relatorio: Ex: 'Fiscalização', 'Monitoramento'
+        nome_foto: Nome do arquivo (ex: 'IMG_001.jpg')
+
+    Returns:
+        True se o arquivo existia e foi removido com sucesso, False caso contrário.
+    """
+    if not nome_foto:
+        return False
+    fotos_dir, _ = obter_diretorios_midia(tipo_relatorio, categoria_relatorio)
+    caminho_foto = os.path.join(fotos_dir, nome_foto)
+    try:
+        if os.path.isfile(caminho_foto):
+            os.remove(caminho_foto)
+            logger.info(f"Foto {nome_foto} removida com sucesso de {fotos_dir}")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Erro ao remover foto {caminho_foto} em disco: {e}")
+        return False
+
+
 def salvar_documento_auxiliar_disco(
     tipo_relatorio: str,
     categoria_relatorio: str,
@@ -304,14 +334,24 @@ def carregar_documento_auxiliar_disco(
     return None
 
 
-def limpar_documentos_auxiliares_disco(tipo_relatorio: str, categoria_relatorio: str) -> None:
-    """Remove todos os documentos auxiliares salvos em midia/arquivos/ do relatório ativo."""
+def limpar_documentos_auxiliares_disco(
+    tipo_relatorio: str,
+    categoria_relatorio: str,
+    extensoes: Optional[Tuple[str, ...]] = None
+) -> None:
+    """
+    Remove documentos auxiliares salvos em midia/arquivos/ do relatório ativo.
+    Se 'extensoes' for fornecido (ex: ('.xlsx', '.xls') ou ('.docx', '.doc')),
+    apaga apenas os arquivos que terminem com essas extensões.
+    """
     _, arquivos_dir = obter_diretorios_midia(tipo_relatorio, categoria_relatorio)
     if not os.path.exists(arquivos_dir):
         return
 
     try:
         for f in os.listdir(arquivos_dir):
+            if extensoes and not f.lower().endswith(tuple(ext.lower() for ext in extensoes)):
+                continue
             caminho = os.path.join(arquivos_dir, f)
             if os.path.isfile(caminho):
                 os.remove(caminho)

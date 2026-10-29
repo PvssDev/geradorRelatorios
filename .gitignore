@@ -12,7 +12,6 @@ ENV/
 
 # IDEs e configurações locais
 .cursor/
-.agents/
 .vscode/
 .idea/
 .pytest_cache/
@@ -39,6 +38,8 @@ downloads/
 temp/
 geradorRelatorios/
 *.spec
+.agents/
+.agents
 
 # Testes automatizados locais
 tests/
