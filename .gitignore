@@ -7,6 +7,10 @@ venv/
 .cursor/
 .agents/
 ref/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.vercel/
 
 # Testes e rascunhos locais
 scratch/

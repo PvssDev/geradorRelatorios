@@ -3,8 +3,11 @@ import io
 import os
 import re
 import unicodedata
-import streamlit as st
 from PIL import Image, ImageOps
+
+
+_THUMBNAIL_CACHE: dict[str, bytes] = {}
+_MAX_CACHE_ENTRIES = 2000
 
 
 def chave_ordenacao_natural(item):
@@ -32,18 +35,18 @@ def chave_ordenacao_natural(item):
     return key
 
 
-
-@st.cache_data(show_spinner=False, max_entries=2000)
 def obter_thumbnail_cached(file_key: str, _file_source, max_size=(400, 300)) -> bytes:
     """
-    Gera e armazena em cache (Streamlit) uma miniatura em JPEG comprimida (~30-60 KB)
+    Gera e armazena em cache em memória uma miniatura em JPEG comprimida (~30-60 KB)
     a partir de um objeto de imagem (UploadedFile, BytesIO ou caminho no disco).
-
-    O Streamlit calcula o hash apenas a partir de 'file_key' e 'max_size' (pois _file_source
-    possui prefixo underline), garantindo acesso ultra rápido em O(1).
+    Agnóstico de framework web (sem dependência de Streamlit).
     """
     if not _file_source:
         return b""
+
+    cache_key = f"{file_key}_{max_size}"
+    if cache_key in _THUMBNAIL_CACHE:
+        return _THUMBNAIL_CACHE[cache_key]
 
     try:
         # Se for um stream com suporte a seek, reposiciona no início
@@ -75,6 +78,9 @@ def obter_thumbnail_cached(file_key: str, _file_source, max_size=(400, 300)) -> 
             except Exception:
                 pass
 
+        if len(_THUMBNAIL_CACHE) >= _MAX_CACHE_ENTRIES:
+            _THUMBNAIL_CACHE.pop(next(iter(_THUMBNAIL_CACHE)), None)
+        _THUMBNAIL_CACHE[cache_key] = thumb_bytes
         return thumb_bytes
     except Exception:
         # Se falhar, garante o seek e retorna None
@@ -148,4 +154,34 @@ def foto_esta_em_nc(photo, nomes_em_nc: set) -> bool:
     base = os.path.basename(name).strip().lower()
     root, _ = os.path.splitext(base)
     return base in nomes_em_nc or root in nomes_em_nc
+
+
+def comprimir_imagem_para_word(image_bytes: bytes, max_kb: int = 500) -> bytes:
+    """
+    Otimiza e comprime imagens acima de `max_kb` KB para inserção leve no Word (.docx),
+    respeitando orientação EXIF de celulares e mantendo nitidez regulatória.
+    """
+    if not image_bytes or len(image_bytes) <= max_kb * 1024:
+        return image_bytes
+
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img = ImageOps.exif_transpose(img)
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+
+        max_dim = 1600
+        if max(img.size) > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+        for quality in (82, 72, 62, 50):
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            data = buf.getvalue()
+            if len(data) <= max_kb * 1024 or quality == 50:
+                return data
+    except Exception:
+        return image_bytes
+
+    return image_bytes
 

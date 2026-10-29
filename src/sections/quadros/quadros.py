@@ -155,7 +155,17 @@ def agrupar_registros(df, report_config=None):
     
     for rec in records:
         found = False
+        rec_grupo = _limpar_valor_campo(rec.get("grupo_relacao", ""))
         for g_rec in grouped:
+            g_rec_grupo = _limpar_valor_campo(g_rec.get("grupo_relacao", ""))
+            if rec_grupo and g_rec_grupo:
+                if rec_grupo == g_rec_grupo:
+                    num_foto = rec.get("Nº")
+                    if num_foto not in g_rec["foto_numeros"]:
+                        g_rec["foto_numeros"].append(num_foto)
+                    found = True
+                    break
+                continue
             match = True
             for key in chaves:
                 val1 = _limpar_valor_campo(rec.get(key, ""))

@@ -200,7 +200,11 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_caption_right.paragraph_format.space_after = Pt(4)
                 
                 num_right = str(2 * idx + 2).zfill(2)
-                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
+                leg_atual_raw = rec.get("Legenda da Foto")
+                leg_atual = "" if (leg_atual_raw is None or pd.isna(leg_atual_raw) or str(leg_atual_raw).strip().lower() in ("nan", "none", "null")) else str(leg_atual_raw).strip()
+                obs_raw = rec.get("Observações")
+                obs_fallback = "" if (obs_raw is None or pd.isna(obs_raw) or str(obs_raw).strip().lower() in ("nan", "none", "null")) else str(obs_raw).strip()
+                obs_text = leg_atual or obs_fallback
                 caption_right_text = f"Foto {num_right} – {obs_text}"
                 if not caption_right_text.endswith("."):
                     caption_right_text += "."
@@ -298,7 +302,11 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
             
             if len(related) == 1:
                 rec = related[0]
-                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip()
+                leg_atual_raw = rec.get("Legenda da Foto")
+                leg_atual = "" if (leg_atual_raw is None or pd.isna(leg_atual_raw) or str(leg_atual_raw).strip().lower() in ("nan", "none", "null")) else str(leg_atual_raw).strip()
+                obs_raw = rec.get("Observações")
+                obs_fallback = "" if (obs_raw is None or pd.isna(obs_raw) or str(obs_raw).strip().lower() in ("nan", "none", "null")) else str(obs_raw).strip()
+                obs_text = leg_atual or obs_fallback
                 ident = str(rec.get("Identificação", "")).strip()
                 nc_txt = str(rec.get("Não Conformidade", "")).strip()
                 

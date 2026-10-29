@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.875rem;
+  --background: oklch(0.984 0.003 247.858);
+  --foreground: oklch(0.208 0.042 265.755);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.208 0.042 265.755);
+  --primary: oklch(0.2 0.06 252);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.955 0.02 250);
+  --secondary-foreground: oklch(0.2 0.06 252);
+  --muted: oklch(0.93 0.025 250);
+  --muted-foreground: oklch(0.446 0.043 257.281);
+  --accent: oklch(0.623 0.188 259.815);
+  --accent-2: oklch(0.72 0.14 214);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.577 0.215 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.88 0.03 250);
+  --input: oklch(0.85 0.035 250);
+  --ring: oklch(0.623 0.188 259.815);
+  --navy: oklch(0.2 0.06 252);
+  --navy-2: oklch(0.27 0.06 250);
+  --slate-blue: oklch(0.43 0.07 250);
+  --nc: oklch(0.577 0.215 27.325);
+  --nc-soft: oklch(0.971 0.013 17.38);
+  --pa: oklch(0.666 0.157 58.318);
+  --pa-soft: oklch(0.987 0.022 95.277);
+  --ok: oklch(0.596 0.127 163.225);
+  --ok-soft: oklch(0.979 0.021 166.113);
+}
+
+@layer base {
+  * {
+    border-color: #c9daeb;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172b;
+    line-height: 1.5;
+  }
+
+  button,
+  [role="button"],
+  select,
+  input[type="checkbox"],
+  input[type="radio"] {
+    cursor: pointer;
+  }
+}
+
+/* Custom scrollbar discreta */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #e6f2fe;
+}
+::-webkit-scrollbar-thumb {
+  background: #bdd0e4;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

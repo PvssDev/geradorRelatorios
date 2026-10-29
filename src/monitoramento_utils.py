@@ -44,6 +44,12 @@ def extrair_metadados_anterior(documento_anterior):
         return meta
 
     try:
+        if hasattr(documento_anterior, "seek"):
+            try:
+                documento_anterior.seek(0)
+            except Exception:
+                pass
+
         filename = getattr(documento_anterior, "name", str(documento_anterior)).lower()
         if "fiscaliza" in filename:
             meta["is_fiscalizacao"] = True
@@ -113,6 +119,11 @@ def extrair_linhas_quadro1_anterior(documento_anterior):
     if not documento_anterior:
         return ncs
     try:
+        if hasattr(documento_anterior, "seek"):
+            try:
+                documento_anterior.seek(0)
+            except Exception:
+                pass
         doc = Document(documento_anterior)
         quadro1 = encontrar_quadro1_table(doc)
         if quadro1:
@@ -261,7 +272,7 @@ def criar_tabela_quadro1_monitoramento(doc, headers, ncs_from_prev, ncs_reais, c
 
     return table
 
-def extrair_ncs_e_fotos_anterior(documento_anterior):
+def extrair_ncs_e_fotos_anterior(documento_anterior, output_dir=None):
     """
     Lê o documento do monitoramento ou fiscalização anterior (.docx),
     extrai as NCs e suas respectivas fotos da tabela do apêndice.
@@ -273,7 +284,7 @@ def extrair_ncs_e_fotos_anterior(documento_anterior):
         return result
 
     try:
-        # Garante o reposicionamento do ponteiro do arquivo Streamlit (BytesIO)
+        # Garante o reposicionamento do ponteiro do arquivo (BytesIO)
         if hasattr(documento_anterior, "seek"):
             try:
                 documento_anterior.seek(0)
@@ -344,8 +355,11 @@ def extrair_ncs_e_fotos_anterior(documento_anterior):
                         foto_to_id_map[f"FOTO {num:02d}"] = txt_id
 
         # 2. Varrer o corpo do documento para encontrar as fotos do apêndice
-        temp_dir = tempfile.gettempdir()
-        extracted_dir = os.path.join(temp_dir, "arpe_extracted_photos")
+        if output_dir:
+            extracted_dir = output_dir
+        else:
+            temp_dir = tempfile.gettempdir()
+            extracted_dir = os.path.join(temp_dir, "arpe_extracted_photos")
         os.makedirs(extracted_dir, exist_ok=True)
 
         current_trecho = "PE-024"
@@ -478,4 +492,3 @@ def extrair_ncs_e_fotos_anterior(documento_anterior):
         print(f"Erro ao extrair NCs e fotos do documento anterior: {e}")
         
     return result
-
