@@ -6,6 +6,7 @@ import {
   Plus,
   Link2,
   Wand2,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
@@ -33,16 +34,16 @@ const inputCls =
 
 const btn = {
   primary:
-    "inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-navy-2 transition disabled:opacity-40",
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-stone-950 shadow-[0_3px_0_0_#b45309] transition-all duration-150 hover:bg-amber-400 active:translate-y-[2px] active:shadow-[0_1px_0_0_#b45309] disabled:opacity-40 disabled:pointer-events-none",
   secondary:
-    "inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:border-accent hover:text-accent transition disabled:opacity-40",
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:border-accent hover:text-accent transition-all duration-200 active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none",
 };
 
 const pill = (on: boolean) =>
-  `rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+  `rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all duration-150 ${
     on
-      ? "border-accent bg-accent text-accent-foreground"
-      : "border-border bg-card text-muted-foreground hover:border-accent/50"
+      ? "border-amber-500 bg-amber-500 text-stone-950 shadow-sm"
+      : "border-border bg-card text-foreground hover:border-amber-500/60"
   }`;
 
 function Field({
@@ -424,59 +425,65 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-4">
         {!isMonitoring ? (
           tipoRelatorio === "CRA" ? (
-            <div className="inline-flex rounded-xl bg-muted p-1">
-              {(["NC", "PA"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTipo(t)}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
-                    tipo === t
-                      ? t === "NC"
-                        ? "bg-nc-soft text-nc shadow-card"
-                        : "bg-pa-soft text-pa shadow-card"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {t === "NC" ? (
-                    <AlertTriangle className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                  {t === "NC"
-                    ? "Não Conformidade (NC)"
-                    : "Ponto de Atenção (PA)"}
-                </button>
-              ))}
+            <div className="inline-flex rounded-2xl border border-border bg-secondary/70 p-1.5 shadow-inner">
+              {(["NC", "PA"] as const).map((t) => {
+                const isSelected = tipo === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTipo(t)}
+                    className={`flex items-center gap-2.5 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 ${
+                      isSelected
+                        ? t === "NC"
+                          ? "bg-nc-soft text-nc border border-nc/40 shadow-sm"
+                          : "bg-amber-100 text-amber-800 border border-amber-400 shadow-sm"
+                        : "text-muted-foreground hover:bg-card hover:text-foreground"
+                    }`}
+                  >
+                    {t === "NC" ? (
+                      <AlertTriangle className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    {t === "NC"
+                      ? "Não Conformidade (NC)"
+                      : "Ponto de Atenção (PA)"}
+                  </button>
+                );
+              })}
             </div>
           ) : (
-            <div className="inline-flex items-center gap-2 rounded-xl bg-nc-soft px-4 py-2 text-sm font-semibold text-nc">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-nc/30 bg-nc-soft px-4 py-2 text-xs font-bold text-nc">
               <AlertTriangle className="h-4 w-4" />
               Não Conformidade (NC) · {tipoRelatorio}
             </div>
           )
         ) : (
-          <div className="inline-flex flex-wrap gap-1 rounded-xl bg-muted p-1">
+          <div className="inline-flex flex-wrap gap-1.5 rounded-2xl border border-border bg-secondary/70 p-1.5 shadow-inner">
             {(
               ["Pendente", "Parcialmente Sanada", "Sanada"] as SituacaoNC[]
-            ).map((sit) => (
-              <button
-                key={sit}
-                type="button"
-                onClick={() => setSituacaoMon(sit)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  situacaoMon === sit
-                    ? sit === "Sanada"
-                      ? "bg-ok-soft text-ok shadow-card"
-                      : sit === "Parcialmente Sanada"
-                      ? "bg-pa-soft text-pa shadow-card"
-                      : "bg-nc-soft text-nc shadow-card"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {sit}
-              </button>
-            ))}
+            ).map((sit) => {
+              const isSelected = situacaoMon === sit;
+              return (
+                <button
+                  key={sit}
+                  type="button"
+                  onClick={() => setSituacaoMon(sit)}
+                  className={`rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 ${
+                    isSelected
+                      ? sit === "Sanada"
+                        ? "bg-ok-soft text-ok border border-ok/40 shadow-sm"
+                        : sit === "Parcialmente Sanada"
+                        ? "bg-amber-100 text-amber-800 border border-amber-400 shadow-sm"
+                        : "bg-nc-soft text-nc border border-nc/40 shadow-sm"
+                      : "text-muted-foreground hover:bg-card hover:text-foreground"
+                  }`}
+                >
+                  {sit}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -901,19 +908,26 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       <div className="mt-8 flex flex-wrap gap-3">
         <button
           type="button"
-          className={`${btn.primary} flex-1 py-3`}
+          className="group relative inline-flex items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:brightness-105 hover:shadow-xl hover:shadow-amber-500/35 active:translate-y-[2px] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none flex-1"
           disabled={!activePhoto}
           onClick={addReg}
         >
-          <Plus className="h-4 w-4" />
-          {isMonitoring
-            ? "Salvar Auditoria no Relatório"
-            : "Adicionar Registro ao Relatório"}
+          <div className="flex items-center gap-2.5">
+            <Plus className="h-4 w-4 stroke-[2.5]" />
+            <span>
+              {isMonitoring
+                ? "Salvar Auditoria no Relatório"
+                : "Adicionar Registro ao Relatório"}
+            </span>
+          </div>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
+            <ChevronRight className="h-4 w-4 stroke-[2.5]" />
+          </span>
         </button>
 
         <button
           type="button"
-          className={`${btn.secondary} py-3`}
+          className={`${btn.secondary} py-3.5 px-5`}
           disabled={!podeRelacionar}
           title={
             podeRelacionar

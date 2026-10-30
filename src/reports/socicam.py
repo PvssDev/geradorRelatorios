@@ -1,254 +1,248 @@
-import pandas as pd
+# -*- coding: utf-8 -*-
+"""
+Especialização do Relatório para a Concessionária SOCICAM (Terminais Rodoviários).
+Contrato de Concessão de Serviço Público Nº 1.041.080/08 (TIP, Caruaru, Garanhuns, Petrolina).
+Implementa os contratos do core e utiliza templates modulares padronizados.
+"""
+from typing import Any, Dict, List, Optional, Tuple
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import pandas as pd
+
 from reports.base import BaseReport
-def _obter_terminal_rodoviario_nome(local_val):
-    l_str = str(local_val).strip()
-    l_lower = l_str.lower()
-    if l_lower.startswith("terminal rodoviário"):
-        return l_str
-    elif l_lower.startswith("terminal de ") or l_lower.startswith("terminal do ") or l_lower.startswith("terminal da "):
-        return "Terminal Rodoviário " + l_str[len("Terminal "):].strip()
-    elif l_lower.startswith("terminal"):
-        return "Terminal Rodoviário " + l_str[len("Terminal"):].strip()
-    return f"Terminal Rodoviário de {l_str}"
+from core.interfaces.report_contracts import IReportContract
+from core.rules.socicam_rules import (
+    normalizar_nome_terminal_rodoviario,
+    normalizar_nome_terminal_curto,
+    extrair_sigla_terminal,
+    formatar_extenso_achados_socicam,
+    formatar_frase_conclusao_achados_socicam,
+    classificar_achados_socicam,
+    separar_achados_df_socicam,
+)
+from reports.templates.socicam_templates import (
+    SOCICAM_KEY,
+    SOCICAM_DISPLAY_NAME,
+    SOCICAM_DEFAULT_CONTRATO,
+    SOCICAM_CAPA_ORGAO_CONCEDENTE,
+    SOCICAM_CAPA_SECRETARIA,
+    SOCICAM_CAPA_TITULO,
+    SOCICAM_CAPA_CTR_NUMBER_TEMPLATE,
+    SOCICAM_CAPA_PRESTADOR_LABEL,
+    SOCICAM_CAPA_CONTRATO_LABEL,
+    SOCICAM_CAPA_REGULADOR_LABEL,
+    SOCICAM_ANALYST_TITLE,
+    SOCICAM_ABBREVIATIONS,
+    SOCICAM_BASE_SUMARIO_LINHAS,
+    SOCICAM_GENERAL_INFO_COL_WIDTHS,
+    SOCICAM_GENERAL_INFO_HEADERS_INDICES,
+    SOCICAM_METHODOLOGY_PARAGRAPHS,
+    SOCICAM_REFERENCES_BULLETS,
+    SOCICAM_REFERENCES_LEFT_INDENT_PT,
+    SOCICAM_POST_METHODOLOGY_PARAGRAPHS,
+    SOCICAM_QUADROS_SECTION_TITLE,
+    SOCICAM_QUADRO_TITLE_TEMPLATE,
+    SOCICAM_NC_TABLE_HEADERS,
+    SOCICAM_FINALIZACAO_SECTIONS_CONFIG,
+    SOCICAM_RECOMMENDATIONS_PARAGRAPHS,
+    get_socicam_capa_titulos,
+    get_socicam_intro_paragraphs,
+    get_socicam_objective_paragraphs,
+    get_socicam_general_info_rows,
+    get_socicam_quadro_intro_paragraphs,
+    get_socicam_determinations_paragraphs,
+    get_socicam_conclusions_paragraphs,
+)
 
-def _obter_terminal_de_nome(local_val):
-    l_str = str(local_val).strip()
-    l_lower = l_str.lower()
-    if l_lower.startswith("terminal rodoviário de "):
-        return "Terminal de " + l_str[len("Terminal Rodoviário de "):].strip()
-    elif l_lower.startswith("terminal rodoviário do "):
-        return "Terminal do " + l_str[len("Terminal Rodoviário do "):].strip()
-    elif l_lower.startswith("terminal rodoviário da "):
-        return "Terminal da " + l_str[len("Terminal Rodoviário da "):].strip()
-    elif l_lower.startswith("terminal rodoviário "):
-        return "Terminal de " + l_str[len("Terminal Rodoviário "):].strip()
-    elif l_lower.startswith("terminal de ") or l_lower.startswith("terminal do ") or l_lower.startswith("terminal da "):
-        return l_str
-    elif l_lower.startswith("terminal "):
-        return l_str
-    return f"Terminal de {l_str}"
 
-class SocicamReport(BaseReport):
+def _obter_terminal_rodoviario_nome(local_val: Any) -> str:
+    """Função legada para compatibilidade retroativa, delega para socicam_rules."""
+    return normalizar_nome_terminal_rodoviario(local_val)
+
+
+def _obter_terminal_de_nome(local_val: Any) -> str:
+    """Função legada para compatibilidade retroativa, delega para socicam_rules."""
+    return normalizar_nome_terminal_curto(local_val)
+
+
+class SocicamReport(BaseReport, IReportContract):
+    """Relatório Técnico-Operacional de Fiscalização de Terminais Rodoviários (SOCICAM)."""
+
     @property
     def key(self) -> str:
-        return "SOCICAM"
+        return SOCICAM_KEY
 
     @property
     def display_name(self) -> str:
-        return "SOCICAM"
+        return SOCICAM_DISPLAY_NAME
 
     @property
     def default_contrato(self) -> str:
-        return "CT. nº 1.041.080/08"
+        return SOCICAM_DEFAULT_CONTRATO
 
     @property
     def capa_orgao_concedente(self) -> str:
-        return "GOVERNO DO ESTADO DE PERNAMBUCO"
+        return SOCICAM_CAPA_ORGAO_CONCEDENTE
 
     @property
     def capa_secretaria(self) -> str:
-        return "SECRETARIA DE MOBILIDADE E INFRAESTRUTURA - SEMOBI"
+        return SOCICAM_CAPA_SECRETARIA
 
     @property
     def capa_titulo(self) -> str:
-        return "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL"
+        return SOCICAM_CAPA_TITULO
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
+        return SOCICAM_CAPA_CTR_NUMBER_TEMPLATE
 
     @property
     def capa_prestador_label(self) -> str:
-        return "PRESTADOR DE SERVIÇO: SOCICAM - ADMINISTRAÇÃO, PROJETOS E REPRESENTAÇÕES LTDA"
+        return SOCICAM_CAPA_PRESTADOR_LABEL
 
     @property
     def capa_contrato_label(self) -> str:
-        return "CONTRATO DE CONCESSÃO DE SERVIÇO PÚBLICO"
+        return SOCICAM_CAPA_CONTRATO_LABEL
 
     @property
     def capa_regulador_label(self) -> str:
-        return "AGÊNCIA DE REGULAÇÃO DOS SERVIÇOS PÚBLICOS DELEGADOS DO ESTADO DE PERNAMBUCO - ARPE"
+        return SOCICAM_CAPA_REGULADOR_LABEL
 
-    def get_capa_titulos(self, row, ano) -> list:
-        local_val = str(row.get("Local", "TIP")).upper()
-        if "TERMINAL" not in local_val and "FISCALIZAÇÃO" not in local_val:
-            local_val = f"TERMINAL RODOVIÁRIO DE PASSAGEIROS DO RECIFE ({local_val})" if "RECIFE" in local_val or "TIP" in local_val else f"TERMINAL RODOVIÁRIO DE PASSAGEIROS ({local_val})"
-        return [
-            f"FISCALIZAÇÃO NO {local_val}",
-            "PRESTADOR DE SERVIÇO: SOCICAM - ADMINISTRAÇÃO, PROJETOS E REPRESENTAÇÕES LTDA"
-        ]
+    @property
+    def analyst_title(self) -> str:
+        return SOCICAM_ANALYST_TITLE
+
+    def get_capa_titulos(self, row: Any, ano: str) -> List[str]:
+        local_val = str(row.get("Local", "TIP")).upper() if hasattr(row, "get") else str(row["Local"]).upper()
+        return get_socicam_capa_titulos(local_val)
 
     @property
     def sumario_before_abreviaturas(self) -> bool:
         return True
 
-    def get_abbreviations(self) -> list:
-        return [
-            ("ABNT", "Associação Brasileira de Normas Técnicas"),
-            ("ARPE", "Agência de Regulação de Pernambuco"),
-            ("EPTI", "Empresa Pernambucana de Transporte Coletivo Intermunicipal"),
-            ("NC", "Não Conformidade"),
-            ("PCD", "Pessoa com Deficiência"),
-            ("TIP", "Terminal Rodoviário de Passageiros do Recife")
-        ]
+    def get_abbreviations(self) -> List[Tuple[str, str]]:
+        return list(SOCICAM_ABBREVIATIONS)
 
-    def get_sumario_linhas(self, row, nc_df=None) -> list:
-        local_val = str(row.get("Local", "TIP")).upper()
-        local_sigla = "TIP"
-        if "TIP" in local_val:
-            local_sigla = "TIP"
-        elif "(" in local_val:
-            local_sigla = local_val.split("(")[0].strip()
-        else:
-            local_sigla = local_val
-            
-        linhas = [
-            "1.\tINTRODUÇÃO\t4",
-            "2.\tOBJETIVO\t4",
-            "3.\tMETODOLOGIA\t5",
-            "4.\tFISCALIZAÇÃO\t5",
-            "5.\tDETERMINAÇÕES GERAIS\t6",
-            "6.\tRECOMENDAÇÕES\t6",
-            "7.\tCONCLUSÕES\t7"
-        ]
-        
-        ambos_presentes = False
-        tem_nc = False
-        tem_pa = False
-        if nc_df is not None and not nc_df.empty:
-            id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
-            if "ID da Fiscalização" in nc_df.columns:
-                mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc
-                current_ncs = nc_df[mask_id].copy()
-                if current_ncs.empty:
-                    current_ncs = nc_df.copy()
-            else:
-                current_ncs = nc_df.copy()
-                
-            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
-            if col_nc:
-                mask_nc = current_ncs[col_nc].fillna("").astype(str).str.strip() != ""
-                if not current_ncs[mask_nc].empty:
-                    tem_nc = True
+    def get_sumario_linhas(self, row: Any, nc_df: Any = None) -> List[str]:
+        local_val = row.get("Local", "TIP") if hasattr(row, "get") else row["Local"]
+        local_sigla = extrair_sigla_terminal(local_val)
+        linhas = list(SOCICAM_BASE_SUMARIO_LINHAS)
 
-            col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
-            if col_pa:
-                mask_pa = current_ncs[col_pa].fillna("").astype(str).str.strip() != ""
-                if not current_ncs[mask_pa].empty:
-                    tem_pa = True
-                    
-        ambos_presentes = tem_nc and tem_pa
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
+        resumo = classificar_achados_socicam(nc_df, id_fisc=id_fisc)
 
-        if ambos_presentes:
+        if resumo.ambos_presentes:
             linhas.append(f"\tAPÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}\t7")
             linhas.append(f"\tAPÊNDICE B - REGISTROS FOTOGRÁFICOS DOS PONTOS DE ATENÇÃO APONTADOS PARA O {local_sigla}\t7")
         else:
             linhas.append(f"\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO NO {local_sigla}\t7")
-            
+
         return linhas
 
-    def get_intro_paragraphs(self, row, ano, data_extenso) -> list:
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        terminal_nome = _obter_terminal_rodoviario_nome(local_val)
-        return [
-            [
-                ("A Coordenadoria de Transportes e Rodovias da Arpe realizou vistorias no ", False, False, None),
-                (terminal_nome, True, False, None),
-                (" com o objetivo de verificar as condições operacionais, de conservação, de manutenção e de segurança e da qualidade do serviço prestado no referido terminal, conforme Contrato de Concessão de Serviço Público No 1.041.080/08, firmado entre o Governo do Estado, atualmente representado pela Empresa Pernambucana de Transportes Intermunicipal (EPTI) e a SOCICAM - Administração, Projetos e Representações Ltda (SOCICAM) visando a operação, manutenção e administração de terminais rodoviários no Estado de Pernambuco, com execução de obras de reforma e construção, incluindo, ainda, a cessão de uso de espaços para a exploração comercial através de locação e publicidade.", False, False, None)
-            ]
-        ]
+    def get_intro_paragraphs(self, row: Any, ano: str, data_extenso: str) -> List[Any]:
+        local_val = row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)") if hasattr(row, "get") else row["Local"]
+        terminal_nome = normalizar_nome_terminal_rodoviario(local_val)
+        return get_socicam_intro_paragraphs(terminal_nome)
 
-    def get_objective_paragraphs(self, row) -> list:
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        terminal_nome = _obter_terminal_rodoviario_nome(local_val)
-        return [
-            [
-                ("A fiscalização direta e periódica dos Terminais Rodoviários de Passageiros concedidos à SOCICAM, tem por objetivo verificar as condições de conservação, limpeza e higiene das áreas de embarque e desembarque, dos sanitários, as condições do pavimento das vias de circulação interna, a infraestrutura oferecida, a segurança e o atendimento ao usuário, bem como toda estrutura para funcionamento desses terminais. Dessa forma, a ação de fiscalização no ", False, False, None),
-                (terminal_nome, True, False, None),
-                (", realizada pela ARPE verificou o grau de conformidade dessas instalações com o Contrato de Concessão, bem como com a legislação e normas vigentes de modo a determinar e/ou recomendar medidas corretivas, com foco na qualidade dos serviços prestados.", False, False, None)
-            ]
-        ]
+    def get_objective_paragraphs(self, row: Any) -> List[Any]:
+        local_val = row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)") if hasattr(row, "get") else row["Local"]
+        terminal_nome = normalizar_nome_terminal_rodoviario(local_val)
+        return get_socicam_objective_paragraphs(terminal_nome)
 
-    def get_general_info_rows(self, row, responsaveis_formatted, periodo_val) -> list:
-        return [
-            ("3.1 DO TITULAR", "", True, False),
-            ("Titular:", "Empresa Pernambucana de Transportes Intermunicipal (EPTI)", False, False),
-            ("Endereço:", "Av. Caxangá, 2.200 Cordeiro Recife/PE CEP: 50.711-000", False, False),
-            ("Responsável:", "THIAGO EDGLES SOBRAL DE SOUZA", False, True),
-            
-            ("3.2 DO REGULADO", "", True, False),
-            ("Regulado:", "SOCICAM - Administração, Projetos e Representações Ltda", False, False),
-            ("Responsável:", "THIAGO DUARTE PIMENTEL", False, True),
-            ("Endereço:", "Avenida Prefeito Antônio Pereira, S/N Várzea Recife/PE CEP: 50.950-030", False, False),
-            ("Representantes para acompanhar:", "Recife (TIP): Monalisa Pereira", False, False),
-            
-            ("3.3 DO REGULADOR", "", True, False),
-            ("Regulador:", "Agência de Regulação de Pernambuco (Arpe)", False, False),
-            ("Diretor Presidente:", "CARLOS PORTO FILHO", False, True),
-            ("Endereço:", "Av. Cons. Rosa e Silva, 975, Aflitos, Recife/PE, CEP: 52.050-020", False, False),
-            ("Estacionamento:", "Rua do Futuro, 150, Aflitos, Recife/PE", False, False),
-            ("Responsáveis pela fiscalização:", responsaveis_formatted, False, False),
-            ("Período da Fiscalização:", periodo_val, False, False),
-            ("Tipo de Fiscalização:", "Direta e periódica.", False, False)
-        ]
+    def get_general_info_rows(self, row: Any, responsaveis_formatted: str, periodo_val: str) -> List[Any]:
+        return get_socicam_general_info_rows(responsaveis_formatted, periodo_val)
 
     @property
-    def general_info_col_widths(self) -> list:
-        return [Inches(3.0), Inches(4.57)]
+    def general_info_col_widths(self) -> List[Any]:
+        return list(SOCICAM_GENERAL_INFO_COL_WIDTHS)
 
     @property
-    def general_info_headers_indices(self) -> list:
-        return [0, 4, 9]
+    def general_info_headers_indices(self) -> List[int]:
+        return list(SOCICAM_GENERAL_INFO_HEADERS_INDICES)
 
-    def get_methodology_paragraphs(self, data_extenso) -> list:
-        return [
-            [("A fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da Arpe está submetida a uma metodologia organizada em três etapas: Preparação e Planejamento, Execução da Fiscalização e Monitoramento e Avaliação.", False, False, None)],
-            [("Preparação e Planejamento", True, False, None),
-             (" - compreende a organização e estruturação das atividades preliminares à execução da fiscalização, destacando-se a elaboração e o envio de avisos de fiscalização à Concessionária e demais atividades de suporte à fiscalização, bem como a análise de fiscalizações anteriores com a identificação de eventuais Não Conformidades pendentes.", False, False, None)],
-            [("Execução da Fiscalização", True, False, None),
-             (" - a execução da fiscalização é pautada por um arcabouço de normas e diretrizes, possibilitando que todas as etapas sejam desenvolvidas de maneira eficiente e em conformidade aos padrões estabelecidos, destacando-se:", False, False, None)]
-        ]
+    def get_methodology_paragraphs(self, data_extenso: str) -> List[Any]:
+        return list(SOCICAM_METHODOLOGY_PARAGRAPHS)
 
-    def get_references_bullets(self) -> list:
-        return [
-            ("Lei nº 13.254, de 21 de junho de 2007, alterada pela Lei nº 15.200, de 17 de dezembro de 2013, e regulamentada pelo Decreto nº 40.559, de 31 de março de 2014.", False, True),
-            ("", False, False),
-            ("Resoluções Arpe nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), alterada pela Resolução ARPE nº 53, de 26 de janeiro de 2009 (Antiga 003/2009); e nº 083, de 30 de julho de 2013.", False, True),
-            ("", False, False),
-            ("Contrato de Concessão de Serviço Público Nº 1.041.080/08, de 19 de setembro de 2008 e aditivos, em especial, o Segundo Termo Aditivo ao Contrato de Concessão, de 29 de setembro de 2017.", False, True),
-            ("", False, False),
-            ("Normas Técnicas da ABNT.", False, True)
-        ]
+    def get_references_bullets(self) -> List[Any]:
+        return list(SOCICAM_REFERENCES_BULLETS)
 
     @property
     def references_left_indent_pt(self) -> float:
-        return 53.4
+        return SOCICAM_REFERENCES_LEFT_INDENT_PT
 
-    def get_post_methodology_paragraphs(self, total_ncs) -> list:
-        return [
-            [("Monitoramento e Avaliação", True, False, None),
-             (" - Esta etapa é fundamental para garantir a eficácia das ações corretivas a serem executadas pela Concessionária para a melhoria contínua dos serviços prestados. Os principais instrumentos do Monitoramento e Avaliação são: Termo de Notificação e respectivo Relatório de Fiscalização, Plano de Ação da Concessionária e Relatórios de Monitoramento e Avaliação Final.", False, False, None)]
-        ]
+    def get_post_methodology_paragraphs(self, total_ncs: int) -> List[Any]:
+        return list(SOCICAM_POST_METHODOLOGY_PARAGRAPHS)
 
-    def get_levels_data(self) -> dict:
+    def get_levels_data(self) -> Optional[Dict[str, Any]]:
         return None
 
-    def get_post_metodologia_extra_paragraphs(self, row, data_extenso, total_achados) -> tuple:
+    def get_post_metodologia_extra_paragraphs(self, row: Any, data_extenso: str, total_achados: int) -> Tuple[Any, List[Any]]:
         return (None, [])
 
-    def render_quadros(self, doc, row, nc_df, criar_tabela_quadros_fn) -> None:
+    @property
+    def quadros_section_title(self) -> str:
+        return SOCICAM_QUADROS_SECTION_TITLE
+
+    def get_quadro_intro_paragraphs(self, row: Any, data_extenso: str, responsaveis_formatted: str) -> List[Any]:
+        raw_resp = row.get("Pessoal Responsável", "") if hasattr(row, "get") else row["Pessoal Responsável"]
+        if pd.isna(raw_resp) or str(raw_resp).strip().lower() in ["", "nan", "none"]:
+            responsaveis_list = []
+        else:
+            responsaveis_list = [
+                r.strip() for r in str(raw_resp).split(",")
+                if r.strip() and r.strip().lower() not in ["nan", "none"]
+            ]
+        from database.manager import carregar_responsaveis
+        db_resp = carregar_responsaveis()
+
+        team_runs = []
+        for idx, nome in enumerate(responsaveis_list):
+            match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
+            matricula = match["matricula"] if match else "xxxxxxx/xx"
+            nome_real = match["nome"] if match else nome
+
+            if idx > 0:
+                if idx == len(responsaveis_list) - 1:
+                    team_runs.append((" e ", False, False, None))
+                else:
+                    team_runs.append((", ", False, False, None))
+            team_runs.append((nome_real, True, False, None))
+            team_runs.append((f" (matrícula nº {matricula})", False, False, None))
+
+        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)")) if hasattr(row, "get") else str(row["Local"])
+        return get_socicam_quadro_intro_paragraphs(data_extenso, team_runs, local_val)
+
+    @property
+    def quadro_title_template(self) -> str:
+        return SOCICAM_QUADRO_TITLE_TEMPLATE
+
+    @property
+    def nc_table_headers(self) -> List[str]:
+        return list(SOCICAM_NC_TABLE_HEADERS)
+
+    @property
+    def nc_table_col_widths(self) -> List[Any]:
+        return [Inches(1.24), Inches(1.62), Inches(1.26), Inches(1.69), Inches(2.25)]
+
+    def format_nc_table_total_row(self, table: Any, row_idx: int, total_ncs: int, col_widths: Optional[List[Any]] = None) -> None:
+        r_total = table.rows[row_idx]
+        r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2]).merge(r_total.cells[3])
+        r_total.cells[0].text = "TOTAL"
+        r_total.cells[4].text = str(total_ncs)
+
+        widths = col_widths if col_widths is not None else self.nc_table_col_widths
+        r_total.cells[0].width = widths[0] + widths[1] + widths[2] + widths[3]
+        r_total.cells[4].width = widths[4]
+
+    def render_quadros(self, doc: Any, row: Any, nc_df: Any, criar_tabela_quadros_fn: Any) -> None:
         from utils import formatar_data_extenso, adicionar_titulo_secao
-        from docx.shared import Pt
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        
+
         data_extenso = formatar_data_extenso(row["Data"])
-        
+
         # 1. Título da Seção
         adicionar_titulo_secao(doc, self.quadros_section_title)
-        doc.add_paragraph() # Pula linha abaixo do título
-        
+        doc.add_paragraph()
+
         # 2. Parágrafos introdutórios (todos em negrito para SOCICAM)
         intro_paragraphs = self.get_quadro_intro_paragraphs(row, data_extenso, "")
         for paragraph_runs in intro_paragraphs:
@@ -258,251 +252,93 @@ class SocicamReport(BaseReport):
             p.paragraph_format.line_spacing = 1.15
             for text, bold, italic, _ in paragraph_runs:
                 run = p.add_run(text)
-                run.font.name = 'Aptos'
+                run.font.name = "Aptos"
                 run.font.size = Pt(11)
                 if bold:
                     run.bold = True
                 if italic:
                     run.italic = True
-                    
-        doc.add_paragraph() # Parágrafo vazio
-        
-        # Obter dados de NC
-        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
-        if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
-            mask_id = nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc
-            current_ncs = nc_df[mask_id].copy()
-            if current_ncs.empty:
-                current_ncs = nc_df.copy()
-        elif nc_df is not None and not nc_df.empty:
-            current_ncs = nc_df.copy()
-        else:
-            current_ncs = pd.DataFrame()
 
-        ncs_reais = pd.DataFrame()
-        pas_reais = pd.DataFrame()
-        if not current_ncs.empty:
-            col_nc = next((c for c in current_ncs.columns if str(c).strip().lower() in ["não conformidade", "nao conformidade"]), None)
-            if col_nc:
-                mask_nc = current_ncs[col_nc].fillna("").astype(str).str.strip() != ""
-                ncs_reais = current_ncs[mask_nc].copy()
-                
-            col_pa = next((c for c in current_ncs.columns if str(c).strip().lower() in ["ponto de atenção", "ponto de atencao"]), None)
-            if col_pa:
-                mask_pa = current_ncs[col_pa].fillna("").astype(str).str.strip() != ""
-                pas_reais = current_ncs[mask_pa].copy()
-            
-            if ncs_reais.empty and pas_reais.empty:
-                cols_check = [c for c in ["Foto", "Fotos", "Observações", "Legenda da Foto", "Identificação", "Descrição da Evidência", "Descrição"] if c in current_ncs.columns]
-                if cols_check:
-                    mask_any = current_ncs[cols_check].fillna("").astype(str).apply(lambda r_c: any(v.strip() != "" for v in r_c), axis=1)
-                    ncs_reais = current_ncs[mask_any].copy()
-                else:
-                    ncs_reais = current_ncs.copy()
-            
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        
-        ambos_presentes = not ncs_reais.empty and not pas_reais.empty
-        tem_nc = not ncs_reais.empty
-        tem_pa = not pas_reais.empty
+        doc.add_paragraph()
+
+        # Obter dados de NC via separador otimizado em O(N)
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
+        ncs_reais, pas_reais, resumo = separar_achados_df_socicam(nc_df, id_fisc=id_fisc)
+
+        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)")) if hasattr(row, "get") else str(row["Local"])
+
+        ambos_presentes = resumo.ambos_presentes
+        tem_nc = resumo.tem_nc
+        tem_pa = resumo.tem_pa
 
         if tem_nc or (not tem_nc and not tem_pa):
-            # 3. Quadro 1 title
+            # Quadro 1
             p7 = doc.add_paragraph()
             p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p7.paragraph_format.space_after = Pt(6)
             r7_1 = p7.add_run("Quadro 1")
             r7_1.bold = True
-            r7_1.font.name = 'Aptos'
+            r7_1.font.name = "Aptos"
             r7_1.font.size = Pt(11)
             r7_2 = p7.add_run(f" – Não Conformidades do {local_val}")
-            r7_2.font.name = 'Aptos'
+            r7_2.font.name = "Aptos"
             r7_2.font.size = Pt(11)
-            
-            # 4. Render Table NC
+
             criar_tabela_quadros_fn(doc, ncs_reais, is_pa=False, report_config=self)
             doc.add_paragraph()
-            
+
             if ambos_presentes:
                 p_q2 = doc.add_paragraph()
                 p_q2.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 p_q2.paragraph_format.space_after = Pt(6)
                 r_q2_1 = p_q2.add_run("Quadro 2")
                 r_q2_1.bold = True
-                r_q2_1.font.name = 'Aptos'
+                r_q2_1.font.name = "Aptos"
                 r_q2_1.font.size = Pt(11)
                 r_q2_2 = p_q2.add_run(f" – Pontos de Atenção do {local_val}")
-                r_q2_2.font.name = 'Aptos'
+                r_q2_2.font.name = "Aptos"
                 r_q2_2.font.size = Pt(11)
-                
+
                 criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
                 doc.add_paragraph()
         elif tem_pa:
-            # 3. Quadro 1 title
+            # Apenas Pontos de Atenção
             p7 = doc.add_paragraph()
             p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p7.paragraph_format.space_after = Pt(6)
             r7_1 = p7.add_run("Quadro 1")
             r7_1.bold = True
-            r7_1.font.name = 'Aptos'
+            r7_1.font.name = "Aptos"
             r7_1.font.size = Pt(11)
             r7_2 = p7.add_run(f" – Pontos de Atenção do {local_val}")
-            r7_2.font.name = 'Aptos'
+            r7_2.font.name = "Aptos"
             r7_2.font.size = Pt(11)
-            
+
             criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
             doc.add_paragraph()
 
     @property
-    def quadros_section_title(self) -> str:
-        return "4. FISCALIZAÇÃO"
+    def finalizacao_sections_config(self) -> Dict[str, str]:
+        return dict(SOCICAM_FINALIZACAO_SECTIONS_CONFIG)
 
-    def get_quadro_intro_paragraphs(self, row, data_extenso, responsaveis_formatted) -> list:
-        raw_resp = row.get("Pessoal Responsável", "")
-        if pd.isna(raw_resp) or str(raw_resp).strip().lower() in ["", "nan", "none"]:
-            responsaveis_list = []
-        else:
-            responsaveis_list = [
-                r.strip() for r in str(raw_resp).split(",") 
-                if r.strip() and r.strip().lower() not in ["nan", "none"]
-            ]
-        from database.manager import carregar_responsaveis
-        db_resp = carregar_responsaveis()
-        
-        team_runs = []
-        for idx, nome in enumerate(responsaveis_list):
-            match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
-            matricula = match['matricula'] if match else "xxxxxxx/xx"
-            nome_real = match['nome'] if match else nome
-            
-            if idx > 0:
-                if idx == len(responsaveis_list) - 1:
-                    team_runs.append((" e ", False, False, None))
-                else:
-                    team_runs.append((", ", False, False, None))
-            team_runs.append((nome_real, True, False, None))
-            team_runs.append((f" (matrícula nº {matricula})", False, False, None))
-            
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)"))
-        
-        p1 = [
-            ("As ações de fiscalização foram realizadas, em ", False, False, None),
-            (f"{data_extenso}, ", False, False, None),
-            ("pela equipe formada pelos Especialista em Regulação ", False, False, None)
-        ] + team_runs + [
-            (f", no {local_val}.", False, False, None)
-        ]
-        
-        p2 = [
-            ("As Não Conformidades constatadas estão relacionadas ao ", False, False, None),
-            ("Programa de Manutenção dos Terminais Rodoviários", True, False, None),
-            (", Anexo V do Contrato de Concessão, conforme descritas no ", False, False, None),
-            ("Quadro 1", True, False, None),
-            (", a seguir, com indicação dos respectivos registros fotográficos no ", False, False, None),
-            ("Apêndice A", True, False, None),
-            (".", False, False, None)
-        ]
-        return [p1, p2]
+    def get_determinations_paragraphs(self, total_ncs: int) -> List[Any]:
+        extenso_ncs = formatar_extenso_achados_socicam(total_ncs)
+        return get_socicam_determinations_paragraphs(total_ncs, extenso_ncs)
 
-    @property
-    def quadro_title_template(self) -> str:
-        return "Quadro 1 – Não Conformidades do {local_val}"
+    def get_recommendations_paragraphs(self) -> List[Any]:
+        return list(SOCICAM_RECOMMENDATIONS_PARAGRAPHS)
 
-    @property
-    def nc_table_headers(self) -> list:
-        return [
-            "IDENTIFICAÇÃO", 
-            "DESCRIÇÃO", 
-            "REGISTRO\nFOTOGRÁFICO", 
-            "FUNDAMENTO DA INFRAÇÃO\n(ANEXO V CONTRATO DE CONCESSÃO)", 
-            "DETERMINAÇÃO"
-        ]
+    def get_conclusions_paragraphs(self, total_ncs: int, local_val: str) -> List[Any]:
+        nc_frase = formatar_frase_conclusao_achados_socicam(total_ncs)
+        terminal_curto = normalizar_nome_terminal_curto(local_val)
+        return get_socicam_conclusions_paragraphs(nc_frase, terminal_curto)
 
-    @property
-    def nc_table_col_widths(self) -> list:
-        return [Inches(1.24), Inches(1.62), Inches(1.26), Inches(1.69), Inches(2.25)]
-
-    def format_nc_table_total_row(self, table, row_idx, total_ncs, col_widths=None) -> None:
-        r_total = table.rows[row_idx]
-        r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2]).merge(r_total.cells[3])
-        r_total.cells[0].text = "TOTAL"
-        r_total.cells[4].text = str(total_ncs)
-        
-        widths = col_widths if col_widths is not None else self.nc_table_col_widths
-        r_total.cells[0].width = widths[0] + widths[1] + widths[2] + widths[3]
-        r_total.cells[4].width = widths[4]
-
-    @property
-    def finalizacao_sections_config(self) -> dict:
-        return {
-            "5": "determinações",
-            "6": "recomendações",
-            "7": "conclusões"
-        }
-
-    def get_determinations_paragraphs(self, total_ncs) -> list:
-        from sections.finalizacao.finalizacao import numero_por_extenso
-        f_extenso = {
-            1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
-            6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
-        }
-        extenso_ncs = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
-        return [
-            [("Considerando os dispositivos contratuais pertinentes e visando garantir a qualidade dos serviços prestados, determina-se que a SOCICAM tome as seguintes medidas através de plano de ação:", False, False, None)],
-            [("Manutenção e Monitoramento", True, False, None),
-             (": adotar medidas para assegurar a manutenção, o monitoramento contínuo e o cumprimento do Programa de Manutenção dos Terminais Rodoviários, constante da proposta da SOCICAM nos subitens 9.1.1 Manutenção Preventiva; 9.1.2 Manutenção Corretiva e 9.1.3 Tabela de Classificação de Níveis de Falha (tabela de tempos máximos para os níveis de atendimento).", False, False, None)],
-            [("Medidas imediatas", True, False, None),
-             (" para resolutividade das ", False, False, None),
-             (f"{total_ncs} ({extenso_ncs}) novas Não Conformidades", True, False, None),
-             (" constatadas, nos prazos estabelecidos, conforme disposto no Quadro 1, na coluna denominada Determinações.", False, False, None)]
-        ]
-
-    def get_recommendations_paragraphs(self) -> list:
-        return [
-            [("Considerando as disposições do Contrato de Concessão, em especial, o Anexo III – Regulamento Interno dos Terminais Rodoviários, aprovado pela Resolução Arpe nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), bem como a legislação aplicável, devem ser observadas pela SOCICAM as seguintes recomendações:", False, False, None)],
-            [("Garantir condições de segurança, higiene, acessibilidade e conforto aos usuários dos Terminais Rodoviários, sejam passageiros, público em geral, comerciantes neles estabelecidos, empresas de transportes e de seus empregados.", False, False, None)],
-            [("Exigir a utilização de EPI adequados, inclusive por funcionários de empresas terceirizadas que prestem serviços nos Terminais Rodoviários.", False, False, None)],
-            [("Providenciar a correta manutenção (evitar o vencimento) de extintores de incêndios nos Terminais Rodoviários.", False, False, None)],
-            [("Instalar, sempre que necessário, aviso de sinalização de segurança, principalmente em pontos de risco de acidentes.", False, False, None)]
-        ]
-
-    def get_conclusions_paragraphs(self, total_ncs, local_val) -> list:
-        from sections.finalizacao.finalizacao import numero_por_extenso
-        f_extenso = {
-            1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
-            6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez"
-        }
-        extenso_ncs = f_extenso.get(total_ncs, numero_por_extenso(total_ncs))
-        if total_ncs == 1:
-            nc_str = f"{extenso_ncs} nova Não Conformidade"
-        elif total_ncs == 0:
-            nc_str = "nenhuma nova Não Conformidade"
-        else:
-            nc_str = f"{extenso_ncs} novas Não Conformidades"
-
-        terminal_curto = _obter_terminal_de_nome(local_val)
-        return [
-            [
-                ("Tendo em vista as ações de fiscalização realizadas pela ARPE foram constatadas ", False, False, None),
-                (f"{nc_str} no {terminal_curto}", True, False, None),
-                (", que devem ser solucionadas pela SOCICAM de acordo com as Determinações desta Agência de Regulação (v. Quadro 1).", False, False, None)
-            ],
-            [("Por fim, solicita-se o encaminhamento deste Processo de Fiscalização para conhecimento e acompanhamento da EPTI, na qualidade de Poder Concedente do Contrato de Concessão e gestora do Sistema de Transporte Coletivo Intermunicipal de Passageiros (STCIP-PE).", False, False, None)]
-        ]
-
-    def render_apendices(self, doc, row, ncs_reais, pas_reais, fotos_dir, data_fisc, ano, criar_grade_fotos_fn) -> None:
+    def render_apendices(self, doc: Any, row: Any, ncs_reais: Any, pas_reais: Any, fotos_dir: Any, data_fisc: Any, ano: Any, criar_grade_fotos_fn: Any) -> None:
         from utils import adicionar_titulo_secao
-        from docx.shared import Pt
-        
-        local_sigla = "TIP"
-        local_val = str(row.get("Local", "TIP")).upper()
-        if "TIP" in local_val:
-            local_sigla = "TIP"
-        elif "(" in local_val:
-            local_sigla = local_val.split("(")[0].strip()
-        else:
-            local_sigla = local_val
-            
+
+        local_val = row.get("Local", "TIP") if hasattr(row, "get") else row["Local"]
+        local_sigla = extrair_sigla_terminal(local_val)
+
         ambos_presentes = not ncs_reais.empty and not pas_reais.empty
         tem_nc = not ncs_reais.empty
         tem_pa = not pas_reais.empty
@@ -510,35 +346,27 @@ class SocicamReport(BaseReport):
         if ambos_presentes:
             p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}")
             p_ap_a.paragraph_format.page_break_before = True
-            
-            criar_grade_fotos_fn(doc, ncs_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+
+            criar_grade_fotos_fn(doc, ncs_reais, row.get("Local", "") if hasattr(row, "get") else row["Local"], fotos_dir, data_fisc, self.key)
 
             p_ap_b = adicionar_titulo_secao(doc, f"APÊNDICE B - REGISTROS FOTOGRÁFICOS DOS PONTOS DE ATENÇÃO APONTADOS PARA O {local_sigla}")
             p_ap_b.paragraph_format.page_break_before = True
-            
-            criar_grade_fotos_fn(doc, pas_reais, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+
+            criar_grade_fotos_fn(doc, pas_reais, row.get("Local", "") if hasattr(row, "get") else row["Local"], fotos_dir, data_fisc, self.key)
         else:
             p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO NO {local_sigla}")
             p_ap_a.paragraph_format.page_break_before = True
-            
-            if tem_pa and not tem_nc:
-                df_render = pas_reais
-            else:
-                df_render = ncs_reais
-                
+
+            df_render = pas_reais if (tem_pa and not tem_nc) else ncs_reais
             if not df_render.empty:
-                criar_grade_fotos_fn(doc, df_render, row.get("Local", ""), fotos_dir, data_fisc, self.key)
+                criar_grade_fotos_fn(doc, df_render, row.get("Local", "") if hasattr(row, "get") else row["Local"], fotos_dir, data_fisc, self.key)
             else:
                 p_empty = doc.add_paragraph()
                 r_empty = p_empty.add_run("Nenhum registro fotográfico cadastrado.")
-                r_empty.font.name = 'Aptos'
+                r_empty.font.name = "Aptos"
                 r_empty.font.size = Pt(11)
 
-    @property
-    def analyst_title(self) -> str:
-        return "Especialista em Regulação"
-
-    def get_process_sei_texts(self, row, ano=None) -> list:
+    def get_process_sei_texts(self, row: Any, ano: Optional[Any] = None) -> List[str]:
         from utils import extrair_mes_ano_numerico, extrair_ano
         if isinstance(row, (str, int)) and ano is None:
             ano = str(row)

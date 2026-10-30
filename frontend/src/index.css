@@ -44,7 +44,7 @@
 
   body {
     font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-    background-color: #f8fafc;
+    background-color: #eaf1f8;
     color: #0f172b;
     line-height: 1.5;
   }
@@ -55,6 +55,36 @@
   input[type="checkbox"],
   input[type="radio"] {
     cursor: pointer;
+  }
+}
+
+/* UI/UX Design System Buttons (Inspirado em UI Elements Collection) */
+@layer components {
+  /* Botão Master CTA com Gradiente e Cápsula de Ação (Ref: Col 2, Row 4) */
+  .btn-cta-master {
+    @apply group relative inline-flex items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:brightness-105 hover:shadow-xl hover:shadow-amber-500/35 active:translate-y-[2px] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none;
+  }
+  .btn-cta-capsule {
+    @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-transform duration-200 group-hover:scale-110;
+  }
+
+  /* Botão Sólido Tátil com Sombra 3D Física (Ref: Col 1, Row 1-3) */
+  .btn-tactile-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-stone-950 shadow-[0_3px_0_0_#b45309] transition-all duration-150 hover:bg-amber-400 active:translate-y-[2px] active:shadow-[0_1px_0_0_#b45309] disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  .btn-tactile-navy {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-[0_3px_0_0_#061324] transition-all duration-150 hover:bg-navy-2 active:translate-y-[2px] active:shadow-[0_1px_0_0_#061324] disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  /* Botão Dark Ghost / Borda Fina Luminosa (Ref: Col 3, Row 1-4) */
+  .btn-ghost-navy {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs sm:text-sm font-medium text-foreground transition-all duration-200 hover:border-accent hover:text-accent active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  /* Botão de Perigo / Exclusão (Ref: Linha Coral / Red da Ref) */
+  .btn-danger-tactile {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-nc/40 bg-nc-soft px-3.5 py-2 text-xs font-semibold text-nc transition-all duration-200 hover:bg-nc hover:border-nc hover:text-white active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none;
   }
 }
 

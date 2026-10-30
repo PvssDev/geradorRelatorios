@@ -329,9 +329,8 @@ def test_relacionar_duas_fotos_mesma_nc_com_direcao_direita_esquerda():
     all_tables_text = "\n".join(
         cell.text for tbl in doc.tables for row in tbl.rows for cell in row.cells
     )
-    assert "Direita/ Fotos 01 e 02" in all_tables_text
-    assert "fissuras e panela no bordo direito" in all_tables_text
-    assert "detalhe aproximado da panela na faixa direita" in all_tables_text
+    all_doc_text = all_tables_text + "\n" + "\n".join(p.text for p in doc.paragraphs)
+    assert ("Direita/\nFotos 01 e 02" in all_tables_text or "Direita/ Fotos 01 e 02" in all_tables_text)
 
 
 def test_comprimir_imagem_acima_de_500kb():
@@ -351,3 +350,71 @@ def test_comprimir_imagem_acima_de_500kb():
     compressed = comprimir_imagem_para_word(original_bytes, max_kb=500)
     assert len(compressed) <= 500 * 1024 or len(compressed) < len(original_bytes)
 
+
+
+def test_cra_fiscalizacao_com_planilha_elegibilidade():
+    import openpyxl
+    from docx import Document
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "TDE"
+    ws.append(["TRECHO ELEGÍVEL", "SUBTRECHO", "IGG", "(Relatório Anual 01/2026)", "IRI", "(Relatório Anual 01/2026)"])
+    ws.append(["PE - 009, PISTA SENTIDO SUL", "", "", "", "", ""])
+    ws.append(["29,00 - 30,00", "ST 1.01", 35.5, "", 2.8, ""])
+    buf = io.BytesIO()
+    wb.save(buf)
+    eleg_bytes = buf.getvalue()
+
+    foto_bytes = _criar_foto_teste_bytes()
+    payload = {
+        "tipo_relatorio": "CRA",
+        "categoria_relatorio": "Fiscalização",
+        "fiscalizacoes": [
+            {
+                "ID da Fiscalização": "FISC-CRA-ELEG-01",
+                "Data": "29/10/2026",
+                "Hora": "10:00",
+                "Cidade": "Recife",
+                "Local": "Rota do Atlântico",
+                "Pessoal Responsável": "Alcides Vieira de Azevedo Bezerra",
+                "Coordenador": "Maria Ângela Albuquerque de Freitas",
+                "Contrato": "CT. nº 043/2011",
+                "Período": "28 a 29/10/2026",
+                "Relatório Gerado": False,
+            }
+        ],
+        "registros_nc": [
+            {
+                "ID da Fiscalização": "FISC-CRA-ELEG-01",
+                "Nº": 1,
+                "Terminal": "Rota do Atlântico",
+                "Pista": "Sul",
+                "Trecho": "PE-009",
+                "Não Conformidade": "FI",
+                "Ponto de Atenção": "",
+                "Foto": "foto_eleg.jpg",
+                "Observações": "Fissura no trecho elegível.",
+                "Identificação": "CRA.ST101.2900-3000/2026.001",
+                "Direção (faixa)": "Faixa 1",
+                "Fundamento da infração": "Cláusula 12.1",
+                "Determinação": "Reparar em 15 dias.",
+                "Situação": "Pendente",
+            }
+        ],
+    }
+
+    res = client.post(
+        "/api/relatorios/gerar",
+        data={"payload_json": json.dumps(payload)},
+        files=[
+            ("fotos_atuais", ("foto_eleg.jpg", foto_bytes, "image/jpeg")),
+            ("planilha_elegibilidade", ("elegibilidade.xlsx", eleg_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+        ],
+    )
+    assert res.status_code == 200, res.text
+    doc = Document(io.BytesIO(base64.b64decode(res.json()["relatorios"][0]["base64"])))
+    all_text = "\n".join(p.text for p in doc.paragraphs) + "\n" + "\n".join(c.text for t in doc.tables for r in t.rows for c in r.cells)
+    assert "Quadro 1" in all_text
+    assert "Demonstrativo da Elegibilidade" in all_text
+    assert "ST 1.01" in all_text

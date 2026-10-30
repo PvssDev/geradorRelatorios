@@ -26,6 +26,7 @@ export interface ModalityWorkspaceState {
   pistaPersistida: string;
   trechoPersistido: string;
   documentoAnteriorFile: File | null;
+  planilhaElegibilidadeFile: File | null;
   oldPhotosToMatch: MonitoramentoAnteriorItem[];
   relatoriosGerados: RelatorioGeradoItem[];
 }
@@ -41,6 +42,7 @@ function createEmptyWorkspace(): ModalityWorkspaceState {
     pistaPersistida: "",
     trechoPersistido: "",
     documentoAnteriorFile: null,
+    planilhaElegibilidadeFile: null,
     oldPhotosToMatch: [],
     relatoriosGerados: [],
   };
@@ -70,6 +72,10 @@ export interface RelacionarFotoParams {
   observacoes?: string;
   legendaDaFoto?: string;
   situacao?: SituacaoNC;
+  tipoRegistro?: "Não Conformidade" | "Ponto de Atenção";
+  siglas?: string[];
+  direcaoFaixa?: string;
+  codificacao?: string;
 }
 
 interface ReportStore {
@@ -123,6 +129,7 @@ interface ReportStore {
   clearPhotos: () => void;
   setCarouselIndex: (idx: number) => void;
   setMonitoramentoAnteriorData: (file: File | null, items: MonitoramentoAnteriorItem[]) => void;
+  setPlanilhaElegibilidadeFile: (file: File | null) => void;
 
   // Ações de Fiscalização / Monitoramento
   setActiveFiscalizacaoIndex: (idx: number) => void;
@@ -539,6 +546,21 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       };
     }),
 
+  setPlanilhaElegibilidadeFile: (file) =>
+    set((state) => {
+      const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
+      const ws = state.workspaces[key];
+      return {
+        workspaces: {
+          ...state.workspaces,
+          [key]: {
+            ...ws,
+            planilhaElegibilidadeFile: file,
+          },
+        },
+      };
+    }),
+
   setActiveFiscalizacaoIndex: (idx) =>
     set((state) => {
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
@@ -833,6 +855,10 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     observacoes,
     legendaDaFoto,
     situacao,
+    tipoRegistro,
+    siglas,
+    direcaoFaixa,
+    codificacao,
   }) => {
     const state = get();
     const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
@@ -873,10 +899,41 @@ export const useReportStore = create<ReportStore>((set, get) => ({
 
     const updatedBase: RegistroNcItem = { ...baseNc, grupo_relacao: grpId };
 
+    const isPa = tipoRegistro === "Ponto de Atenção";
+    const siglasStr = siglas && siglas.length > 0 ? siglas.join(", ") : undefined;
+
+    let ncField = updatedBase["Não Conformidade"];
+    let paField = updatedBase["Ponto de Atenção"];
+
+    if (tipoRegistro !== undefined) {
+      if (isPa) {
+        paField = siglasStr ?? (updatedBase["Ponto de Atenção"] || updatedBase["Não Conformidade"]);
+        ncField = "";
+      } else {
+        ncField = siglasStr ?? (updatedBase["Não Conformidade"] || updatedBase["Ponto de Atenção"]);
+        paField = "";
+      }
+    } else if (siglasStr !== undefined) {
+      if (paField && !ncField) {
+        paField = siglasStr;
+      } else {
+        ncField = siglasStr;
+      }
+    }
+
+    const codFinal = codificacao?.trim()
+      ? codificacao.trim()
+      : (updatedBase.Codificação || updatedBase.Identificação);
+
     // Insere logo após a ocorrência base e renumera sequencialmente por ID da Fiscalização
     const newRelatedRaw: RegistroNcItem = {
       ...updatedBase,
       Foto: fotoName,
+      "Não Conformidade": ncField,
+      "Ponto de Atenção": paField,
+      Identificação: codFinal,
+      Codificação: codFinal,
+      "Direção (faixa)": direcaoFaixa !== undefined ? direcaoFaixa : updatedBase["Direção (faixa)"],
       Trecho: trecho !== undefined ? trecho : updatedBase.Trecho,
       Observações: observacoes !== undefined ? observacoes : updatedBase.Observações,
       "Legenda da Foto":

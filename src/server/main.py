@@ -203,6 +203,7 @@ async def gerar_relatorios_endpoint(
     payload_json: str = Form(...),
     fotos_atuais: List[UploadFile] = File(default=[]),
     documento_anterior: Optional[UploadFile] = File(default=None),
+    planilha_elegibilidade: Optional[UploadFile] = File(default=None),
 ):
     try:
         payload = GerarRelatorioPayloadSchema.model_validate_json(payload_json)
@@ -257,6 +258,14 @@ async def gerar_relatorios_endpoint(
                     content = comprimir_imagem_para_word(content, max_kb=500)
                 with open(dest_path, "wb") as f:
                     f.write(content)
+
+        # 1.1 Processar planilha de elegibilidade (Quadro 1 CRA Fiscalização)
+        planilha_elegibilidade_stream: Optional[io.BytesIO] = None
+        if planilha_elegibilidade and planilha_elegibilidade.filename:
+            eleg_bytes = await planilha_elegibilidade.read()
+            if eleg_bytes:
+                planilha_elegibilidade_stream = io.BytesIO(eleg_bytes)
+                planilha_elegibilidade_stream.name = planilha_elegibilidade.filename
 
         # 2. Se for Monitoramento, extrair fotos antigas do documento_anterior e/ou fotos_anteriores_b64
         doc_anterior_stream: Optional[io.BytesIO] = None
@@ -318,6 +327,7 @@ async def gerar_relatorios_endpoint(
                 gerar_todos=True,
                 tipo_relatorio=tipo_key,
                 documento_anterior=doc_anterior_stream,
+                planilha_elegibilidade=planilha_elegibilidade_stream,
             )
 
             for arq_path in arquivos_paths:

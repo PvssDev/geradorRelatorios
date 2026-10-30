@@ -3,6 +3,7 @@ import {
   CloudUpload,
   Trash2,
   FileCheck2,
+  FileSpreadsheet,
   Loader2,
   Images,
   CheckCircle2,
@@ -37,7 +38,9 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
     clearPhotos,
     setSortOption,
     setCarouselIndex,
+    tipoRelatorio,
     setMonitoramentoAnteriorData,
+    setPlanilhaElegibilidadeFile,
   } = useReportStore();
 
   const ws = getActiveWorkspace();
@@ -45,6 +48,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
 
   const [parsingDoc, setParsingDoc] = useState(false);
   const docInputRef = useRef<HTMLInputElement | null>(null);
+  const elegInputRef = useRef<HTMLInputElement | null>(null);
 
   const fotosEmNc = useMemo(() => {
     const set = new Set<string>();
@@ -96,6 +100,56 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
       icon={<CloudUpload className="h-5 w-5" />}
       title="Fotos da Vistoria em Campo"
     >
+      {tipoRelatorio === "CRA" && !isMonitoring && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-secondary/60 p-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-blue">
+              Planilha de Demonstrativo de Elegibilidade (Quadro 1) (.xlsx)
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {ws.planilhaElegibilidadeFile
+                ? `${ws.planilhaElegibilidadeFile.name} carregada com sucesso`
+                : "Envie a planilha .xlsx de demonstrativo para compor o Quadro 1 dinâmico de elegibilidade"}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="file"
+              ref={elegInputRef}
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setPlanilhaElegibilidadeFile(f);
+                if (f) toast.success(`Planilha "${f.name}" anexada com sucesso!`);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => elegInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-navy-2 transition"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              {ws.planilhaElegibilidadeFile ? "Substituir .xlsx" : "Enviar Planilha de Elegibilidade"}
+            </button>
+            {ws.planilhaElegibilidadeFile && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPlanilhaElegibilidadeFile(null);
+                  toast.info("Planilha de elegibilidade removida.");
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-nc/30 bg-nc-soft px-3 py-2 text-xs font-semibold text-nc hover:bg-nc hover:text-destructive-foreground transition"
+                title="Remover planilha"
+              >
+                <X className="h-3.5 w-3.5" />
+                Remover
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {isMonitoring && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-secondary/60 p-4">
           <div>
@@ -150,7 +204,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
       )}
 
       <label
-        className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/50 p-8 text-center hover:border-accent transition"
+        className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[#c5daf0] bg-[#f0f6fc]/70 p-8 text-center hover:border-primary hover:shadow-md hover:bg-white transition-all duration-300"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();

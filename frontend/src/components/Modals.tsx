@@ -635,7 +635,12 @@ export const RelacionarFotoModal: React.FC<{
     categoriaRelatorio,
     getActiveWorkspace,
     relacionarFotoComNc,
+    getNcOptionsForCurrent,
+    mapSiglas,
   } = useReportStore();
+
+  const optionsNc = getNcOptionsForCurrent();
+  const isCraFisc = tipoRelatorio === "CRA" && categoriaRelatorio === "Fiscalização";
 
   const ws = getActiveWorkspace();
   const isMonitoring = categoriaRelatorio === "Monitoramento";
@@ -697,8 +702,31 @@ export const RelacionarFotoModal: React.FC<{
     targetNc?.Situação || "Pendente"
   );
 
+  const baseSiglasList = useMemo(() => {
+    if (!targetNc) return [];
+    const val = targetNc["Não Conformidade"] || targetNc["Ponto de Atenção"] || "";
+    return val
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }, [targetNc]);
+
+  const [tipo2, setTipo2] = useState<"Não Conformidade" | "Ponto de Atenção">("Não Conformidade");
+  const [siglas2, setSiglas2] = useState<string[]>([]);
+  const [direcaoFaixa2, setDirecaoFaixa2] = useState<string>("Direita");
+  const [codificacao2, setCodificacao2] = useState<string>("");
+
   useEffect(() => {
     if (targetNc) {
+      const isBasePa = Boolean(targetNc["Ponto de Atenção"] && !targetNc["Não Conformidade"]);
+      setTipo2(isBasePa ? "Ponto de Atenção" : "Não Conformidade");
+      const sList = (targetNc["Não Conformidade"] || targetNc["Ponto de Atenção"] || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      setSiglas2(sList);
+      setDirecaoFaixa2(targetNc["Direção (faixa)"] || "Direita");
+      setCodificacao2("");
       setTrecho2(targetNc.Trecho || "");
       setObs2(
         isMonitoring
@@ -708,6 +736,12 @@ export const RelacionarFotoModal: React.FC<{
       setSituacao2(targetNc.Situação || "Pendente");
     }
   }, [targetNc, isMonitoring]);
+
+  const siglasMudaram = useMemo(() => {
+    const a = [...siglas2].sort().join(",");
+    const b = [...baseSiglasList].sort().join(",");
+    return a !== b;
+  }, [siglas2, baseSiglasList]);
 
   const foto1Obj = ws.photos.find((p) => p.name === targetNc?.Foto) || null;
   const foto2Obj = ws.photos.find((p) => p.name === foto2Name) || null;
@@ -738,6 +772,10 @@ export const RelacionarFotoModal: React.FC<{
       observacoes: isMonitoring ? targetNc.Observações : obs2.trim(),
       legendaDaFoto: isMonitoring ? obs2.trim() : undefined,
       situacao: isMonitoring ? situacao2 : targetNc.Situação,
+      tipoRegistro: tipoRelatorio === "CRA" && !isMonitoring ? tipo2 : "Não Conformidade",
+      siglas: siglas2,
+      direcaoFaixa: tipoRelatorio === "CRA" ? direcaoFaixa2 : undefined,
+      codificacao: codificacao2.trim() || undefined,
     });
 
     if (!res.ok) {
@@ -925,8 +963,141 @@ export const RelacionarFotoModal: React.FC<{
                       ))}
                     </select>
                   </div>
+
+                  {/* Tipo de Registro (NC vs PA para CRA Fiscalização) */}
+                  {tipoRelatorio === "CRA" && !isMonitoring && (
+                    <div>
+                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-blue">
+                        Tipo de Registro da 2ª Foto
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTipo2("Não Conformidade")}
+                          className={modalPill(tipo2 === "Não Conformidade")}
+                        >
+                          Não Conformidade
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTipo2("Ponto de Atenção")}
+                          className={modalPill(tipo2 === "Ponto de Atenção")}
+                        >
+                          Ponto de Atenção
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Direção / Faixa da 2ª Foto (CRA) */}
+                  {tipoRelatorio === "CRA" && (
+                    <div>
+                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-blue">
+                        Direção / Faixa da 2ª Foto
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-input bg-secondary/60 p-1">
+                        {(["Direita", "Esquerda"] as const).map((dir) => (
+                          <button
+                            key={dir}
+                            type="button"
+                            onClick={() => setDirecaoFaixa2(dir)}
+                            className={`rounded-md py-1 text-xs font-semibold transition ${
+                              direcaoFaixa2 === dir
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {dir}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Codificação da 2ª Foto */}
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-blue">
+                      Codificação da 2ª Foto (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={codificacao2}
+                      onChange={(e) => setCodificacao2(e.target.value)}
+                      placeholder={`Em branco = herdar anterior (${targetNc?.Identificação || "—"})`}
+                      className={`${modalInputCls} font-mono text-xs`}
+                    />
+                  </div>
                 </div>
               </div>
+
+              {/* Seleção de Siglas da 2ª Foto */}
+              {!isMonitoring && (
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-blue">
+                      Siglas da 2ª Foto ({tipoRelatorio})
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      {siglas2.length} selecionada(s)
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1">
+                    {optionsNc.map((s) => {
+                      const d = mapSiglas[s] || s;
+                      const isSel = siglas2.includes(s);
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          title={d}
+                          onClick={() =>
+                            setSiglas2((prev) =>
+                              prev.includes(s)
+                                ? prev.filter((x) => x !== s)
+                                : [...prev, s]
+                            )
+                          }
+                          className={modalPill(isSel)}
+                        >
+                          <b>{s}</b>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {siglas2.length > 0 && (
+                    <div className="text-[11px] text-muted-foreground italic bg-card/60 p-2 rounded-lg border border-border/60">
+                      {siglas2.map((s) => `${s}: ${mapSiglas[s] || s}`).join(" · ")}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Banner Informativo sobre a Relação das Fotos no Relatório Word */}
+              {isCraFisc && (
+                <div
+                  className={`rounded-xl border p-3.5 text-xs flex items-center gap-3 ${
+                    !siglasMudaram
+                      ? "border-accent/40 bg-accent/10 text-accent-foreground"
+                      : "border-pa/40 bg-pa-soft text-pa"
+                  }`}
+                >
+                  {!siglasMudaram ? (
+                    <>
+                      <Link2 className="h-4 w-4 shrink-0 text-accent" />
+                      <div>
+                        <span className="font-bold">Mesmas Siglas Mantidas:</span> A 2ª foto será agrupada sob a mesma linha e codificação ({codificacao2.trim() || targetNc?.Identificação || "—"}) no Quadro de Não Conformidades (relação 1:1).
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <div>
+                        <span className="font-bold">Siglas Diferentes Detectadas:</span> No Quadro será gerada uma codificação para cada sigla (N para 1) e as fotos ficarão relacionadas com colunas de registro fotográfico mescladas no Word.
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Campos específicos da 2ª foto */}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -994,14 +1165,14 @@ export const RelacionarFotoModal: React.FC<{
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-lg border border-border bg-card px-4 py-2.5 text-xs font-semibold hover:bg-muted transition"
+                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={!targetNc || !foto2Name || jaTemDuas}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-navy-2 transition disabled:opacity-40"
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-stone-950 shadow-[0_2px_0_0_#b45309] hover:bg-amber-400 active:translate-y-[1px] transition disabled:opacity-40"
                 >
                   <Link2 className="h-4 w-4" />
                   Confirmar Relação de Fotos
@@ -1063,7 +1234,7 @@ export const ConfirmDeleteModal: React.FC<{
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-border bg-card px-4 py-2 text-xs font-semibold hover:bg-muted transition"
+              className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition"
             >
               Cancelar
             </button>
@@ -1073,7 +1244,7 @@ export const ConfirmDeleteModal: React.FC<{
                 onConfirm();
                 onClose();
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-nc px-4 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/60 bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-[0_2px_0_0_#991b1b] hover:bg-red-500 active:translate-y-[1px] transition"
             >
               <Trash2 className="h-4 w-4" />
               Sim, Excluir

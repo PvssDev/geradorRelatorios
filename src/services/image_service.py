@@ -185,3 +185,76 @@ def comprimir_imagem_para_word(image_bytes: bytes, max_kb: int = 500) -> bytes:
 
     return image_bytes
 
+
+
+def extrair_nome_foto(photo_source) -> str:
+    """Extrai o nome base do arquivo a partir de uma string ou objeto de arquivo."""
+    if photo_source is None:
+        return ""
+    if isinstance(photo_source, str):
+        return os.path.basename(photo_source).strip()
+    return getattr(photo_source, "name", "").strip()
+
+
+def extrair_data_original_foto(photo_source) -> str:
+    """
+    Extrai a data original (DateTimeOriginal) dos metadados EXIF da foto enviada.
+    - Retorna a data formatada em 'DD/MM/YYYY'.
+    - Busca estritamente a data original de criação/captura (tag 36867 / 0x9003)
+      e NÃO utiliza a data de modificação da imagem (tag 306).
+    - Em caso de ausência de metadados, erro de leitura, foto corrompida ou inexistente,
+      retorna 'xx/xx/xxxx'.
+    """
+    if not photo_source:
+        return "xx/xx/xxxx"
+
+    raw_date = None
+    try:
+        if isinstance(photo_source, str):
+            if not os.path.exists(photo_source):
+                return "xx/xx/xxxx"
+            img = Image.open(photo_source)
+        elif hasattr(photo_source, "read"):
+            if hasattr(photo_source, "seek"):
+                photo_source.seek(0)
+            img = Image.open(photo_source)
+        elif isinstance(photo_source, (bytes, bytearray)):
+            img = Image.open(io.BytesIO(photo_source))
+        else:
+            return "xx/xx/xxxx"
+
+        try:
+            exif = img.getexif()
+            if exif:
+                TAG_DATETIME_ORIGINAL = 36867  # 0x9003
+                TAG_DATETIME_DIGITIZED = 36868  # 0x9004
+                if TAG_DATETIME_ORIGINAL in exif:
+                    raw_date = exif[TAG_DATETIME_ORIGINAL]
+                else:
+                    exif_ifd = exif.get_ifd(0x8769)
+                    if exif_ifd:
+                        if TAG_DATETIME_ORIGINAL in exif_ifd:
+                            raw_date = exif_ifd[TAG_DATETIME_ORIGINAL]
+                        elif TAG_DATETIME_DIGITIZED in exif_ifd:
+                            raw_date = exif_ifd[TAG_DATETIME_DIGITIZED]
+        finally:
+            try:
+                img.close()
+            except Exception:
+                pass
+            if hasattr(photo_source, "seek"):
+                try:
+                    photo_source.seek(0)
+                except Exception:
+                    pass
+
+        if raw_date and isinstance(raw_date, str):
+            raw_str = raw_date.strip()
+            m = re.match(r"^(\d{4})[:\-](\d{2})[:\-](\d{2})", raw_str)
+            if m:
+                ano, mes, dia = m.groups()
+                return f"{dia}/{mes}/{ano}"
+    except Exception:
+        pass
+
+    return "xx/xx/xxxx"

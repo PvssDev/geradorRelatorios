@@ -5,8 +5,19 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 import os
 import pandas as pd
 from datetime import datetime
-from utils import adicionar_titulo_secao, extrair_ano, formatar_data_extenso
+from utils import (
+    adicionar_titulo_secao,
+    extrair_ano,
+    formatar_data_extenso,
+    formatar_codificacoes_contraidas,
+    fotos_tem_mesmas_ncs,
+    formatar_legenda_foto,
+    converter_faixa_para_sigla,
+    combinar_faixas_relacionadas
+)
 from database.manager import carregar_responsaveis, carregar_coordenadores
+from services.image_service import extrair_data_original_foto
+from core.rules.cra_rules import consolidar_dados_legenda_grupo_cra
 
 def formatar_data_dd_mm_yyyy(data_val):
     if pd.isna(data_val) or not data_val:
@@ -71,13 +82,28 @@ def _obter_caminho_foto_valido(foto_val, fotos_dir):
 
     return None
 
+def _obter_texto_localizacao_cra(rec: dict) -> str:
+    val = str(rec.get("Codificação") or rec.get("Trecho", "")).strip()
+    return val
+
+def _formatar_trecho_caption(rec: dict, tipo_relatorio: str, obs_text: str = "", cod_custom: str = None) -> str:
+    if str(tipo_relatorio).upper() != "CRA":
+        return ""
+    val = cod_custom if cod_custom else _obter_texto_localizacao_cra(rec)
+    if not val:
+        return ""
+    apresentando_suffix = " apresentando " if str(obs_text).strip() else ""
+    if val.lower().startswith("trecho") or any(val.upper().startswith(p) for p in ["CRA", "CRC", "NC"]):
+        return f"{val}{apresentando_suffix}"
+    return f"Trecho {val}{apresentando_suffix}"
+
 def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_relatorio="CRA"):
     if df_fotos is None or df_fotos.empty:
         return
     
     # Compatibilidade com planilhas antigas
     df_fotos = df_fotos.copy()
-    for col in ["Pista", "Trecho", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação"]:
+    for col in ["Pista", "Trecho", "Codificação", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação", "Data da Foto"]:
         if col not in df_fotos.columns:
             df_fotos[col] = ""
         
@@ -114,12 +140,19 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 desc_nc = str(rec.get("Não Conformidade", "")).strip()
                 
                 parts = []
-                if ident:
-                    parts.append(ident)
-                if trecho_val:
-                    parts.append(trecho_val)
-                if desc_nc and desc_nc != ident:
-                    parts.append(desc_nc)
+                if "CRA" in str(tipo_relatorio).upper():
+                    cod_val = _obter_texto_localizacao_cra(rec)
+                    if cod_val:
+                        parts.append(cod_val)
+                    else:
+                        parts.append("Codificação Não Informada")
+                else:
+                    if ident:
+                        parts.append(ident)
+                    if trecho_val:
+                        parts.append(trecho_val)
+                    if desc_nc and desc_nc != ident:
+                        parts.append(desc_nc)
                 
                 run_nc_desc = p_nc_desc.add_run(" – ".join(parts))
                 run_nc_desc.bold = True
@@ -154,8 +187,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     try:
                         run_img_left = p_img_left.add_run()
                         run_img_left.add_picture(foto_path_left, width=Inches(2.708), height=Inches(2.708))
-                    except Exception as e:
-                        print(f"Erro ao adicionar foto anterior: {e}")
+                    except Exception:
+                        pass
                 
                 # Foto Direita (Nova)
                 p_img_right = table.rows[0].cells[1].paragraphs[0]
@@ -171,8 +204,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     try:
                         run_img_right = p_img_right.add_run()
                         run_img_right.add_picture(foto_path_right, width=Inches(2.708), height=Inches(2.708))
-                    except Exception as e:
-                        print(f"Erro ao adicionar foto nova: {e}")
+                    except Exception:
+                        pass
                     
                 # Legenda Esquerda
                 p_caption_left = table.rows[1].cells[0].paragraphs[0]
@@ -200,14 +233,11 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 p_caption_right.paragraph_format.space_after = Pt(4)
                 
                 num_right = str(2 * idx + 2).zfill(2)
-                leg_atual_raw = rec.get("Legenda da Foto")
-                leg_atual = "" if (leg_atual_raw is None or pd.isna(leg_atual_raw) or str(leg_atual_raw).strip().lower() in ("nan", "none", "null")) else str(leg_atual_raw).strip()
-                obs_raw = rec.get("Observações")
-                obs_fallback = "" if (obs_raw is None or pd.isna(obs_raw) or str(obs_raw).strip().lower() in ("nan", "none", "null")) else str(obs_raw).strip()
-                obs_text = leg_atual or obs_fallback
-                caption_right_text = f"Foto {num_right} – {obs_text}"
-                if not caption_right_text.endswith("."):
-                    caption_right_text += "."
+                obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip().rstrip(".")
+                data_foto_r = rec.get("Data da Foto")
+                if not data_foto_r or data_foto_r == "xx/xx/xxxx":
+                    data_foto_r = extrair_data_original_foto(foto_path_right or foto_new)
+                caption_right_text = f"Foto {num_right} – {obs_text}, em {data_foto_r}." if obs_text else f"Foto {num_right}, em {data_foto_r}."
                 run_caption_right = p_caption_right.add_run(caption_right_text)
                 run_caption_right.font.name = 'Aptos'
                 run_caption_right.font.size = Pt(10)
@@ -299,28 +329,46 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
 
         for g in grupos_pista:
             related = g["related_records"]
+            rec_main = related[0]
             
-            if len(related) == 1:
-                rec = related[0]
-                leg_atual_raw = rec.get("Legenda da Foto")
-                leg_atual = "" if (leg_atual_raw is None or pd.isna(leg_atual_raw) or str(leg_atual_raw).strip().lower() in ("nan", "none", "null")) else str(leg_atual_raw).strip()
-                obs_raw = rec.get("Observações")
-                obs_fallback = "" if (obs_raw is None or pd.isna(obs_raw) or str(obs_raw).strip().lower() in ("nan", "none", "null")) else str(obs_raw).strip()
-                obs_text = leg_atual or obs_fallback
-                ident = str(rec.get("Identificação", "")).strip()
-                nc_txt = str(rec.get("Não Conformidade", "")).strip()
+            obs_text = str(rec_main.get("Observações") or rec_main.get("Legenda da Foto") or "").strip()
+            ident = str(rec_main.get("Identificação", "")).strip()
+            nc_txt = str(rec_main.get("Não Conformidade", "")).strip()
+
+            cod_grupo_cra, siglas_grupo_cra, faixa_grupo_cra = ("", [], "")
+            if str(tipo_relatorio).upper() == "CRA":
+                cod_grupo_cra, siglas_grupo_cra, faixa_grupo_cra = consolidar_dados_legenda_grupo_cra(related)
+            
+            if str(tipo_relatorio).upper() == "CRC":
+                p_nc_desc = doc.add_paragraph()
+                p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p_nc_desc.paragraph_format.space_before = Pt(12)
+                p_nc_desc.paragraph_format.space_after = Pt(6)
+                p_nc_desc.paragraph_format.line_spacing = 1.15
                 
-                if str(tipo_relatorio).upper() == "CRC":
-                    p_nc_desc = doc.add_paragraph()
-                    p_nc_desc.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                    p_nc_desc.paragraph_format.space_before = Pt(12)
-                    p_nc_desc.paragraph_format.space_after = Pt(6)
-                    p_nc_desc.paragraph_format.line_spacing = 1.15
+                if obs_text.lower().startswith("foto ") or obs_text.lower().startswith("foto\xa0"):
+                    label_item = ident or nc_txt or "Item"
+                else:
                     label_item = f"{ident} – {obs_text}" if ident and obs_text else (ident or nc_txt or obs_text or "Item")
-                    run_nc_desc = p_nc_desc.add_run(label_item)
-                    run_nc_desc.bold = True
-                    run_nc_desc.font.name = 'Aptos'
-                    run_nc_desc.font.size = Pt(11)
+                    
+                run_nc_desc = p_nc_desc.add_run(label_item)
+                run_nc_desc.bold = True
+                run_nc_desc.font.name = 'Aptos'
+                run_nc_desc.font.size = Pt(11)
+            
+            # Desduplica fotos no grupo para que uma foto com múltiplas NCs não seja renderizada repetida lado a lado
+            distinct_related = []
+            seen_fotos = set()
+            for r in related:
+                f_val = str(r.get("Foto") or r.get("Fotos") or r.get("foto") or "").strip().lower()
+                if f_val and f_val not in seen_fotos:
+                    seen_fotos.add(f_val)
+                    distinct_related.append(r)
+            if not distinct_related:
+                distinct_related = related[:1]
+
+            if len(distinct_related) == 1:
+                rec = distinct_related[0]
                     
                 table = doc.add_table(rows=2, cols=1)
                 table.style = 'Table Grid'
@@ -343,8 +391,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         run_img = p_img.add_run()
                         img_dim = Inches(3.15)
                         run_img.add_picture(foto_path, width=img_dim, height=img_dim)
-                    except Exception as e:
-                        print(f"Erro ao adicionar foto: {e}")
+                    except Exception:
+                        pass
                         
                 p_caption = table.rows[1].cells[0].paragraphs[0]
                 p_caption.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -354,14 +402,42 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 if num == "00" or num == "":
                     num_val = records.index(rec) + 1
                     num = str(num_val).zfill(2)
-                data_str = f", em {data_fisc}" if data_fisc else ""
+                data_foto = rec.get("Data da Foto")
+                if not data_foto or data_foto == "xx/xx/xxxx":
+                    data_foto = extrair_data_original_foto(foto_path or rec.get("Foto"))
+                data_str = f", em {data_foto}"
                 
-                trecho = str(rec.get("Trecho", "")).strip()
-                trecho_txt = f"Trecho {trecho} apresentando " if trecho and str(tipo_relatorio).upper() == "CRA" else ""
-                
-                caption_text = f"Foto {num} – {trecho_txt}{obs_text}{data_str}."
-                if str(tipo_relatorio).upper() in ["CRC", "SOCICAM"] or not trecho_txt:
-                    caption_text = f"Foto {num} – {obs_text}{data_str}."
+                obs_text_clean = str(obs_text).strip()
+                if str(tipo_relatorio).upper() == "CRA":
+                    cod_val = cod_grupo_cra or _obter_texto_localizacao_cra(rec)
+                    faixa_val = faixa_grupo_cra or rec.get("Direção (faixa)", "")
+                    if siglas_grupo_cra:
+                        caption_text = formatar_legenda_foto(
+                            num=num,
+                            codificacao=cod_val,
+                            siglas_ou_ncs=siglas_grupo_cra,
+                            faixa=faixa_val,
+                            data_foto=data_foto
+                        )
+                    elif obs_text_clean.lower().startswith("foto ") or obs_text_clean.lower().startswith("foto\xa0"):
+                        caption_text = obs_text_clean
+                    else:
+                        caption_text = formatar_legenda_foto(
+                            num=num,
+                            codificacao=cod_val,
+                            siglas_ou_ncs=obs_text_clean,
+                            faixa=faixa_val,
+                            data_foto=data_foto
+                        )
+                elif obs_text_clean.lower().startswith("foto ") or obs_text_clean.lower().startswith("foto\xa0"):
+                    caption_text = obs_text_clean
+                else:
+                    data_str = f", em {data_foto}"
+                    obs_text_strip = obs_text_clean.rstrip(".")
+                    trecho_txt = _formatar_trecho_caption(rec, tipo_relatorio, obs_text_strip)
+                    caption_text = f"Foto {num} – {trecho_txt}{obs_text_strip}{data_str}."
+                    if str(tipo_relatorio).upper() in ["CRC", "SOCICAM"] or not trecho_txt:
+                        caption_text = f"Foto {num} – {obs_text_strip}{data_str}."
                     
                 run_caption = p_caption.add_run(caption_text)
                 run_caption.font.name = 'Aptos'
@@ -376,9 +452,14 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 table.columns[0].width = Inches(3.635)
                 table.columns[1].width = Inches(3.635)
                 
-                for i in range(0, len(related), 2):
-                    rec_left = related[i]
-                    rec_right = related[i+1] if i+1 < len(related) else None
+                # No CRA, todas as fotos relacionadas no mesmo grupo compartilham a mesma codificação contraída,
+                # as mesmas Não Conformidades / Pontos de Atenção consolidados e a mesma faixa combinada.
+                cod_custom_rel = cod_grupo_cra if str(tipo_relatorio).upper() == "CRA" and cod_grupo_cra else None
+                faixa_custom_rel = faixa_grupo_cra if str(tipo_relatorio).upper() == "CRA" and faixa_grupo_cra else None
+
+                for i in range(0, len(distinct_related), 2):
+                    rec_left = distinct_related[i]
+                    rec_right = distinct_related[i+1] if i+1 < len(distinct_related) else None
                     
                     row_img = table.add_row()
                     row_img.cells[0].width = Inches(3.635)
@@ -393,8 +474,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     if f_path_left:
                         try:
                             p_img_left.add_run().add_picture(f_path_left, width=Inches(3.15), height=Inches(3.15))
-                        except Exception as e:
-                            print(f"Erro foto esquerda: {e}")
+                        except Exception:
+                            pass
                             
                     p_img_right = row_img.cells[1].paragraphs[0]
                     p_img_right.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -406,8 +487,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         if f_path_right:
                             try:
                                 p_img_right.add_run().add_picture(f_path_right, width=Inches(3.15), height=Inches(3.15))
-                            except Exception as e:
-                                print(f"Erro foto direita: {e}")
+                            except Exception:
+                                pass
                     else:
                         row_img.cells[1].width = Inches(3.635)
                         
@@ -423,11 +504,37 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     if num_l == "00" or num_l == "":
                         num_l_val = records.index(rec_left) + 1
                         num_l = str(num_l_val).zfill(2)
-                    trecho_l = str(rec_left.get("Trecho", "")).strip()
                     obs_l = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip()
-                    trecho_txt_l = f"Trecho {trecho_l} apresentando " if trecho_l and str(tipo_relatorio).upper() == "CRA" else ""
-                    data_txt = f", em {data_fisc}" if data_fisc else ""
-                    desc_text_l = f"Foto {num_l} – {trecho_txt_l}{obs_l}{data_txt}."
+                    data_foto_l = rec_left.get("Data da Foto")
+                    if not data_foto_l or data_foto_l == "xx/xx/xxxx":
+                        data_foto_l = extrair_data_original_foto(f_path_left or rec_left.get("Foto"))
+                    if str(tipo_relatorio).upper() == "CRA":
+                        cod_l = cod_custom_rel or _obter_texto_localizacao_cra(rec_left)
+                        faixa_l = faixa_custom_rel or rec_left.get("Direção (faixa)", "")
+                        if siglas_grupo_cra:
+                            desc_text_l = formatar_legenda_foto(
+                                num=num_l,
+                                codificacao=cod_l,
+                                siglas_ou_ncs=siglas_grupo_cra,
+                                faixa=faixa_l,
+                                data_foto=data_foto_l
+                            )
+                        elif obs_l.lower().startswith("foto ") or obs_l.lower().startswith("foto\xa0"):
+                            desc_text_l = obs_l
+                        else:
+                            desc_text_l = formatar_legenda_foto(
+                                num=num_l,
+                                codificacao=cod_l,
+                                siglas_ou_ncs=obs_l,
+                                faixa=faixa_l,
+                                data_foto=data_foto_l
+                            )
+                    elif obs_l.lower().startswith("foto ") or obs_l.lower().startswith("foto\xa0"):
+                        desc_text_l = obs_l
+                    else:
+                        obs_l_strip = obs_l.rstrip(".")
+                        trecho_txt_l = _formatar_trecho_caption(rec_left, tipo_relatorio, obs_l_strip, cod_custom=cod_custom_rel)
+                        desc_text_l = f"Foto {num_l} – {trecho_txt_l}{obs_l_strip}, em {data_foto_l}."
                     run_l = p_desc_left.add_run(desc_text_l)
                     run_l.font.name = 'Aptos'
                     run_l.font.size = Pt(10)
@@ -441,10 +548,37 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         if num_r == "00" or num_r == "":
                             num_r_val = records.index(rec_right) + 1
                             num_r = str(num_r_val).zfill(2)
-                        trecho_r = str(rec_right.get("Trecho", "")).strip()
                         obs_r = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip()
-                        trecho_txt_r = f"Trecho {trecho_r} apresentando " if trecho_r and str(tipo_relatorio).upper() == "CRA" else ""
-                        desc_text_r = f"Foto {num_r} – {trecho_txt_r}{obs_r}{data_txt}."
+                        data_foto_r = rec_right.get("Data da Foto")
+                        if not data_foto_r or data_foto_r == "xx/xx/xxxx":
+                            data_foto_r = extrair_data_original_foto(f_path_right or rec_right.get("Foto"))
+                        if str(tipo_relatorio).upper() == "CRA":
+                            cod_r = cod_custom_rel or _obter_texto_localizacao_cra(rec_right)
+                            faixa_r = faixa_custom_rel or rec_right.get("Direção (faixa)", "")
+                            if siglas_grupo_cra:
+                                desc_text_r = formatar_legenda_foto(
+                                    num=num_r,
+                                    codificacao=cod_r,
+                                    siglas_ou_ncs=siglas_grupo_cra,
+                                    faixa=faixa_r,
+                                    data_foto=data_foto_r
+                                )
+                            elif obs_r.lower().startswith("foto ") or obs_r.lower().startswith("foto\xa0"):
+                                desc_text_r = obs_r
+                            else:
+                                desc_text_r = formatar_legenda_foto(
+                                    num=num_r,
+                                    codificacao=cod_r,
+                                    siglas_ou_ncs=obs_r,
+                                    faixa=faixa_r,
+                                    data_foto=data_foto_r
+                                )
+                        elif obs_r.lower().startswith("foto ") or obs_r.lower().startswith("foto\xa0"):
+                            desc_text_r = obs_r
+                        else:
+                            obs_r_strip = obs_r.rstrip(".")
+                            trecho_txt_r = _formatar_trecho_caption(rec_right, tipo_relatorio, obs_r_strip, cod_custom=cod_custom_rel)
+                            desc_text_r = f"Foto {num_r} – {trecho_txt_r}{obs_r_strip}, em {data_foto_r}."
                         run_r = p_desc_right.add_run(desc_text_r)
                         run_r.font.name = 'Aptos'
                         run_r.font.size = Pt(10)
@@ -730,9 +864,6 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
         run_mat3.font.name = 'Aptos'
         run_mat3.font.size = Pt(11)
 
-    if getattr(report_config, "signatures_before_apendices", False):
-        render_assinaturas_fn()
-        render_apendices_fn()
-    else:
-        render_apendices_fn()
-        render_assinaturas_fn()
+    # Por definição padrão de design, as assinaturas sempre vêm antes dos apêndices de fotos
+    render_assinaturas_fn()
+    render_apendices_fn()

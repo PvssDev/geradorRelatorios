@@ -7,7 +7,7 @@ from docx.oxml.ns import qn
 from utils import adicionar_titulo_secao, formatar_data_extenso, extrair_ano
 import pandas as pd
 
-def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_df=None, documento_anterior=None):
+def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_df=None, documento_anterior=None, planilha_elegibilidade=None, *args, **kwargs):
     """Gera as seções de Introdução, Objetivo, Informações Gerais, Metodologia e Fiscalização."""
 
     # Delega para implementação própria quando o relatório tem estrutura diferente
@@ -86,7 +86,7 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
         cell = row.cells[0].merge(row.cells[1])
         cell.text = text
         p = cell.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         p.paragraph_format.space_before = Pt(4)
         p.paragraph_format.space_after = Pt(4)
         for run in p.runs:
@@ -263,4 +263,5 @@ def gerar_secao_introducao(doc: Document, row, total_achados, report_config, nc_
             add_formatted_paragraph(paragraph_runs)
             
         if hasattr(report_config, "render_post_metodologia_extra_content"):
-            report_config.render_post_metodologia_extra_content(doc, row)
+            planilha = planilha_elegibilidade or kwargs.get("planilha_elegibilidade") or getattr(report_config, "planilha_elegibilidade", None)
+            report_config.render_post_metodologia_extra_content(doc, row, planilha_elegibilidade=planilha)

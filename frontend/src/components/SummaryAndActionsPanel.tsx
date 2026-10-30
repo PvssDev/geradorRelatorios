@@ -12,6 +12,7 @@ import {
   Edit3,
   AlertTriangle,
   Link2,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
@@ -29,11 +30,11 @@ interface SummaryAndActionsPanelProps {
 
 const btn = {
   primary:
-    "inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-navy-2 transition disabled:opacity-40",
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-stone-950 shadow-[0_3px_0_0_#b45309] transition-all duration-150 hover:bg-amber-400 active:translate-y-[2px] active:shadow-[0_1px_0_0_#b45309] disabled:opacity-40 disabled:pointer-events-none",
   secondary:
-    "inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition disabled:opacity-40",
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted hover:border-primary/40 transition-all duration-200 active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none",
   danger:
-    "inline-flex items-center justify-center gap-2 rounded-lg border border-nc/30 bg-nc-soft px-4 py-2.5 text-sm font-medium text-nc hover:bg-nc hover:text-destructive-foreground transition disabled:opacity-40",
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-nc/30 bg-nc-soft px-4 py-2.5 text-sm font-semibold text-nc transition-all duration-200 hover:bg-nc hover:text-white active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none",
 };
 
 function downloadBase64Docx(item: RelatorioGeradoItem) {
@@ -170,6 +171,7 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = ({
         photos: fotos,
         oldItems: ws.oldPhotosToMatch,
         documentoAnteriorFile: ws.documentoAnteriorFile,
+        planilhaElegibilidadeFile: ws.planilhaElegibilidadeFile,
         customSiglasMap: mapSiglas,
         responsaveis,
         coordenadores,
@@ -647,16 +649,21 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = ({
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            className={`${btn.primary} px-6 py-3 text-base`}
+            className="group relative inline-flex items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:brightness-105 hover:shadow-xl hover:shadow-amber-500/40 active:translate-y-[2px] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
             disabled={!regs.length || generating}
             onClick={handleGerar}
           >
-            {generating ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Sparkles className="h-5 w-5" />
-            )}
-            {generating ? "Gerando Relatório..." : "Gerar Relatório (.docx)"}
+            <div className="flex items-center gap-2.5">
+              {generating ? (
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              ) : (
+                <Sparkles className="h-5 w-5 text-amber-100" />
+              )}
+              <span>{generating ? "Gerando Relatório..." : "Gerar Relatório (.docx)"}</span>
+            </div>
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-transform duration-200 group-hover:translate-x-0.5">
+              <ChevronRight className="h-4 w-4 stroke-[2.5]" />
+            </span>
           </button>
 
           <button

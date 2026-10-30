@@ -113,6 +113,7 @@ export async function gerarRelatoriosApi(params: {
   photos: UploadedPhotoItem[];
   oldItems: MonitoramentoAnteriorItem[];
   documentoAnteriorFile: File | null;
+  planilhaElegibilidadeFile?: File | null;
   customSiglasMap: Record<string, string>;
   responsaveis: PessoaItem[];
   coordenadores: PessoaItem[];
@@ -162,6 +163,10 @@ export async function gerarRelatoriosApi(params: {
 
   if (params.documentoAnteriorFile) {
     formData.append("documento_anterior", params.documentoAnteriorFile, params.documentoAnteriorFile.name);
+  }
+
+  if (params.planilhaElegibilidadeFile) {
+    formData.append("planilha_elegibilidade", params.planilhaElegibilidadeFile, params.planilhaElegibilidadeFile.name);
   }
 
   const res = await fetch(`${API_BASE}/api/relatorios/gerar`, {

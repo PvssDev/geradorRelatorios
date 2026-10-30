@@ -60,11 +60,15 @@ export const App: React.FC = () => {
   }, [hydrateBootstrapConfig]);
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen bg-[#eaf1f8]">
       <Toaster position="top-right" richColors closeButton />
 
-      {/* Sidebar Desktop Infinita (Topo, Base e Esquerda colados na tela): Alterna entre 76px e 288px */}
-      <div className="fixed inset-y-0 left-0 z-40 hidden lg:block transition-all duration-300 ease-in-out">
+      {/* Sidebar Desktop Infinita (Topo, Base e Esquerda colados na tela): Alterna entre 76px e 288px com Animação Fluida */}
+      <div
+        className={`fixed inset-y-0 left-0 z-40 hidden lg:block transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+          sidebarExpanded ? "w-72" : "w-[76px]"
+        }`}
+      >
         <Sidebar
           expanded={sidebarExpanded}
           onToggleExpand={() => setSidebarExpanded((prev) => !prev)}
@@ -73,30 +77,38 @@ export const App: React.FC = () => {
         />
       </div>
 
-      {/* Drawer Mobile Infinito na Vertical e Esquerda */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <button
-            type="button"
-            aria-label="Fechar menu"
-            className="fixed inset-0 bg-foreground/40 backdrop-blur-[1px]"
-            onClick={() => setMobileMenuOpen(false)}
+      {/* Drawer Mobile Infinito com Animação Fluida de Slide */}
+      <div
+        className={`fixed inset-0 z-50 flex lg:hidden transition-opacity duration-300 ${
+          mobileMenuOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <button
+          type="button"
+          aria-label="Fechar menu"
+          className="fixed inset-0 bg-foreground/50 backdrop-blur-[2px] transition-opacity duration-300"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+        <div
+          className={`relative z-10 h-full transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <Sidebar
+            expanded={true}
+            onToggleExpand={() => setMobileMenuOpen(false)}
+            onNavigate={() => setMobileMenuOpen(false)}
+            dense={dense}
+            onToggleDense={setDense}
           />
-          <div className="relative z-10 h-full">
-            <Sidebar
-              expanded={true}
-              onToggleExpand={() => setMobileMenuOpen(false)}
-              onNavigate={() => setMobileMenuOpen(false)}
-              dense={dense}
-              onToggleDense={setDense}
-            />
-          </div>
         </div>
-      )}
+      </div>
 
-      {/* Área Principal alinhada exatamente com a largura da barra (76px recolhida ou 288px expandida) */}
+      {/* Área Principal com Transição Fluida no Padding */}
       <main
-        className={`min-h-screen bg-muted transition-[padding] duration-300 ease-in-out ${
+        className={`min-h-screen bg-[#eaf1f8] transition-[padding] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
           sidebarExpanded ? "lg:pl-72" : "lg:pl-[76px]"
         }`}
       >

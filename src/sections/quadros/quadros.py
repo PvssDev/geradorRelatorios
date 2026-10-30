@@ -12,20 +12,20 @@ MAP_SIGLAS = {
     "TTL": "Trincas isoladas transversais longas",
     "TLC": "Trincas isoladas longitudinais curtas",
     "TLL": "Trincas isoladas longitudinais longas",
-    "J": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+    "J": "Trincas interligadas",
     "JE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
-    "TRR": "Trincas isoladas no revestimento devido à retração térmica ou dissecação da base (solo-cimento) ou do revestimento",
-    "TB": "Trincas interligadas sem erosão acentuada nas bordas das trincas",
+    "TRR": "Trincas isoladas no revestimento",
+    "TB": "Trincas interligadas",
     "TBE": "Trincas interligadas com erosão acentuada nas bordas das trincas",
-    "ALP": "Afundamento local plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
-    "ATP": "Afundamento da trilha plástico devido à fluência plástica de uma ou mais camadas do pavimento ou do subleito",
-    "ALC": "Afundamento local de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
-    "ATC": "Afundamento da trilha de consolidação devido à consolidação diferencial ocorrente em camadas do pavimento ou do subleito",
-    "O": "Ondulação/Corrugação, caracterizada por ondulações transversais causadas por instabilidade da mistura betuminosa constituinte do revestimento ou da base",
+    "ALP": "Afundamento local plástico",
+    "ATP": "Afundamento da trilha plástico",
+    "ALC": "Afundamento local de consolidação",
+    "ATC": "Afundamento da trilha de consolidação",
+    "O": "Ondulação, caracterizada por ondulações transversais",
     "E": "Escorregamento do revestimento betuminoso",
     "EX": "Exsudação do ligante betuminoso no revestimento",
     "D": "Desgaste acentuado na superfície do revestimento",
-    "P": "buracos decorrentes da desagregação do revestimento e às vezes de camadas inferiores",
+    "P": "buracos decorrentes da desagregação do revestimento",
     "R": "Remendo"
 }
 
@@ -143,11 +143,86 @@ def agrupar_registros(df, report_config=None):
         is_cra = (getattr(report_config, "key", "").upper() == "CRA")
 
     records = df.to_dict('records')
+    
+    if is_cra:
+        # 1. Agrupar fotos por grupo_relacao
+        grupo_fotos = {}
+        for rec in records:
+            grp = _limpar_valor_campo(rec.get("grupo_relacao", ""))
+            if not grp:
+                grp = f"{_limpar_valor_campo(rec.get('Direção (faixa)', ''))}_{_limpar_valor_campo(rec.get('Fundamento da infração', ''))}_{_limpar_valor_campo(rec.get('Determinação', ''))}"
+            num_foto = rec.get("Nº")
+            if grp not in grupo_fotos:
+                grupo_fotos[grp] = []
+            if num_foto not in grupo_fotos[grp]:
+                grupo_fotos[grp].append(num_foto)
+        
+        # 2. Formatar string de fotos de cada grupo
+        grupo_fotos_str = {}
+        for grp, raw_nums in grupo_fotos.items():
+            valid_nums = [n for n in raw_nums if n is not None and not pd.isna(n) and str(n).strip().lower() not in ["", "nan", "none", "null"]]
+            try:
+                sorted_nums = sorted(valid_nums, key=lambda x: (float(x) if str(x).replace('.', '', 1).isdigit() else 999999, str(x)))
+            except Exception:
+                sorted_nums = valid_nums
+            nums_formatted = [_formatar_num_foto(n) for n in sorted_nums if _formatar_num_foto(n)]
+            if not nums_formatted:
+                s = ""
+            elif len(nums_formatted) == 1:
+                s = f"Foto {nums_formatted[0]}"
+            elif len(nums_formatted) == 2:
+                s = f"Fotos {nums_formatted[0]} e {nums_formatted[1]}"
+            else:
+                s = f"Fotos {', '.join(nums_formatted[:-1])} e {nums_formatted[-1]}"
+            grupo_fotos_str[grp] = s
+
+        # 3. Preparar registros da tabela para o CRA: registros com mesma Codificação e mesma NC são desduplicados; codificações diferentes permanecem em linhas separadas
+        grouped = []
+        chaves_cra = ["grupo_relacao", "Não Conformidade", "Ponto de Atenção", "Codificação"]
+        for rec in records:
+            found = False
+            for g_rec in grouped:
+                match = True
+                for k in chaves_cra:
+                    v1 = _limpar_valor_campo(rec.get(k, ""))
+                    v2 = _limpar_valor_campo(g_rec.get(k, ""))
+                    if v1 != v2:
+                        match = False
+                        break
+                if match:
+                    found = True
+                    break
+            if not found:
+                new_g = rec.copy()
+                grp = _limpar_valor_campo(rec.get("grupo_relacao", ""))
+                if not grp:
+                    grp = f"{_limpar_valor_campo(rec.get('Direção (faixa)', ''))}_{_limpar_valor_campo(rec.get('Fundamento da infração', ''))}_{_limpar_valor_campo(rec.get('Determinação', ''))}"
+                fotos_str = grupo_fotos_str.get(grp, "")
+                faixa = _limpar_valor_campo(rec.get("Direção (faixa)", ""))
+                new_g["localizacao_formatada"] = f"{faixa}/\n{fotos_str}" if (faixa and fotos_str) else (faixa or fotos_str)
+                new_g["_resolved_grupo"] = grp
+                grouped.append(new_g)
+
+        # Garante que registros do mesmo grupo fiquem contíguos na tabela para mesclagem vertical
+        grupos_ordenados = []
+        grupos_map = {}
+        for r in grouped:
+            g_id = r.get("_resolved_grupo", "")
+            if g_id not in grupos_map:
+                grupos_map[g_id] = []
+                grupos_ordenados.append(g_id)
+            grupos_map[g_id].append(r)
+
+        grouped_contiguo = []
+        for g_id in grupos_ordenados:
+            grouped_contiguo.extend(grupos_map[g_id])
+        return grouped_contiguo
+
     grouped = []
     
     chaves = [
         "Não Conformidade", "Ponto de Atenção",
-        "Pista", "Trecho", "Observações",
+        "Pista", "Codificação", "Trecho", "Observações",
         "Fundamento da infração", "Determinação"
     ]
     if is_cra:
@@ -155,17 +230,7 @@ def agrupar_registros(df, report_config=None):
     
     for rec in records:
         found = False
-        rec_grupo = _limpar_valor_campo(rec.get("grupo_relacao", ""))
         for g_rec in grouped:
-            g_rec_grupo = _limpar_valor_campo(g_rec.get("grupo_relacao", ""))
-            if rec_grupo and g_rec_grupo:
-                if rec_grupo == g_rec_grupo:
-                    num_foto = rec.get("Nº")
-                    if num_foto not in g_rec["foto_numeros"]:
-                        g_rec["foto_numeros"].append(num_foto)
-                    found = True
-                    break
-                continue
             match = True
             for key in chaves:
                 val1 = _limpar_valor_campo(rec.get(key, ""))
@@ -261,7 +326,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
     elif not is_pa:
         if report_config.key == "CRA":
             table.cell(0, 0).text = "NÃO CONFORMIDADE (NC)"
-            table.cell(1, 0).text = "IDENTIFICAÇÃO"
+            table.cell(1, 0).text = "CODIFICAÇÃO"
             table.cell(1, 1).text = "DESCRIÇÃO"
             table.cell(0, 2).text = "LOCALIZAÇÃO/\nREGISTRO FOTOGRÁFICO"
             table.cell(0, 3).text = "FUNDAMENTO DA INFRAÇÃO (PDCL)"
@@ -279,7 +344,10 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
             col_widths = report_config.nc_table_col_widths
     else:
         table.cell(0, 0).text = "PONTOS DE ATENÇÃO"
-        table.cell(1, 0).text = "IDENTIFICAÇÃO"
+        if report_config.key == "CRA":
+            table.cell(1, 0).text = "CODIFICAÇÃO"
+        else:
+            table.cell(1, 0).text = "IDENTIFICAÇÃO"
         table.cell(1, 1).text = "DESCRIÇÃO DA EVIDÊNCIA"
         table.cell(0, 2).text = "LOCALIZAÇÃO/\nREGISTRO FOTOGRÁFICO"
         table.cell(0, 3).text = "JUSTIFICATIVA PARA PONTOS DE ATENÇÃO"
@@ -332,8 +400,12 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         fund = _limpar_valor_campo(rec.get("Fundamento da infração", ""))
         det = _limpar_valor_campo(rec.get("Determinação", ""))
         
-        # A coluna IDENTIFICAÇÃO do quadro exibe diretamente as siglas da NC/PA
-        row.cells[0].text = str(siglas_str if siglas_str else ident)
+        # A coluna CODIFICAÇÃO (CRA) ou IDENTIFICAÇÃO (demais)
+        if report_config.key == "CRA":
+            cod_val = _limpar_valor_campo(rec.get("Codificação", ""))
+            row.cells[0].text = str(cod_val if cod_val else (siglas_str if siglas_str else ident))
+        else:
+            row.cells[0].text = str(siglas_str if siglas_str else ident)
         row.cells[1].text = str(desc)
         row.cells[2].text = str(localizacao)
         row.cells[3].text = str(fund)
@@ -345,7 +417,9 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
             
             if cell.paragraphs:
                 p = cell.paragraphs[0]
-                if c_idx in [0, 2, 3, 4]:
+                if report_config.key == "CRA" and c_idx == 2:
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                elif c_idx in [0, 2, 3, 4]:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 else:
                     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -362,6 +436,46 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
     for row in table.rows:
         for c_idx, cell in enumerate(row.cells):
             cell.width = col_widths[c_idx]
+
+    # Mesclar verticalmente as colunas 2, 3 e 4 para grupos com mais de uma NC (relação N:1:1 no CRA)
+    if report_config.key == "CRA":
+        groups = []
+        curr_grp = None
+        curr_start = None
+        for i, rec in enumerate(grouped_records):
+            grp = rec.get("_resolved_grupo") or rec.get("grupo_relacao") or f"row_{i}"
+            if grp != curr_grp:
+                if curr_grp is not None:
+                    groups.append((curr_start, i - 1))
+                curr_grp = grp
+                curr_start = i
+        if curr_grp is not None:
+            groups.append((curr_start, len(grouped_records) - 1))
+
+        for g_start, g_end in groups:
+            if g_end > g_start:
+                tbl_r_start = g_start + start_r_idx
+                tbl_r_end = g_end + start_r_idx
+                for col_idx in [2, 3, 4]:
+                    top_cell = table.cell(tbl_r_start, col_idx)
+                    bot_cell = table.cell(tbl_r_end, col_idx)
+                    merged = top_cell.merge(bot_cell)
+                    while len(merged.paragraphs) > 1:
+                        p_elem = merged.paragraphs[-1]._p
+                        p_elem.getparent().remove(p_elem)
+                    merged.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                    if merged.paragraphs:
+                        p_m = merged.paragraphs[0]
+                        if col_idx == 2:
+                            p_m.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        else:
+                            p_m.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                        p_m.paragraph_format.space_before = Pt(0)
+                        p_m.paragraph_format.space_after = Pt(0)
+                        p_m.paragraph_format.line_spacing = 1.0
+                        for r_m in p_m.runs:
+                            r_m.font.name = 'Aptos'
+                            r_m.font.size = Pt(10)
 
     if report_config.key in ["CRC", "SOCICAM", "CRA"]:
         # Add TOTAL row

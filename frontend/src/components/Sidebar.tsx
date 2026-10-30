@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   /* ------------------------------------------------------------------------ */
   if (!expanded) {
     return (
-      <aside className="flex h-full w-[76px] flex-col items-center justify-between border-r border-white/10 bg-navy-gradient py-6 text-sidebar-foreground shadow-xl select-none">
+      <aside className="flex h-full w-[76px] flex-col items-center justify-between border-r border-white/10 bg-navy-gradient py-6 text-sidebar-foreground shadow-xl select-none transition-all duration-300 animate-in fade-in">
         {/* Topo: Orbe da Marca (clicar expande o menu) */}
         <button
           type="button"
@@ -147,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   /* ESTADO EXPANDIDO (Card Flutuante Completo — Colunas 1 e 4 da Referência) */
   /* ------------------------------------------------------------------------ */
   return (
-    <aside className="flex h-full w-72 flex-col justify-between overflow-y-auto border-r border-white/10 bg-navy-gradient p-6 text-sidebar-foreground shadow-xl select-none">
+    <aside className="flex h-full w-72 flex-col justify-between overflow-y-auto border-r border-white/10 bg-navy-gradient p-6 text-sidebar-foreground shadow-2xl select-none transition-all duration-300 animate-in fade-in">
       {/* Topo: Marca + Botão de Recolher */}
       <div>
         <div className="flex items-center justify-between">

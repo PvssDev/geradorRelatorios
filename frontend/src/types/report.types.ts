@@ -49,6 +49,7 @@ export interface RegistroNcItem {
   "Legenda da Foto"?: string;
   Observações: string;
   Identificação: string;
+  Codificação?: string;
   "Direção (faixa)": string;
   "Fundamento da infração": string;
   Determinação: string;
