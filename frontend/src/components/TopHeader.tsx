@@ -96,7 +96,7 @@ function Segmented<T extends string>({
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
-  const isVisible = useSmartHeader();
+  const { headerRef, offsetY, isAnimating, resetHeader } = useSmartHeader();
   const {
     tipoRelatorio,
     categoriaRelatorio,
@@ -117,9 +117,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
 
   return (
     <header
-      className={`sticky top-0 z-30 border-b border-[#d8e5f2]/80 bg-white/95 backdrop-blur-md shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] before:absolute before:inset-x-0 before:-top-[500px] before:h-[500px] before:bg-white/95 before:backdrop-blur-md pointer-events-auto ${
-        isVisible ? "translate-y-0" : "-translate-y-full"
-      }`}
+      ref={headerRef as React.RefObject<HTMLElement>}
+      onClick={() => {
+        if (offsetY > 0) {
+          resetHeader();
+        }
+      }}
+      style={{
+        transform: `translate3d(0, -${offsetY}px, 0)`,
+        willChange: "transform",
+      }}
+      className={`sticky top-0 z-30 border-b border-[#d8e5f2]/80 bg-white/95 backdrop-blur-md shadow-xs before:absolute before:inset-x-0 before:-top-[500px] before:h-[500px] before:bg-white/95 before:backdrop-blur-md pointer-events-auto ${
+        isAnimating
+          ? "transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          : "transition-none"
+      } ${offsetY > 0 ? "cursor-pointer" : ""}`}
     >
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-4 px-6 py-4">
         <div className="flex items-center gap-4">
