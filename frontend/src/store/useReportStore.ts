@@ -264,6 +264,17 @@ interface ReportStore {
   executarAutoPreenchimento: () => void;
   limparRegistrosAtuais: (alsoClearPhotos?: boolean) => void;
   setRelatoriosGerados: (items: RelatorioGeradoItem[]) => void;
+  importarEstadoModalidade: (
+    tipo: TipoRelatorio,
+    categoria: CategoriaRelatorio,
+    dados: {
+      fiscalizacoes: FiscalizacaoItem[];
+      registrosNc: RegistroNcItem[];
+      photos: UploadedPhotoItem[];
+      pistaPersistida?: string;
+      trechoPersistido?: string;
+    }
+  ) => void;
 }
 
 const DEFAULT_BASE_OPTIONS = [
@@ -1441,6 +1452,33 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           [key]: {
             ...ws,
             relatoriosGerados: items,
+          },
+        },
+      };
+    }),
+
+  importarEstadoModalidade: (tipo, categoria, dados) =>
+    set((state) => {
+      const key = getStateKey(tipo, categoria);
+      const ws = state.workspaces[key];
+      ws.photos.forEach((p) => {
+        if (p.previewUrl && p.previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(p.previewUrl);
+        }
+      });
+      return {
+        workspaces: {
+          ...state.workspaces,
+          [key]: {
+            ...ws,
+            fiscalizacoes: dados.fiscalizacoes,
+            activeFiscalizacaoIndex: 0,
+            registrosNc: dados.registrosNc,
+            photos: dados.photos,
+            carouselIndex: 0,
+            pistaPersistida: dados.pistaPersistida || "",
+            trechoPersistido: dados.trechoPersistido || "",
+            relatoriosGerados: [],
           },
         },
       };
