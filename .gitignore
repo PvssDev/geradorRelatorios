@@ -1,65 +1,46 @@
-# Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[cod]
-*$py.class
-*.exe
-
-# Ambientes virtuais
+/reports/
+/assets/
+dist/reports/
+dist/assets/
 venv/
-.venv/
-env/
-ENV/
-
-# IDEs e configurações locais
 .cursor/
-.vscode/
-.idea/
-.pytest_cache/
+.agents/
+ref/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.vercel/
 
-# Relatórios, planilhas e documentos gerados
-*.docx
-*.doc
-*.pdf
-relatorio_*.docx
-**/relatorio_*.docx
-test_out*.docx
-**/reports/*.docx
-*.xlsx
-
-# Pastas de saída, scratch e temporários
+# Testes e rascunhos locais
 scratch/
 scratch_*.py
+test_out.docx
 ref_paragraphs.txt
-ref/
-dist/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+.docx
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
 build/
-output/
-downloads/
-temp/
-geradorRelatorios/
-*.spec
-.agents/
-.agents
+dist/
 
-# Testes automatizados locais
-tests/
-
-# Arquivos de lock e temporários do Microsoft Office
-~$*
-
-# Arquivos temporários e logs
-*.tmp
-*.log
-
-# Arquivos do Sistema Operacional (Windows / macOS)
-Thumbs.db
-Thumbs.db:encryptable
-desktop.ini
-ehthumbs.db
-.DS_Store
-
-# Variáveis de ambiente e segredos
+# Ambientes virtuais
 .env
-.env.*
+.venv
+env/
 
+# IDE e Editor
+.vscode/
+.idea/
+*.swp
 
+# OS
+.DS_Store
+Thumbs.db

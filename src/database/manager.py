@@ -1,10 +1,17 @@
 import os
 import json
+import tempfile
 
 DB_DIR = os.path.dirname(os.path.abspath(__file__))
+TMP_DB_DIR = os.path.join(tempfile.gettempdir(), "arpe_db_cache")
+
 RESPONSAVEIS_FILE = os.path.join(DB_DIR, "responsaveis.json")
 COORDENADORES_FILE = os.path.join(DB_DIR, "coordenadores.json")
 CONTRATOS_FILE = os.path.join(DB_DIR, "contratos.json")
+CUSTOM_NCS_FILE = os.path.join(DB_DIR, "custom_ncs.json")
+CUSTOM_NCS_SOCICAM_FILE = os.path.join(DB_DIR, "custom_ncs_socicam.json")
+
+_RUNTIME_CACHE: dict[str, list] = {}
 
 DEFAULT_RESPONSAVEIS = [
     {
@@ -41,163 +48,144 @@ DEFAULT_CONTRATOS = [
     "1.041.080/08"
 ]
 
-# --- RESPONSÁVEIS ---
-def carregar_responsaveis():
-    """Carrega a lista de responsáveis do banco de dados local (JSON)."""
-    if not os.path.exists(RESPONSAVEIS_FILE):
-        salvar_responsaveis(DEFAULT_RESPONSAVEIS)
-        return DEFAULT_RESPONSAVEIS.copy()
-    try:
-        with open(RESPONSAVEIS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                # Se for lista de strings (versão antiga), converte para a nova estrutura de dicionários
-                if data and isinstance(data[0], str):
-                    nova_lista = []
-                    for nome in data:
-                        match = next((d for d in DEFAULT_RESPONSAVEIS if d["nome"] == nome), None)
-                        if match:
-                            nova_lista.append(match)
-                        else:
-                            nova_lista.append({
-                                "nome": nome,
-                                "matricula": "xxxxxxx/xx",
-                                "funcao": "Analista de Regulação"
-                            })
-                    salvar_responsaveis(nova_lista)
-                    return nova_lista
-                return data
-            return DEFAULT_RESPONSAVEIS.copy()
-    except Exception:
-        return DEFAULT_RESPONSAVEIS.copy()
+DEFAULT_CUSTOM_NCS = []
+DEFAULT_CUSTOM_NCS_SOCICAM = []
 
-def salvar_responsaveis(lista):
-    """Salva a lista de responsáveis no banco de dados local (JSON)."""
+
+def _read_json_with_fallback(primary_path: str, cache_key: str):
+    if cache_key in _RUNTIME_CACHE:
+        return [item.copy() if isinstance(item, dict) else item for item in _RUNTIME_CACHE[cache_key]]
+
+    tmp_path = os.path.join(TMP_DB_DIR, os.path.basename(primary_path))
+    for candidate in (tmp_path, primary_path):
+        if os.path.exists(candidate):
+            try:
+                with open(candidate, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        _RUNTIME_CACHE[cache_key] = data
+                        return data
+            except Exception:
+                continue
+    return None
+
+
+def _write_json_with_fallback(primary_path: str, cache_key: str, lista: list) -> bool:
+    _RUNTIME_CACHE[cache_key] = [item.copy() if isinstance(item, dict) else item for item in lista]
     try:
         os.makedirs(DB_DIR, exist_ok=True)
-        with open(RESPONSAVEIS_FILE, "w", encoding="utf-8") as f:
+        with open(primary_path, "w", encoding="utf-8") as f:
             json.dump(lista, f, ensure_ascii=False, indent=2)
         return True
     except Exception:
-        return False
+        try:
+            os.makedirs(TMP_DB_DIR, exist_ok=True)
+            tmp_path = os.path.join(TMP_DB_DIR, os.path.basename(primary_path))
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(lista, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception:
+            return False
+
+
+# --- RESPONSÁVEIS ---
+def carregar_responsaveis():
+    """Carrega a lista de responsáveis do banco de dados local (JSON) ou cache em memória."""
+    data = _read_json_with_fallback(RESPONSAVEIS_FILE, "responsaveis")
+    if data is None:
+        salvar_responsaveis(DEFAULT_RESPONSAVEIS)
+        return DEFAULT_RESPONSAVEIS.copy()
+    if data and isinstance(data[0], str):
+        nova_lista = []
+        for nome in data:
+            match = next((d for d in DEFAULT_RESPONSAVEIS if d["nome"] == nome), None)
+            if match:
+                nova_lista.append(match)
+            else:
+                nova_lista.append({
+                    "nome": nome,
+                    "matricula": "xxxxxxx/xx",
+                    "funcao": "Analista de Regulação"
+                })
+        salvar_responsaveis(nova_lista)
+        return nova_lista
+    return data
+
+
+def salvar_responsaveis(lista):
+    """Salva a lista de responsáveis no banco de dados local (JSON) com fallback serverless."""
+    return _write_json_with_fallback(RESPONSAVEIS_FILE, "responsaveis", lista)
+
 
 # --- COORDENADORES ---
 def carregar_coordenadores():
-    """Carrega a lista de coordenadores do banco de dados local (JSON)."""
-    if not os.path.exists(COORDENADORES_FILE):
+    """Carrega a lista de coordenadores do banco de dados local (JSON) ou cache em memória."""
+    data = _read_json_with_fallback(COORDENADORES_FILE, "coordenadores")
+    if data is None:
         salvar_coordenadores(DEFAULT_COORDENADORES)
         return DEFAULT_COORDENADORES.copy()
-    try:
-        with open(COORDENADORES_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                # Se for lista de strings (versão antiga), converte para a nova estrutura de dicionários
-                if data and isinstance(data[0], str):
-                    nova_lista = []
-                    for nome in data:
-                        match = next((d for d in DEFAULT_COORDENADORES if d["nome"] == nome), None)
-                        if match:
-                            nova_lista.append(match)
-                        else:
-                            nova_lista.append({
-                                "nome": nome,
-                                "matricula": "xxxxxx/xx",
-                                "funcao": "Coordenador(a)"
-                            })
-                    salvar_coordenadores(nova_lista)
-                    return nova_lista
-                return data
-            return DEFAULT_COORDENADORES.copy()
-    except Exception:
-        return DEFAULT_COORDENADORES.copy()
+    if data and isinstance(data[0], str):
+        nova_lista = []
+        for nome in data:
+            match = next((d for d in DEFAULT_COORDENADORES if d["nome"] == nome), None)
+            if match:
+                nova_lista.append(match)
+            else:
+                nova_lista.append({
+                    "nome": nome,
+                    "matricula": "xxxxxx/xx",
+                    "funcao": "Coordenador(a)"
+                })
+        salvar_coordenadores(nova_lista)
+        return nova_lista
+    return data
+
 
 def salvar_coordenadores(lista):
-    """Salva a lista de coordenadores no banco de dados local (JSON)."""
-    try:
-        os.makedirs(DB_DIR, exist_ok=True)
-        with open(COORDENADORES_FILE, "w", encoding="utf-8") as f:
-            json.dump(lista, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception:
-        return False
+    """Salva a lista de coordenadores no banco de dados local (JSON) com fallback serverless."""
+    return _write_json_with_fallback(COORDENADORES_FILE, "coordenadores", lista)
+
 
 # --- CONTRATOS ---
 def carregar_contratos():
-    """Carrega a lista de contratos do banco de dados local (JSON)."""
-    if not os.path.exists(CONTRATOS_FILE):
+    """Carrega a lista de contratos do banco de dados local (JSON) ou cache em memória."""
+    data = _read_json_with_fallback(CONTRATOS_FILE, "contratos")
+    if data is None:
         salvar_contratos(DEFAULT_CONTRATOS)
         return DEFAULT_CONTRATOS.copy()
-    try:
-        with open(CONTRATOS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                return data
-            return DEFAULT_CONTRATOS.copy()
-    except Exception:
-        return DEFAULT_CONTRATOS.copy()
+    return data
+
 
 def salvar_contratos(lista):
-    """Salva a lista de contratos no banco de dados local (JSON)."""
-    try:
-        os.makedirs(DB_DIR, exist_ok=True)
-        with open(CONTRATOS_FILE, "w", encoding="utf-8") as f:
-            json.dump(lista, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception:
-        return False
+    """Salva a lista de contratos no banco de dados local (JSON) com fallback serverless."""
+    return _write_json_with_fallback(CONTRATOS_FILE, "contratos", lista)
+
 
 # --- CUSTOM NCS ---
-CUSTOM_NCS_FILE = os.path.join(DB_DIR, "custom_ncs.json")
-DEFAULT_CUSTOM_NCS = []
-
 def carregar_custom_ncs():
     """Carrega a lista de não conformidades customizadas do banco de dados local (JSON)."""
-    if not os.path.exists(CUSTOM_NCS_FILE):
+    data = _read_json_with_fallback(CUSTOM_NCS_FILE, "custom_ncs")
+    if data is None:
         salvar_custom_ncs(DEFAULT_CUSTOM_NCS)
         return DEFAULT_CUSTOM_NCS.copy()
-    try:
-        with open(CUSTOM_NCS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                return data
-            return DEFAULT_CUSTOM_NCS.copy()
-    except Exception:
-        return DEFAULT_CUSTOM_NCS.copy()
+    return data
+
 
 def salvar_custom_ncs(lista):
     """Salva a lista de não conformidades customizadas no banco de dados local (JSON)."""
-    try:
-        os.makedirs(DB_DIR, exist_ok=True)
-        with open(CUSTOM_NCS_FILE, "w", encoding="utf-8") as f:
-            json.dump(lista, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception:
-        return False
+    return _write_json_with_fallback(CUSTOM_NCS_FILE, "custom_ncs", lista)
+
 
 # --- CUSTOM NCS SOCICAM ---
-CUSTOM_NCS_SOCICAM_FILE = os.path.join(DB_DIR, "custom_ncs_socicam.json")
-DEFAULT_CUSTOM_NCS_SOCICAM = []
-
 def carregar_custom_ncs_socicam():
     """Carrega a lista de não conformidades customizadas da SOCICAM (JSON)."""
-    if not os.path.exists(CUSTOM_NCS_SOCICAM_FILE):
+    data = _read_json_with_fallback(CUSTOM_NCS_SOCICAM_FILE, "custom_ncs_socicam")
+    if data is None:
         salvar_custom_ncs_socicam(DEFAULT_CUSTOM_NCS_SOCICAM)
         return DEFAULT_CUSTOM_NCS_SOCICAM.copy()
-    try:
-        with open(CUSTOM_NCS_SOCICAM_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                return data
-            return DEFAULT_CUSTOM_NCS_SOCICAM.copy()
-    except Exception:
-        return DEFAULT_CUSTOM_NCS_SOCICAM.copy()
+    return data
+
 
 def salvar_custom_ncs_socicam(lista):
     """Salva a lista de não conformidades customizadas da SOCICAM no banco de dados local (JSON)."""
-    try:
-        os.makedirs(DB_DIR, exist_ok=True)
-        with open(CUSTOM_NCS_SOCICAM_FILE, "w", encoding="utf-8") as f:
-            json.dump(lista, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception:
-        return False
+    return _write_json_with_fallback(CUSTOM_NCS_SOCICAM_FILE, "custom_ncs_socicam", lista)

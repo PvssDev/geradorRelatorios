@@ -87,7 +87,7 @@ def obter_proximo_sequencial_cra(registros: List[Dict[str, Any]], id_vinculo: st
 
     max_num = 0
     for r in recs_tipo:
-        cod = str(r.get("Codificação", "") or r.get("Trecho", "")).strip()
+        cod = str(r.get("Codificação", "") or r.get("Identificação", "") or r.get("Trecho", "")).strip()
         m = re.search(r"/(\d{4})\.(\d+)$", cod)
         if m:
             try:
@@ -123,22 +123,23 @@ def formatar_codificacoes_contraidas_cra(cods: List[str]) -> str:
     if len(unique_cods) == 1:
         return unique_cods[0]
 
-    pattern = re.compile(r"^(.*?)/(\d{4})\.(\d+)$")
+    pattern = re.compile(r"^(.*?)([/.]?)(\d{4})\.(\d+)$")
     parsed = []
     for c in unique_cods:
         m = pattern.match(c)
         if m:
-            parsed.append((m.group(1), m.group(2), m.group(3)))
+            parsed.append((m.group(1), m.group(2) or "/", m.group(3), m.group(4)))
         else:
             parsed.append(None)
 
     if all(p is not None for p in parsed):
         primeira_base = parsed[0][0]
-        primeiro_ano = parsed[0][1]
-        mesma_base_ano = all(p[0] == primeira_base and p[1] == primeiro_ano for p in parsed)
+        sep = parsed[0][1]
+        primeiro_ano = parsed[0][2]
+        mesma_base_ano = all(p[0] == primeira_base and p[2] == primeiro_ano for p in parsed)
         if mesma_base_ano:
-            sufixos = [p[2] for p in parsed]
-            primeiro_completo = f"{primeira_base}/{primeiro_ano}.{sufixos[0]}"
+            sufixos = [p[3] for p in parsed]
+            primeiro_completo = f"{primeira_base}{sep}{primeiro_ano}.{sufixos[0]}"
             if len(sufixos) == 2:
                 return f"{primeiro_completo} e {sufixos[1]}."
             else:
@@ -317,7 +318,6 @@ def validar_vistoria_cra(fisc: Union[FiscalizacaoRecord, Dict[str, Any]]) -> Tup
     if not local or local.lower() in ("nan", "none", "=local="):
         erros.append("Local/Subtrecho da fiscalização é obrigatório.")
     return len(erros) == 0, erros
-
 
 
 def separar_achados_df_cra(
@@ -556,11 +556,11 @@ def consolidar_dados_legenda_grupo_cra(
     faixa_combinada = ""
 
     for rec in related_records:
-        cod_raw = str(rec.get("Codificação") or rec.get("Trecho") or "").strip()
+        cod_raw = str(rec.get("Codificação") or rec.get("Identificação") or rec.get("Trecho") or "").strip()
         if cod_raw and cod_raw.lower() not in ("nan", "none") and cod_raw not in cods:
             cods.append(cod_raw)
 
-        for col_achado in ("Não Conformidade", "Ponto de Atenção"):
+        for col_achado in ("Não Conformidade", "Não conformidade", "Ponto de Atenção", "Ponto de atencao", "ponto_atencao", "nao_conformidade"):
             val_achado = str(rec.get(col_achado) or "").strip()
             if val_achado and val_achado.lower() not in ("nan", "none"):
                 for token in val_achado.split(","):
@@ -626,3 +626,137 @@ def sincronizar_legendas_grupo_cra(
         rec["Legenda da Foto"] = legenda_sync
 
 
+def normalizar_registros_cra_para_relatorio(
+    registros: List[Dict[str, Any]],
+    fisc_list: Optional[List[Dict[str, Any]]] = None,
+    mapa_siglas: Optional[Dict[str, str]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Normaliza os registros de Fiscalização CRA antes da geração da planilha/relatório:
+    1. Desmembra registros que possuam múltiplas siglas separadas por vírgula em 1 registro por sigla,
+       preservando o mesmo 'grupo_relacao' e o mesmo 'Nº' da foto.
+    2. Garante que toda codificação possua o sufixo '/{ano}.{seq:03d}' via gerar_codigo_cra (.001, .002, .003).
+    3. Sincroniza as legendas e a faixa combinada ('Esquerda e Direita' / 'FED') de cada grupo_relacao.
+    """
+    if not registros:
+        return []
+
+    data_por_fisc: Dict[str, str] = {}
+    if fisc_list:
+        for f in fisc_list:
+            fid = str(f.get("ID da Fiscalização", "")).strip()
+            fdata = str(f.get("Data", "")).strip()
+            if fid and fdata:
+                data_por_fisc[fid] = fdata
+
+    # 1. Expandir múltiplas siglas na mesma linha (se houver)
+    expanded: List[Dict[str, Any]] = []
+    for rec in registros:
+        nc_raw = str(rec.get("Não Conformidade") or rec.get("Não conformidade") or "").strip()
+        pa_raw = str(rec.get("Ponto de Atenção") or "").strip()
+        is_pa = bool(pa_raw and not nc_raw)
+        siglas_str = pa_raw if is_pa else nc_raw
+        siglas = [s.strip() for s in siglas_str.split(",") if s.strip()]
+
+        if len(siglas) <= 1:
+            r_copy = dict(rec)
+            if is_pa:
+                r_copy["Ponto de Atenção"] = siglas[0] if siglas else ""
+                r_copy["Não Conformidade"] = ""
+            else:
+                r_copy["Não Conformidade"] = siglas[0] if siglas else ""
+                r_copy["Ponto de Atenção"] = ""
+            expanded.append(r_copy)
+        else:
+            cod_in = str(rec.get("Codificação") or rec.get("Identificação") or "").strip()
+            base_in = cod_in.split("/")[0].strip() if "/" in cod_in else cod_in
+            for s in siglas:
+                r_copy = dict(rec)
+                if is_pa:
+                    r_copy["Ponto de Atenção"] = s
+                    r_copy["Não Conformidade"] = ""
+                else:
+                    r_copy["Não Conformidade"] = s
+                    r_copy["Ponto de Atenção"] = ""
+                r_copy["Codificação"] = base_in
+                r_copy["Identificação"] = base_in
+                expanded.append(r_copy)
+
+    # 2. Garantir numeração de foto consistente por foto distinta dentro de cada fiscalização
+    fotos_vistas_por_fisc: Dict[str, Dict[str, int]] = {}
+    for r in expanded:
+        fid = str(r.get("ID da Fiscalização", "")).strip()
+        if fid not in fotos_vistas_por_fisc:
+            fotos_vistas_por_fisc[fid] = {}
+        foto_nome = str(r.get("Foto") or r.get("Fotos") or "").strip().lower()
+        if foto_nome:
+            if foto_nome not in fotos_vistas_por_fisc[fid]:
+                fotos_vistas_por_fisc[fid][foto_nome] = len(fotos_vistas_por_fisc[fid]) + 1
+            r["Nº"] = fotos_vistas_por_fisc[fid][foto_nome]
+
+    # 3. Garantir codificação sequencial (/YYYY.001, /YYYY.002, /YYYY.003) por tipo e fiscalização
+    normalizados: List[Dict[str, Any]] = []
+    grupos_vistos: List[str] = []
+
+    for r in expanded:
+        fid = str(r.get("ID da Fiscalização", "")).strip()
+        data_fisc = data_por_fisc.get(fid, "")
+        is_pa = bool(str(r.get("Ponto de Atenção", "")).strip() and not str(r.get("Não Conformidade", "")).strip())
+        tipo_reg = "Ponto de Atenção" if is_pa else "Não Conformidade"
+        sigla_atual = str(r.get(tipo_reg, "")).strip()
+
+        cod_raw = str(r.get("Codificação") or r.get("Identificação") or r.get("Trecho") or "").strip()
+        grp_id = str(r.get("grupo_relacao") or "").strip()
+        if not grp_id:
+            grp_id = f"grp_{fid}_{r.get('Nº', 1)}"
+            r["grupo_relacao"] = grp_id
+        if grp_id not in grupos_vistos:
+            grupos_vistos.append(grp_id)
+
+        # Se cod_raw estiver vazio, herda a base de outro registro do mesmo grupo ou assume padrão CRA
+        if not cod_raw and grp_id:
+            for prev in normalizados:
+                if prev.get("grupo_relacao") == grp_id and prev.get("Codificação"):
+                    cod_raw = str(prev.get("Codificação")).strip()
+                    break
+            if not cod_raw:
+                for other in expanded:
+                    if other.get("grupo_relacao") == grp_id and (other.get("Codificação") or other.get("Trecho")):
+                        cod_raw = str(other.get("Codificação") or other.get("Trecho")).strip()
+                        break
+        if not cod_raw:
+            cod_raw = "CRA.ST601.2794-2834"
+
+        tem_sufixo = bool(re.search(r"/(\d{4})\.(\d+)$", cod_raw))
+        precisa_gerar = not tem_sufixo
+
+        # Se tem sufixo, mas já existe no mesmo grupo um registro com a mesma codificação e sigla diferente,
+        # significa que a 2ª foto/sigla precisa do próximo sequencial (.002, .003...)
+        if tem_sufixo:
+            conflito_mesmo_cod_outra_sigla = any(
+                str(prev.get("ID da Fiscalização", "")).strip() == fid
+                and str(prev.get("Codificação", "")).strip() == cod_raw
+                and str(prev.get(tipo_reg, "")).strip() != sigla_atual
+                for prev in normalizados
+            )
+            if conflito_mesmo_cod_outra_sigla:
+                precisa_gerar = True
+
+        if precisa_gerar and cod_raw:
+            base_limpa = cod_raw.split("/")[0].strip() if "/" in cod_raw else cod_raw
+            seq_idx = obter_proximo_sequencial_cra(normalizados, id_vinculo=fid, tipo_registro=tipo_reg)
+            cod_final = gerar_codigo_cra(base_limpa, data_fisc=data_fisc, seq_idx=seq_idx)
+        else:
+            cod_final = cod_raw
+
+        r["Codificação"] = cod_final
+        r["Identificação"] = cod_final or sigla_atual
+        if cod_final:
+            r["Trecho"] = cod_final
+        normalizados.append(r)
+
+    # 4. Sincronizar legendas e faixa combinada ('Esquerda e Direita' / 'FED') em cada grupo
+    for grp_id in grupos_vistos:
+        sincronizar_legendas_grupo_cra(normalizados, grp_id, mapa_siglas=mapa_siglas)
+
+    return normalizados
