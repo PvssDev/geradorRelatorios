@@ -121,3 +121,4 @@ export const PastaGeradorBDModal: React.FC<PastaGeradorBDModalProps> = ({
     </div>
   );
 };
+

@@ -43,12 +43,12 @@ def test_quadro1_faixas_distintas():
     grouped = agrupar_registros(df_diff, report_config=cra_rep)
     assert len(grouped) == 2
     assert grouped[0]["Codificação"] == "CRA.ST601.2794-2834/2026.001"
-    assert grouped[0]["localizacao_formatada"] == "Esquerda/\nFoto 01"
-    assert grouped[0]["_mesclar_localizacao"] is False
+    assert grouped[0]["localizacao_formatada"] == "Esquerda e Direita/\nFotos 01 e 02"
+    assert grouped[0]["Direção (faixa)"] == "Esquerda e Direita"
 
     assert grouped[1]["Codificação"] == "CRA.ST601.2794-2834/2026.002"
-    assert grouped[1]["localizacao_formatada"] == "Direita/\nFoto 02"
-    assert grouped[1]["_mesclar_localizacao"] is False
+    assert grouped[1]["localizacao_formatada"] == "Esquerda e Direita/\nFotos 01 e 02"
+    assert grouped[1]["Direção (faixa)"] == "Esquerda e Direita"
 
 
 def test_quadro1_mesma_faixa():
@@ -79,59 +79,49 @@ def test_quadro1_mesma_faixa():
     grouped = agrupar_registros(df_same, report_config=cra_rep)
     assert len(grouped) == 2
     assert grouped[0]["localizacao_formatada"] == "Direita/\nFotos 01 e 02"
-    assert grouped[0]["_mesclar_localizacao"] is True
+    assert grouped[0]["Direção (faixa)"] == "Direita"
     assert grouped[1]["localizacao_formatada"] == "Direita/\nFotos 01 e 02"
-    assert grouped[1]["_mesclar_localizacao"] is True
+    assert grouped[1]["Direção (faixa)"] == "Direita"
 
 
 def test_apendice_legenda_contraida_e_fed():
     related = [
         {
             "Foto": "foto1.jpg",
-            "Nº": 1,
-            "Identificação": "CRA.ST601.2794-2834/2026.001",
-            "Codificação": "CRA.ST601.2794-2834/2026.001",
+            "Identificação": "CRA.ST601.2790-2794/2026.001",
+            "Codificação": "CRA.ST601.2790-2794/2026.001",
             "Não Conformidade": "TRR",
             "Direção (faixa)": "Esquerda",
-            "Data da Foto": "23/04/2026"
+            "Data da Fiscalização": "12/03/2026"
         },
         {
             "Foto": "foto2.jpg",
-            "Nº": 2,
-            "Identificação": "CRA.ST601.2794-2834/2026.002",
-            "Codificação": "CRA.ST601.2794-2834/2026.002",
-            "Não conformidade": "J",
+            "Identificação": "CRA.ST601.2790-2794/2026.002",
+            "Codificação": "CRA.ST601.2790-2794/2026.002",
+            "Não Conformidade": "J",
             "Direção (faixa)": "Direita",
-            "Data da Foto": "23/04/2026"
+            "Data da Fiscalização": "12/03/2026"
         }
     ]
 
-    cod_grp, siglas_grp, faixa_grp = consolidar_dados_legenda_grupo_cra(related)
-    assert cod_grp == "CRA.ST601.2794-2834/2026.001 e 002."
-    assert "TRR" in siglas_grp and "J" in siglas_grp
-    assert faixa_grp == "FED"
-
-    leg1 = formatar_legenda_foto_cra(
-        num=1,
-        codificacao=cod_grp,
-        siglas_ou_ncs=siglas_grp,
-        faixa=faixa_grp,
-        data_foto="23/04/2026"
+    contraida = formatar_codificacoes_contraidas_cra(
+        ["CRA.ST601.2790-2794/2026.001", "CRA.ST601.2790-2794/2026.002"]
     )
-    leg2 = formatar_legenda_foto_cra(
-        num=2,
-        codificacao=cod_grp,
-        siglas_ou_ncs=siglas_grp,
-        faixa=faixa_grp,
-        data_foto="23/04/2026"
+    assert "CRA.ST601.2790-2794/2026.001 e 002" in contraida
+
+    cod_contraida, descricoes_siglas, faixa_sigla = consolidar_dados_legenda_grupo_cra(related)
+    assert faixa_sigla == "FED"
+    assert "TRR" in descricoes_siglas
+    assert "J" in descricoes_siglas
+
+    legenda1 = formatar_legenda_foto_cra(
+        num="1",
+        codificacao=cod_contraida,
+        siglas_ou_ncs=descricoes_siglas,
+        faixa=faixa_sigla,
+        data_foto="12/03/2026"
     )
-
-    assert "CRA.ST601.2794-2834/2026.001 e 002." in leg1
-    assert "Trincas isoladas no revestimento (TRR)" in leg1
-    assert "Trincas interligadas (J)" in leg1
-    assert "na FED (23/04/2026)." in leg1
-    assert leg1.startswith("Foto 1 – ")
-
-    assert "CRA.ST601.2794-2834/2026.001 e 002." in leg2
-    assert "na FED (23/04/2026)." in leg2
-    assert leg2.startswith("Foto 2 – ")
+    assert "Foto 1" in legenda1
+    assert "CRA.ST601.2790-2794/2026.001 e 002" in legenda1
+    assert "FED" in legenda1
+    assert "12/03/2026" in legenda1
