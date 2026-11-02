@@ -114,6 +114,75 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  const currentPhoto = fotos[fotoIdx] || null;
+
+  // Legenda automática calculada para a foto ativa
+  const activeLegenda = useMemo(() => {
+    if (!currentPhoto) return "";
+    const numFoto = String(fotoIdx + 1).padStart(2, "0");
+    const dataFisc = ws.fiscalizacoes?.[0]?.Data || "";
+    const dataBr = dataFisc
+      ? (() => {
+          const parts = dataFisc.split("-");
+          return parts.length === 3
+            ? `${parts[2]}/${parts[1]}/${parts[0]}`
+            : dataFisc;
+        })()
+      : new Date().toLocaleDateString("pt-BR");
+
+    // Verifica se esta foto já possui ocorrência cadastrada
+    const existingNc = ws.registrosNc?.find(
+      (nc) =>
+        nc.Foto?.trim().toLowerCase() === currentPhoto.name.trim().toLowerCase()
+    );
+
+    if (existingNc) {
+      if (existingNc.Observações?.trim()) {
+        const obs = existingNc.Observações.trim();
+        if (
+          obs.toLowerCase().startsWith("foto ") ||
+          obs.toLowerCase().startsWith("foto\xa0")
+        ) {
+          return obs;
+        }
+        if (
+          tipoRelatorio === "CRA" &&
+          (existingNc.Trecho || ws.trechoPersistido)
+        ) {
+          const trechoVal = existingNc.Trecho || ws.trechoPersistido;
+          return `Foto ${numFoto} – Trecho ${trechoVal} apresentando ${obs}, em ${dataBr}.`;
+        }
+        return `Foto ${numFoto} – ${obs}, em ${dataBr}.`;
+      }
+      const desc =
+        existingNc["Não Conformidade"] ||
+        existingNc["Ponto de Atenção"] ||
+        existingNc.Identificação ||
+        "irregularidade constatada";
+      return `Foto ${numFoto} – ${desc}, em ${dataBr}.`;
+    }
+
+    // Caso não vinculada ainda: prévia padrão automática da concessão
+    if (tipoRelatorio === "CRA" && ws.trechoPersistido?.trim()) {
+      return `Foto ${numFoto} – Trecho ${ws.trechoPersistido.trim()} apresentando irregularidades em campo, em ${dataBr}.`;
+    }
+    if (tipoRelatorio === "CRC" && ws.trechoPersistido?.trim()) {
+      return `Foto ${numFoto} – Trecho ${ws.trechoPersistido.trim()}, em ${dataBr}.`;
+    }
+    if (tipoRelatorio === "SOCICAM") {
+      const local = ws.fiscalizacoes?.[0]?.Local || "Terminal Rodoviário";
+      return `Foto ${numFoto} – Constatação no ${local}, em ${dataBr}.`;
+    }
+    return `Foto ${numFoto} – Registro de vistoria em campo, em ${dataBr}.`;
+  }, [
+    currentPhoto,
+    fotoIdx,
+    ws.fiscalizacoes,
+    ws.registrosNc,
+    ws.trechoPersistido,
+    tipoRelatorio,
+  ]);
+
   // =========================================================================
   // MODO MONITORAMENTO: Comparador Anterior x Atual
   // =========================================================================
@@ -425,7 +494,6 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
   const prevIdx = totalFotos > 1 ? (fotoIdx - 1 + totalFotos) % totalFotos : null;
   const nextIdx = totalFotos > 1 ? (fotoIdx + 1) % totalFotos : null;
 
-  const currentPhoto = fotos[fotoIdx] || null;
   const prevPhoto = prevIdx !== null ? fotos[prevIdx] : null;
   const nextPhoto = nextIdx !== null ? fotos[nextIdx] : null;
 
@@ -715,6 +783,22 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
               />
             );
           })}
+        </div>
+      )}
+
+      {/* Prévia Automática da Legenda do Memorial Fotográfico (.docx) */}
+      {currentPhoto && activeLegenda && (
+        <div className="relative z-10 mt-4 mx-auto w-full max-w-xl rounded-2xl border border-white/10 bg-black/45 px-4 py-2.5 text-center shadow-lg backdrop-blur-md transition-all duration-300">
+          <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full animate-pulse"
+              style={{ backgroundColor: theme.primary }}
+            />
+            Prévia da Legenda no Relatório (.docx)
+          </div>
+          <p className="mt-1 font-sans text-xs italic text-slate-100 leading-relaxed">
+            {activeLegenda}
+          </p>
         </div>
       )}
 

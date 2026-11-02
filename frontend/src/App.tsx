@@ -16,9 +16,13 @@ import {
 } from "./components/Modals";
 import { fetchBootstrapConfig } from "./services/api";
 import { useReportStore } from "./store/useReportStore";
+import { getConcessionTheme } from "./utils/concessionTheme";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
-export const App: React.FC = () => {
-  const { hydrateBootstrapConfig } = useReportStore();
+const AppContent: React.FC = () => {
+  const { hydrateBootstrapConfig, tipoRelatorio, categoriaRelatorio } =
+    useReportStore();
+  const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
 
   // No desktop, alterna entre a barra estreita de ícones (false = 76px) e o card expandido (true = 288px)
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(false);
@@ -60,8 +64,67 @@ export const App: React.FC = () => {
   }, [hydrateBootstrapConfig]);
 
   return (
-    <div className="min-h-screen bg-[#eaf1f8]">
+    <div
+      className="relative min-h-screen transition-colors duration-700 ease-in-out"
+      style={{
+        backgroundColor: theme.lightBg,
+      }}
+    >
       <Toaster position="top-right" richColors closeButton />
+
+      {/* Camada UI/UX Atmosférica: Aurora Mesh Gradient com Orbes Orgânicos e Micro-Grid */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      >
+        {/* Orbe 1 (Topo-Centro / Primário Concessão) */}
+        <div
+          className="absolute -top-32 left-1/4 h-[550px] w-[550px] -translate-x-1/2 rounded-full blur-[110px] transition-all duration-1000 ease-out"
+          style={{
+            backgroundColor: theme.primary,
+            opacity: 0.18,
+          }}
+        />
+
+        {/* Orbe 2 (Topo-Direita / Secundário Harmônico) */}
+        <div
+          className="absolute -top-24 right-10 h-[600px] w-[600px] rounded-full blur-[130px] transition-all duration-1000 ease-out"
+          style={{
+            backgroundColor: theme.secondary,
+            opacity: 0.16,
+          }}
+        />
+
+        {/* Orbe 3 (Centro-Fundo / Glow de Profundidade) */}
+        <div
+          className="absolute top-1/3 left-1/3 h-[700px] w-[700px] -translate-x-1/2 rounded-full blur-[140px] transition-all duration-1000 ease-out"
+          style={{
+            backgroundColor: theme.accentGlow,
+            opacity: 0.11,
+          }}
+        />
+
+        {/* Gradiente Conectivo & Iluminação de Superfície */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{
+            background: `radial-gradient(ellipse 120% 80% at 50% 0%, transparent 40%, ${theme.lightBg} 95%), linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.45) 80%, rgba(255, 255, 255, 0.8) 100%)`,
+          }}
+        />
+
+        {/* Micro-Grid Arquitetural / Engenharia Reguladora (Toque Refinado Linear / Vercel) */}
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage: `radial-gradient(#071d36 1px, transparent 1px)`,
+            backgroundSize: "28px 28px",
+            maskImage:
+              "linear-gradient(to bottom, black 20%, rgba(0,0,0,0.4) 60%, transparent 100%)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, black 20%, rgba(0,0,0,0.4) 60%, transparent 100%)",
+          }}
+        />
+      </div>
 
       {/* Sidebar Desktop Infinita (Topo, Base e Esquerda colados na tela): Alterna entre 76px e 288px com Animação Fluida */}
       <div
@@ -106,9 +169,9 @@ export const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Área Principal com Transição Fluida no Padding */}
+      {/* Área Principal com Transição Fluida no Padding e Fundo Transparente para Atmosfera */}
       <main
-        className={`min-h-screen bg-[#eaf1f8] transition-[padding] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+        className={`relative z-10 min-h-screen bg-transparent transition-[padding] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
           sidebarExpanded ? "lg:pl-72" : "lg:pl-[76px]"
         }`}
       >
@@ -207,5 +270,11 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export const App: React.FC = () => (
+  <ErrorBoundary>
+    <AppContent />
+  </ErrorBoundary>
+);
 
 export default App;

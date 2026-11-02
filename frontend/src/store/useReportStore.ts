@@ -52,6 +52,123 @@ function getStateKey(tipo: TipoRelatorio, categoria: CategoriaRelatorio): StateK
   return `${tipo}_${categoria}`;
 }
 
+export function calcularCodificacaoCra(
+  baseInput: string,
+  dataFisc?: string,
+  seqIdx: number = 1
+): string {
+  if (!baseInput || !baseInput.trim()) return "";
+  const baseLimpa = baseInput.trim();
+  const matchAno = dataFisc?.match(/\b(20\d{2})\b/);
+  const anoPadrao = matchAno ? matchAno[1] : String(new Date().getFullYear());
+
+  if (baseLimpa.includes("/")) {
+    const [base, sufixo] = baseLimpa.split("/", 2);
+    const m = sufixo.trim().match(/^(\d{4})\.(\d+)$/);
+    if (m) {
+      const ano = m[1];
+      const offsetInicial = parseInt(m[2], 10);
+      const numFinal = offsetInicial + (seqIdx - 1);
+      return `${base.trim()}/${ano}.${String(numFinal).padStart(3, "0")}`;
+    }
+    const mAno = sufixo.trim().match(/^(\d{4})$/);
+    if (mAno) {
+      return `${base.trim()}/${mAno[1]}.${String(seqIdx).padStart(3, "0")}`;
+    }
+    return `${base.trim()}/${anoPadrao}.${String(seqIdx).padStart(3, "0")}`;
+  }
+
+  return `${baseLimpa}/${anoPadrao}.${String(seqIdx).padStart(3, "0")}`;
+}
+
+export function combinarFaixasRelacionadas(
+  faixa1?: string,
+  faixa2?: string
+): { sigla: string; extenso: string } {
+  const f1 = (faixa1 || "").trim().toUpperCase();
+  const f2 = (faixa2 || "").trim().toUpperCase();
+
+  const temEsq1 = f1.includes("ESQ") || f1 === "FE" || f1 === "E";
+  const temDir1 = f1.includes("DIR") || f1 === "FD" || f1 === "D";
+  const temEsq2 = f2.includes("ESQ") || f2 === "FE" || f2 === "E";
+  const temDir2 = f2.includes("DIR") || f2 === "FD" || f2 === "D";
+
+  const temEsq = temEsq1 || temEsq2;
+  const temDir = temDir1 || temDir2;
+
+  if (temEsq && temDir) {
+    return { sigla: "FED", extenso: "Esquerda e Direita" };
+  }
+  if (temEsq) {
+    return { sigla: "FE", extenso: "Esquerda" };
+  }
+  if (temDir) {
+    return { sigla: "FD", extenso: "Direita" };
+  }
+  return { sigla: f1 || f2, extenso: faixa1 || faixa2 || "" };
+}
+
+export function obterProximoSequencialCra(
+  registros: RegistroNcItem[],
+  idVinculo: string,
+  tipoRegistro: "Não Conformidade" | "Ponto de Atenção"
+): number {
+  const campoFiltro =
+    tipoRegistro === "Não Conformidade" ? "Não Conformidade" : "Ponto de Atenção";
+  const recsTipo = registros.filter(
+    (nc) =>
+      nc["ID da Fiscalização"] === idVinculo &&
+      Boolean(nc[campoFiltro]?.trim())
+  );
+
+  let maxNum = 0;
+  for (const r of recsTipo) {
+    const cod = (r.Codificação || r.Identificação || r.Trecho || "").trim();
+    const m = cod.match(/\/(\d{4})\.(\d+)$/);
+    if (m) {
+      const num = parseInt(m[2], 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  }
+
+  return maxNum > 0 ? maxNum + 1 : recsTipo.length + 1;
+}
+
+export function derivarProximaCodificacao(codBase: string): string {
+  if (!codBase || !codBase.trim()) return "";
+  const trimmed = codBase.trim();
+
+  // Caso 1: Padrão CRA / CRC com barra e ano: ex. CRA.ST601.2794-2834/2026.001 -> .../2026.002
+  const matchAnoSeq = trimmed.match(/^(.*?[\/.])(\d{4})\.(\d+)$/);
+  if (matchAnoSeq) {
+    const prefix = matchAnoSeq[1];
+    const ano = matchAnoSeq[2];
+    const seqStr = matchAnoSeq[3];
+    const nextSeq = Number(seqStr) + 1;
+    return `${prefix}${ano}.${String(nextSeq).padStart(seqStr.length, "0")}`;
+  }
+
+  // Caso 2: Padrão SOCICAM ou geral com ponto e sequência final: ex. SOCICAM.2026.001 ou NC.001
+  const matchPontoSeq = trimmed.match(/^(.*[\/.])(\d+)$/);
+  if (matchPontoSeq) {
+    const prefix = matchPontoSeq[1];
+    const seqStr = matchPontoSeq[2];
+    const nextSeq = Number(seqStr) + 1;
+    return `${prefix}${String(nextSeq).padStart(seqStr.length, "0")}`;
+  }
+
+  // Caso 3: Padrão textual com espaço ou traço no final: ex. "NC 01" -> "NC 02"
+  const matchEspacoSeq = trimmed.match(/^(.*\D)(\d+)$/);
+  if (matchEspacoSeq) {
+    const prefix = matchEspacoSeq[1];
+    const seqStr = matchEspacoSeq[2];
+    const nextSeq = Number(seqStr) + 1;
+    return `${prefix}${String(nextSeq).padStart(seqStr.length, "0")}`;
+  }
+
+  return trimmed;
+}
+
 function sortPhotosList(photos: UploadedPhotoItem[], sortOption: SortOption): UploadedPhotoItem[] {
   const copy = [...photos];
   if (sortOption === "Nome (A-Z / 0-9)") {
@@ -897,7 +1014,26 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     const grpId =
       existingGrp || `grp_${targetIdFiscalizacao}_${baseNc["Nº"]}_${Date.now()}`;
 
-    const updatedBase: RegistroNcItem = { ...baseNc, grupo_relacao: grpId };
+    const baseCod = (baseNc.Codificação || baseNc.Identificação || "").trim();
+
+    const isCraFisc = state.tipoRelatorio === "CRA" && state.categoriaRelatorio === "Fiscalização";
+    const activeFisc = ws.fiscalizacoes.find(
+      (f) => f["ID da Fiscalização"] === targetIdFiscalizacao
+    );
+    const dataFisc = activeFisc?.Data || "";
+
+    const faixaComb = isCraFisc
+      ? combinarFaixasRelacionadas(baseNc["Direção (faixa)"], direcaoFaixa)
+      : null;
+
+    const updatedBase: RegistroNcItem = {
+      ...baseNc,
+      Identificação: baseNc.Identificação || baseCod,
+      Codificação: baseNc.Codificação || baseCod,
+      grupo_relacao: grpId,
+      is_relacionado: true,
+      "Direção (faixa)": faixaComb ? faixaComb.extenso : baseNc["Direção (faixa)"],
+    };
 
     const isPa = tipoRegistro === "Ponto de Atenção";
     const siglasStr = siglas && siglas.length > 0 ? siglas.join(", ") : undefined;
@@ -921,23 +1057,66 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       }
     }
 
-    const codFinal = codificacao?.trim()
-      ? codificacao.trim()
-      : (updatedBase.Codificação || updatedBase.Identificação);
+    let codFinal = "";
+    if (isCraFisc) {
+      const baseRaw = codificacao?.trim() || baseCod;
+      const baseLimpa = baseRaw.split("/")[0].trim() || baseRaw;
+      const baseSiglas = (baseNc["Não Conformidade"] || baseNc["Ponto de Atenção"] || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const novasSiglas = (siglasStr || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const siglasIguais =
+        baseSiglas.length > 0 &&
+        baseSiglas.slice().sort().join(",") === novasSiglas.slice().sort().join(",");
 
-    // Insere logo após a ocorrência base e renumera sequencialmente por ID da Fiscalização
+      if (!codificacao?.trim() && siglasIguais && baseCod) {
+        codFinal = baseCod;
+      } else {
+        const seqIdx = obterProximoSequencialCra(
+          ws.registrosNc,
+          targetIdFiscalizacao,
+          isPa ? "Ponto de Atenção" : "Não Conformidade"
+        );
+        codFinal = calcularCodificacaoCra(baseLimpa, dataFisc, seqIdx);
+      }
+    } else {
+      codFinal = codificacao?.trim()
+        ? codificacao.trim()
+        : derivarProximaCodificacao(baseCod);
+    }
+
+    const obs2Auto =
+      siglas && siglas.length > 0
+        ? siglas.map((s) => (state.mapSiglas[s] || s).toLowerCase()).join(", ")
+        : "";
+
+    // Determina número da foto para exibição e correlação
+    const foto2Idx = ws.photos.findIndex((p) => p.name === fotoName);
+    const foto2Num = foto2Idx >= 0 ? foto2Idx + 1 : (baseNc["Nº"] || 1) + 1;
+
+    // Insere logo após a ocorrência base
     const newRelatedRaw: RegistroNcItem = {
       ...updatedBase,
+      Nº: foto2Num,
       Foto: fotoName,
       "Não Conformidade": ncField,
       "Ponto de Atenção": paField,
       Identificação: codFinal,
       Codificação: codFinal,
-      "Direção (faixa)": direcaoFaixa !== undefined ? direcaoFaixa : updatedBase["Direção (faixa)"],
+      "Direção (faixa)": faixaComb ? faixaComb.extenso : (direcaoFaixa !== undefined ? direcaoFaixa : updatedBase["Direção (faixa)"]),
       Trecho: trecho !== undefined ? trecho : updatedBase.Trecho,
-      Observações: observacoes !== undefined ? observacoes : updatedBase.Observações,
+      Observações:
+        observacoes !== undefined && observacoes.trim()
+          ? observacoes.trim()
+          : (obs2Auto || updatedBase.Observações),
       "Legenda da Foto":
-        legendaDaFoto !== undefined ? legendaDaFoto : updatedBase["Legenda da Foto"],
+        legendaDaFoto !== undefined && legendaDaFoto.trim()
+          ? legendaDaFoto.trim()
+          : (obs2Auto || updatedBase["Legenda da Foto"]),
       Situação: situacao || updatedBase.Situação,
       is_relacionado: true,
       grupo_relacao: grpId,
@@ -947,8 +1126,27 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     nextList[targetIndex] = updatedBase;
     nextList.splice(targetIndex + 1, 0, newRelatedRaw);
 
+    // Se no mesmo grupo houver outros itens, atualiza também a faixa para a faixa combinada
+    if (faixaComb) {
+      for (let i = 0; i < nextList.length; i++) {
+        if (nextList[i].grupo_relacao === grpId) {
+          nextList[i] = {
+            ...nextList[i],
+            "Direção (faixa)": faixaComb.extenso,
+            is_relacionado: true,
+          };
+        }
+      }
+    }
+
     const counters: Record<string, number> = {};
     const renumbered = nextList.map((nc) => {
+      if (isCraFisc) {
+        const pIdx = ws.photos.findIndex((p) => p.name === nc.Foto);
+        if (pIdx >= 0) {
+          return { ...nc, "Nº": pIdx + 1 };
+        }
+      }
       const idF = nc["ID da Fiscalização"];
       counters[idF] = (counters[idF] || 0) + 1;
       return { ...nc, "Nº": counters[idF] };

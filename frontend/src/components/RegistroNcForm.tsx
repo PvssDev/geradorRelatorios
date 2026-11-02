@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type ReactNode } from "react";
+import React, { useEffect, useState, useMemo, type ReactNode } from "react";
 import {
   ImagePlus,
   AlertTriangle,
@@ -11,8 +11,13 @@ import {
 import { toast } from "sonner";
 import { Card } from "./Card";
 import { PhotoCarouselPanel } from "./PhotoCarouselPanel";
-import { useReportStore } from "../store/useReportStore";
-import { SituacaoNC } from "../types/report.types";
+import {
+  useReportStore,
+  calcularCodificacaoCra,
+  obterProximoSequencialCra,
+} from "../store/useReportStore";
+import { SituacaoNC, RegistroNcItem } from "../types/report.types";
+import { getConcessionTheme } from "../utils/concessionTheme";
 
 interface RegistroNcFormProps {
   onOpenCustomNcModal: (onSelectSigla: (siglaOrDesc: string) => void) => void;
@@ -40,10 +45,10 @@ const btn = {
 };
 
 const pill = (on: boolean) =>
-  `rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all duration-150 ${
+  `rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all duration-150 ${
     on
-      ? "border-amber-500 bg-amber-500 text-stone-950 shadow-sm"
-      : "border-border bg-card text-foreground hover:border-amber-500/60"
+      ? "text-white shadow-xs"
+      : "border-border/80 bg-card text-foreground hover:border-slate-400 hover:bg-secondary/40 shadow-2xs"
   }`;
 
 function Field({
@@ -93,6 +98,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
   const ws = getActiveWorkspace();
   const isMonitoring = categoriaRelatorio === "Monitoramento";
   const optionsNc = getNcOptionsForCurrent();
+  const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
 
   // Tipo NC vs PA (Ponto de Atenção é exclusivo de CRA Fiscalização)
   const [tipo, setTipo] = useState<"NC" | "PA">("NC");
@@ -101,7 +107,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
   );
   const [codificacao, setCodificacao] = useState("");
   const [siglas, setSiglas] = useState<string[]>([]);
-  const [observacoes, setObservacoes] = useState("");
   const [fund, setFund] = useState("");
   const [det, setDet] = useState("");
 
@@ -120,7 +125,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     }
     setSiglas([]);
     setCodificacao("");
-    setObservacoes("");
   }, [tipoRelatorio, categoriaRelatorio, isMonitoring]);
 
   const currentOldItem =
@@ -184,11 +188,24 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     activeFisc?.Data || new Date().toLocaleDateString("pt-BR");
   const ano = dataBr.split("/")[2] || String(new Date().getFullYear());
 
-  // Sequencial baseado apenas nas ocorrências principais (não relacionadas)
-  const baseOccurrencesCount = ws.registrosNc.filter(
-    (r) => !r.is_relacionado
-  ).length;
-  const seqStr = String(baseOccurrencesCount + 1).padStart(3, "0");
+  // Sequencial baseado no maior sufixo numérico da fiscalização atual
+  const maxSeqInFiscalizacao = useMemo(() => {
+    let max = 0;
+    const currentId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+    for (const r of ws.registrosNc) {
+      if (!currentId || r["ID da Fiscalização"] === currentId) {
+        const cod = (r.Codificação || r.Identificação || "").trim();
+        const m = cod.match(/[\/.](\d{4})\.(\d+)$/) || cod.match(/[\/.](\d+)$/);
+        if (m) {
+          const num = parseInt(m[2] || m[1], 10);
+          if (!isNaN(num) && num > max) max = num;
+        }
+      }
+    }
+    return max > 0 ? max + 1 : ws.registrosNc.length + 1;
+  }, [ws.registrosNc, activeFisc]);
+
+  const seqStr = String(maxSeqInFiscalizacao).padStart(3, "0");
 
   const sugerirCodificacao = () => {
     if (tipoRelatorio === "CRA") {
@@ -199,34 +216,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       setCodificacao(`SOCICAM.${ano}.${seqStr}`);
     }
   };
-
-  const preencherObsPelasSiglas = () => {
-    if (!siglas.length) {
-      toast.info("Selecione ao menos uma sigla primeiro.");
-      return;
-    }
-    const texto = siglas
-      .map((s) => (mapSiglas[s] || s).toLowerCase())
-      .join(", ");
-    setObservacoes(texto);
-  };
-
-  // Prévia exata da legenda gerada por src/sections/finalizacao/finalizacao.py
-  const numFotoPreview = String(
-    (activePhoto ? fotoIdx : fotos.length) + 1
-  ).padStart(2, "0");
-
-  const legendaPreviewFisc = (() => {
-    const obsText =
-      observacoes.trim() ||
-      (siglas.length
-        ? siglas.map((s) => (mapSiglas[s] || s).toLowerCase()).join(", ")
-        : "descrição da ocorrência");
-    if (tipoRelatorio === "CRA" && ws.trechoPersistido.trim()) {
-      return `Foto ${numFotoPreview} – Trecho ${ws.trechoPersistido.trim()} apresentando ${obsText}, em ${dataBr}.`;
-    }
-    return `Foto ${numFotoPreview} – ${obsText}, em ${dataBr}.`;
-  })();
 
   const legendaPreviewMon = `Foto 02 – ${
     legendaFotoMon.trim() ||
@@ -353,25 +342,83 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     }
 
     // Validação Fiscalização
-    if (siglas.length === 0 && !codificacao.trim() && !observacoes.trim()) {
+    if (siglas.length === 0 && !codificacao.trim()) {
       toast.error(
-        "Selecione ao menos uma sigla/irregularidade ou preencha a codificação/observações."
+        "Selecione ao menos uma sigla/irregularidade ou preencha a codificação."
       );
       return;
     }
 
     const { id: idVinculo, local: localVinculo } = ensureFiscalizacaoHeader();
-    const descStr =
-      siglas.join(", ") || codificacao.trim() || observacoes.trim();
     const isPa = tipoRelatorio === "CRA" && tipo === "PA";
 
-    const obsFinal =
-      observacoes.trim() ||
-      (siglas.length
-        ? siglas.map((s) => (mapSiglas[s] || s).toLowerCase()).join(", ")
-        : descStr);
+    if (tipoRelatorio === "CRA") {
+      const tipoRegistroStr = isPa ? "Ponto de Atenção" : "Não Conformidade";
+      const fotoNum = fotoIdx + 1;
+      const grpId = `grp_${idVinculo}_${fotoNum}_${Date.now()}`;
+      const baseRaw = codificacao.trim() || "CRA.ST601.2794-2834";
+      const baseLimpa = baseRaw.split("/")[0].trim() || baseRaw;
 
-    const identFinal = codificacao.trim() || descStr;
+      const siglasParaCadastrar = siglas.length > 0 ? siglas : [baseRaw];
+      const tempNcClone = [...ws.registrosNc];
+
+      siglasParaCadastrar.forEach((s, idx) => {
+        const seqIdx = obterProximoSequencialCra(tempNcClone, idVinculo, tipoRegistroStr);
+        const codFormatado = calcularCodificacaoCra(baseLimpa, dataBr, seqIdx);
+        const descSigla = s;
+        const obsSigla = (mapSiglas[s] || s).toLowerCase();
+        const isUltima = idx === siglasParaCadastrar.length - 1;
+
+        const novoRec: RegistroNcItem = {
+          "ID da Fiscalização": idVinculo,
+          "Nº": fotoNum,
+          Terminal: localVinculo,
+          Pista: ws.pistaPersistida.trim(),
+          Trecho: codFormatado,
+          "Não Conformidade": isPa ? "" : descSigla,
+          "Ponto de Atenção": isPa ? descSigla : "",
+          Foto: targetPhotoName,
+          "Foto Anterior": "",
+          "Legenda Anterior": "",
+          Observações: obsSigla,
+          Identificação: codFormatado,
+          Codificação: codFormatado,
+          "Direção (faixa)": direcaoFaixa,
+          "Fundamento da infração": fund.trim(),
+          Determinação: det.trim(),
+          Situação: "Pendente",
+          "Análise ARPE": "",
+          grupo_relacao: grpId,
+          is_relacionado: false,
+        };
+
+        tempNcClone.push(novoRec);
+        addOrUpdateRegistroNc(novoRec, isUltima);
+      });
+
+      toast.success(
+        `${isPa ? "Ponto de Atenção" : "Não Conformidade"} (${siglasParaCadastrar.length > 1 ? `${siglasParaCadastrar.length} itens` : baseLimpa}) adicionado(a)!`
+      );
+      setSiglas([]);
+      setCodificacao("");
+      setFund("");
+      setDet("");
+      return;
+    }
+
+    let codPadrao = "";
+    if (tipoRelatorio === "CRC") {
+      codPadrao = `CRC.SH015.0646+0648/${ano}.${seqStr}`;
+    } else {
+      codPadrao = `SOCICAM.${ano}.${seqStr}`;
+    }
+
+    const identFinal = codificacao.trim() || codPadrao;
+    const descStr = siglas.join(", ") || identFinal;
+
+    const obsFinal = siglas.length
+      ? siglas.map((s) => (mapSiglas[s] || s).toLowerCase()).join(", ")
+      : descStr;
     const nextNum = ws.registrosNc.length + 1;
 
     addOrUpdateRegistroNc({
@@ -387,7 +434,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       "Legenda Anterior": "",
       Observações: obsFinal,
       Identificação: identFinal,
-      "Direção (faixa)": tipoRelatorio === "CRA" ? direcaoFaixa : "",
+      Codificação: identFinal,
+      "Direção (faixa)": "",
       "Fundamento da infração": fund.trim(),
       Determinação: det.trim(),
       Situação: "Pendente",
@@ -397,11 +445,10 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     });
 
     toast.success(
-      `${isPa ? "Ponto de Atenção" : "Não Conformidade"} (${identFinal}) adicionado(a)!`
+      `Não Conformidade (${identFinal}) adicionada!`
     );
     setSiglas([]);
     setCodificacao("");
-    setObservacoes("");
     setFund("");
     setDet("");
   };
@@ -667,16 +714,24 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
                   + Personalizar siglas
                 </button>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {optionsNc.map((s) => {
                   const d = mapSiglas[s] || s;
-                  const shortDesc = d.length > 42 ? `${d.slice(0, 42)}…` : d;
+                  const isSelected = siglas.includes(s);
                   return (
                     <button
                       type="button"
                       key={s}
                       title={d}
-                      className={pill(siglas.includes(s))}
+                      className={pill(isSelected)}
+                      style={
+                        isSelected
+                          ? {
+                              backgroundColor: theme.primary,
+                              borderColor: theme.primary,
+                            }
+                          : undefined
+                      }
                       onClick={() =>
                         setSiglas((x) =>
                           x.includes(s)
@@ -685,12 +740,33 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
                         )
                       }
                     >
-                      <b>{s}</b>
-                      {d !== s ? ` · ${shortDesc}` : ""}
+                      {s}
                     </button>
                   );
                 })}
               </div>
+
+              {siglas.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">
+                    Selecionada(s):
+                  </span>
+                  {siglas.map((s) => (
+                    <span
+                      key={s}
+                      className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-secondary/60 px-2 py-0.5 font-mono text-[11px] text-foreground"
+                      title={mapSiglas[s] || s}
+                    >
+                      <b style={{ color: theme.primary }}>{s}</b>
+                      {mapSiglas[s] && mapSiglas[s] !== s && (
+                        <span className="font-sans text-muted-foreground">
+                          · {mapSiglas[s]}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {tipoRelatorio === "SOCICAM" && (
@@ -715,47 +791,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
               </Field>
             )}
 
-            {/* Observações (usadas diretamente na legenda da foto do .docx!) + Prévia da Legenda */}
-            <div className="grid gap-6 sm:grid-cols-2">
-              <Field
-                label={
-                  tipoRelatorio === "SOCICAM"
-                    ? "Observações (Local no Terminal / Legenda da Foto)"
-                    : "Observações (Descrição na Legenda da Foto)"
-                }
-                action={
-                  siglas.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={preencherObsPelasSiglas}
-                      className="text-[11px] font-medium text-muted-foreground hover:text-accent transition"
-                    >
-                      + Usar descrição das siglas
-                    </button>
-                  ) : undefined
-                }
-              >
-                <textarea
-                  rows={2}
-                  className={inputCls}
-                  placeholder={
-                    tipoRelatorio === "SOCICAM"
-                      ? "Ex: banheiro masculino do saguão em condições inadequadas"
-                      : tipoRelatorio === "CRA"
-                      ? "Ex: fissuras e panela na faixa de rolamento"
-                      : "Ex: degrau acentuado entre a pista e o acostamento"
-                  }
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                />
-              </Field>
-
-              <Field label="Prévia da Legenda no Relatório (.docx)">
-                <p className="min-h-[62px] rounded-lg border border-input bg-muted px-3 py-2 text-xs italic leading-relaxed text-muted-foreground">
-                  {legendaPreviewFisc}
-                </p>
-              </Field>
-            </div>
 
             <div className="grid gap-6 sm:grid-cols-2">
               <Field label="Fundamento da Infração">

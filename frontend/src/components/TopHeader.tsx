@@ -115,7 +115,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
       : `ARPE · ${categoriaRelatorio} Rodoviária`;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#d8e5f2] bg-white shadow-xs">
+    <header className="sticky top-0 z-30 border-b border-[#d8e5f2]/80 bg-white/80 backdrop-blur-md shadow-xs transition-colors duration-500">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-4 px-6 py-4">
         <div className="flex items-center gap-4">
           <button
@@ -132,7 +132,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
           </span>
 
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#2563eb]">
+            <div
+              className="text-[11px] font-bold uppercase tracking-[0.22em] transition-colors duration-300"
+              style={{ color: theme.primary }}
+            >
               {kicker}
             </div>
             <h1 className="text-3xl font-extrabold leading-none tracking-tight text-[#071d36] sm:text-4xl">

@@ -16,7 +16,7 @@ import {
   FileText,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useReportStore } from "../store/useReportStore";
+import { useReportStore, derivarProximaCodificacao } from "../store/useReportStore";
 import {
   saveContratosApi,
   saveCoordenadoresApi,
@@ -743,6 +743,13 @@ export const RelacionarFotoModal: React.FC<{
     return a !== b;
   }, [siglas2, baseSiglasList]);
 
+  const proximaSugerida = useMemo(() => {
+    if (!targetNc) return "";
+    return derivarProximaCodificacao(
+      targetNc.Codificação || targetNc.Identificação || ""
+    );
+  }, [targetNc]);
+
   const foto1Obj = ws.photos.find((p) => p.name === targetNc?.Foto) || null;
   const foto2Obj = ws.photos.find((p) => p.name === foto2Name) || null;
   const jaTemDuas = targetNc ? countInGroup(targetNc.grupo_relacao) >= 2 : false;
@@ -1011,6 +1018,19 @@ export const RelacionarFotoModal: React.FC<{
                           </button>
                         ))}
                       </div>
+                      {targetNc?.["Direção (faixa)"] &&
+                        targetNc["Direção (faixa)"].toLowerCase().includes("esq") !==
+                          direcaoFaixa2.toLowerCase().includes("esq") && (
+                          <div className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-500/10 p-2 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                            <span>
+                              <b>Faixa Combinada:</b> Como uma foto é da{" "}
+                              {targetNc["Direção (faixa)"]} e a outra da{" "}
+                              {direcaoFaixa2}, a legenda de ambas terá a sigla{" "}
+                              <b>FED</b> e no Quadro constará{" "}
+                              <b>Esquerda e Direita</b>.
+                            </span>
+                          </div>
+                        )}
                     </div>
                   )}
 
@@ -1023,7 +1043,11 @@ export const RelacionarFotoModal: React.FC<{
                       type="text"
                       value={codificacao2}
                       onChange={(e) => setCodificacao2(e.target.value)}
-                      placeholder={`Em branco = herdar anterior (${targetNc?.Identificação || "—"})`}
+                      placeholder={
+                        proximaSugerida
+                          ? `Em branco = auto-incrementar (${proximaSugerida})`
+                          : `Em branco = herdar anterior (${targetNc?.Identificação || "—"})`
+                      }
                       className={`${modalInputCls} font-mono text-xs`}
                     />
                   </div>
@@ -1092,7 +1116,7 @@ export const RelacionarFotoModal: React.FC<{
                     <>
                       <AlertTriangle className="h-4 w-4 shrink-0" />
                       <div>
-                        <span className="font-bold">Siglas Diferentes Detectadas:</span> No Quadro será gerada uma codificação para cada sigla (N para 1) e as fotos ficarão relacionadas com colunas de registro fotográfico mescladas no Word.
+                        <span className="font-bold">Siglas Diferentes Detectadas:</span> No Quadro será gerada uma codificação para cada sigla (Linha 1: {targetNc?.Identificação || "—"} | Linha 2: {codificacao2.trim() || proximaSugerida}) e as fotos ficarão relacionadas com colunas de registro fotográfico mescladas no Word.
                       </div>
                     </>
                   )}
