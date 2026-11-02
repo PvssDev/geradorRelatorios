@@ -278,6 +278,8 @@ interface ReportStore {
       photos: UploadedPhotoItem[];
       pistaPersistida?: string;
       trechoPersistido?: string;
+      documentoAnteriorFile?: File | null;
+      planilhaElegibilidadeFile?: File | null;
     }
   ) => void;
 }
@@ -1488,6 +1490,8 @@ export const useReportStore = create<ReportStore>((set, get) => ({
             carouselIndex: 0,
             pistaPersistida: dados.pistaPersistida || "",
             trechoPersistido: dados.trechoPersistido || "",
+            documentoAnteriorFile: dados.documentoAnteriorFile ?? ws.documentoAnteriorFile,
+            planilhaElegibilidadeFile: dados.planilhaElegibilidadeFile ?? ws.planilhaElegibilidadeFile,
             relatoriosGerados: [],
           },
         },

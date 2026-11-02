@@ -119,8 +119,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ws
       );
       setPastaLocalStatus(true, dirHandle.name);
+      const extras = [`${res.totalFotos} fotos`, `${res.totalNcs} ocorrências`];
+      if (res.totalArquivos > 0) extras.push(`${res.totalArquivos} anexo(s)`);
       toast.success(
-        `Estado salvo com sucesso em ${dirHandle.name}! (${res.totalFotos} fotos, ${res.totalNcs} ocorrências)`
+        `Estado salvo com sucesso em ${dirHandle.name}! (${extras.join(", ")})`
       );
     } catch (err: any) {
       if (err.name === "AbortError") return;
@@ -154,8 +156,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       importarEstadoModalidade(tipoRelatorio, categoriaRelatorio, dados);
       setPastaLocalStatus(true, dirHandle.name);
+      const extras = [];
+      if (dados.photos.length > 0) extras.push(`${dados.photos.length} fotos`);
+      if (dados.documentoAnteriorFile) extras.push(`documento anterior`);
+      if (dados.planilhaElegibilidadeFile) extras.push(`planilha`);
+      const det = extras.length > 0 ? ` (${extras.join(", ")})` : "";
       toast.success(
-        `Dados de ${tipoRelatorio} - ${categoriaRelatorio} carregados! (${dados.photos.length} fotos)`
+        `Dados de ${tipoRelatorio} - ${categoriaRelatorio} carregados!${det}`
       );
       if (onNavigate) onNavigate();
     } catch (err: any) {

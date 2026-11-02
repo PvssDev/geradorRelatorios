@@ -103,7 +103,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
   } = useReportStore();
 
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
-  const isFiscalizacao = categoriaRelatorio === "Fiscalização";
   const activePillColor = theme.primary;
 
   const tipos: TipoRelatorio[] = ["CRA", "CRC", "SOCICAM"];
@@ -159,9 +158,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
             onChange={setCategoriaRelatorio}
             activeColor={activePillColor}
           />
-          <span className="flex items-center gap-1.5 rounded-full bg-[#e8f8f0] px-3.5 py-1.5 text-xs font-bold text-[#059669] border border-[#bbf0d8]">
-            <span className="h-2 w-2 rounded-full bg-[#10b981]" /> Conectado
-          </span>
         </div>
       </div>
     </header>

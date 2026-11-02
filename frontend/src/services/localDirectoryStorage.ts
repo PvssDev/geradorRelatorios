@@ -2,9 +2,19 @@
 /**
  * Serviço de Persistência Local por Pasta (geradorBD).
  * 
- * Permite salvar e carregar atomicamente o estado da modalidade ativa
- * e fotos diretamente no disco do usuário em uma pasta chamada "geradorBD",
- * com memorização do handle no IndexedDB para reconexão automática.
+ * Organiza a persistência das 6 modalidades na pasta local "geradorBD"
+ * de forma modular e estruturada:
+ * 
+ * geradorBD/
+ * └── <modalidade>/               (ex: cra_fiscalizacao, cra_monitoramento, etc.)
+ *     ├── estado/
+ *     │   └── estado.json
+ *     └── midia/
+ *         ├── fotos/
+ *         │   └── foto_01.jpg
+ *         └── arquivos/
+ *             ├── documento_anterior.docx (ou .pdf)
+ *             └── planilha_elegibilidade.xlsx
  */
 
 import {
@@ -123,7 +133,6 @@ export async function verificarStatusConexaoPasta(): Promise<{
   }
 
   try {
-    // Consulta a permissão sem abrir prompt invasivo
     const perm = await (handle as any).queryPermission({ mode: "readwrite" });
     if (perm === "granted") {
       return { conectado: true, handle, nomePasta: handle.name };
@@ -136,19 +145,7 @@ export async function verificarStatusConexaoPasta(): Promise<{
 }
 
 /**
- * Retorna o nome do arquivo JSON correspondente à combinação.
- */
-export function obterNomeArquivoJson(
-  tipo: TipoRelatorio,
-  categoria: CategoriaRelatorio
-): string {
-  const t = tipo.toLowerCase();
-  const c = categoria.toLowerCase().replace(/ç/g, "c").replace(/ã/g, "a");
-  return `${t}_${c}.json`;
-}
-
-/**
- * Retorna o nome da pasta de mídia correspondente à combinação.
+ * Retorna o identificador normalizado da pasta para cada uma das 6 modalidades.
  */
 export function obterPastaModalidade(
   tipo: TipoRelatorio,
@@ -161,7 +158,6 @@ export function obterPastaModalidade(
 
 /**
  * Solicita ou reaproveita a pasta "geradorBD".
- * Se forcePicker for false e houver handle salvo com permissão, reaproveita.
  */
 export async function solicitarPastaGeradorBD(
   forcePicker: boolean = false
@@ -172,7 +168,6 @@ export async function solicitarPastaGeradorBD(
     );
   }
 
-  // Tenta reaproveitar o handle salvo no IndexedDB se não for forçado
   if (!forcePicker) {
     const handleSalvo = await obterHandleSalvoIndexedDB();
     if (handleSalvo) {
@@ -190,7 +185,6 @@ export async function solicitarPastaGeradorBD(
     }
   }
 
-  // Abre o explorador de arquivos nativo do SO
   const pickedHandle = await (window as any).showDirectoryPicker({
     mode: "readwrite",
     startIn: "documents",
@@ -198,11 +192,9 @@ export async function solicitarPastaGeradorBD(
 
   let targetHandle: FileSystemDirectoryHandle;
 
-  // Caso 1: O usuário selecionou a própria pasta geradorBD
   if (pickedHandle.name.toLowerCase() === "geradorbd") {
     targetHandle = pickedHandle;
   } else {
-    // Caso 2: O usuário selecionou uma pasta pai que contém geradorBD
     try {
       targetHandle = await pickedHandle.getDirectoryHandle("geradorBD", {
         create: false,
@@ -214,26 +206,107 @@ export async function solicitarPastaGeradorBD(
     }
   }
 
-  // Persiste no IndexedDB para conexões automáticas futuras
   await salvarHandleIndexedDB(targetHandle);
   return targetHandle;
 }
 
 /**
- * Salva o estado atual e todas as fotos da modalidade na pasta geradorBD.
+ * Salva o estado atual, fotos e arquivos anexos na estrutura padronizada da modalidade:
+ * geradorBD/<modalidade>/estado/estado.json
+ * geradorBD/<modalidade>/midia/fotos/
+ * geradorBD/<modalidade>/midia/arquivos/
  */
 export async function salvarEstadoEmGeradorBD(
   dirHandle: FileSystemDirectoryHandle,
   tipo: TipoRelatorio,
   categoria: CategoriaRelatorio,
   workspace: ModalityWorkspaceState
-): Promise<{ totalFotos: number; totalNcs: number }> {
-  const nomeJson = obterNomeArquivoJson(tipo, categoria);
-  const pastaModalidade = obterPastaModalidade(tipo, categoria);
+): Promise<{ totalFotos: number; totalNcs: number; totalArquivos: number }> {
+  const pastaModalidadeNome = obterPastaModalidade(tipo, categoria);
 
+  // 1. Cria ou acessa a pasta da modalidade (ex: cra_fiscalizacao)
+  const modHandle = await dirHandle.getDirectoryHandle(pastaModalidadeNome, {
+    create: true,
+  });
+
+  // 2. Cria subpastas: estado/ e midia/ (fotos/ e arquivos/)
+  const estadoHandle = await modHandle.getDirectoryHandle("estado", { create: true });
+  const midiaHandle = await modHandle.getDirectoryHandle("midia", { create: true });
+  const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", { create: true });
+  const arquivosHandle = await midiaHandle.getDirectoryHandle("arquivos", { create: true });
+
+  let totalArquivosSalvos = 0;
+  const metaArquivos: Array<{ slot: string; nome: string; size: number; type: string }> = [];
+
+  // Salva Documento Anterior (se houver)
+  if (workspace.documentoAnteriorFile) {
+    try {
+      const docFile = workspace.documentoAnteriorFile;
+      const fileHandle = await arquivosHandle.getFileHandle(docFile.name, { create: true });
+      const writable = await (fileHandle as any).createWritable();
+      await writable.write(docFile);
+      await writable.close();
+      totalArquivosSalvos++;
+      metaArquivos.push({
+        slot: "documentoAnterior",
+        nome: docFile.name,
+        size: docFile.size,
+        type: docFile.type,
+      });
+    } catch (errDoc) {
+      console.warn("Erro ao salvar documento anterior:", errDoc);
+    }
+  }
+
+  // Salva Planilha de Elegibilidade (se houver)
+  if (workspace.planilhaElegibilidadeFile) {
+    try {
+      const planFile = workspace.planilhaElegibilidadeFile;
+      const fileHandle = await arquivosHandle.getFileHandle(planFile.name, { create: true });
+      const writable = await (fileHandle as any).createWritable();
+      await writable.write(planFile);
+      await writable.close();
+      totalArquivosSalvos++;
+      metaArquivos.push({
+        slot: "planilhaElegibilidade",
+        nome: planFile.name,
+        size: planFile.size,
+        type: planFile.type,
+      });
+    } catch (errPlan) {
+      console.warn("Erro ao salvar planilha de elegibilidade:", errPlan);
+    }
+  }
+
+  // Salva fotos em midia/fotos/
+  for (const photo of workspace.photos) {
+    try {
+      let blob: Blob | null = null;
+      if (photo.file) {
+        blob = photo.file;
+      } else if (photo.previewUrl && photo.previewUrl.startsWith("data:")) {
+        const res = await fetch(photo.previewUrl);
+        blob = await res.blob();
+      }
+
+      if (blob) {
+        const photoFileHandle = await fotosHandle.getFileHandle(photo.name, {
+          create: true,
+        });
+        const photoWritable = await (photoFileHandle as any).createWritable();
+        await photoWritable.write(blob);
+        await photoWritable.close();
+      }
+    } catch (errFoto) {
+      console.warn(`Aviso ao gravar foto local ${photo.name}:`, errFoto);
+    }
+  }
+
+  // 3. Monta o payload completo e salva em estado/estado.json
   const payload = {
     tipo_relatorio: tipo,
     categoria_relatorio: categoria,
+    modalidade: pastaModalidadeNome,
     salvo_em: new Date().toISOString(),
     temp_fiscalizacoes: workspace.fiscalizacoes,
     temp_nc: workspace.registrosNc,
@@ -241,6 +314,7 @@ export async function salvarEstadoEmGeradorBD(
     trecho_persistido: workspace.trechoPersistido,
     sort_option: workspace.sortOption,
     carousel_index: workspace.carouselIndex,
+    meta_arquivos: metaArquivos,
     meta_fotos: workspace.photos.map((p) => ({
       id: p.id,
       name: p.name,
@@ -250,57 +324,25 @@ export async function salvarEstadoEmGeradorBD(
     })),
   };
 
-  const fileHandle = await dirHandle.getFileHandle(nomeJson, { create: true });
-  const writableStream = await (fileHandle as any).createWritable();
+  const estadoFileHandle = await estadoHandle.getFileHandle("estado.json", { create: true });
+  const writableStream = await (estadoFileHandle as any).createWritable();
   await writableStream.write(JSON.stringify(payload, null, 2));
   await writableStream.close();
 
-  if (workspace.photos.length > 0) {
-    const modHandle = await dirHandle.getDirectoryHandle(pastaModalidade, {
-      create: true,
-    });
-    const midiaHandle = await modHandle.getDirectoryHandle("midia", {
-      create: true,
-    });
-    const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", {
-      create: true,
-    });
-
-    for (const photo of workspace.photos) {
-      try {
-        let blob: Blob | null = null;
-        if (photo.file) {
-          blob = photo.file;
-        } else if (photo.previewUrl && photo.previewUrl.startsWith("data:")) {
-          const res = await fetch(photo.previewUrl);
-          blob = await res.blob();
-        }
-
-        if (blob) {
-          const photoFileHandle = await fotosHandle.getFileHandle(photo.name, {
-            create: true,
-          });
-          const photoWritable = await (photoFileHandle as any).createWritable();
-          await photoWritable.write(blob);
-          await photoWritable.close();
-        }
-      } catch (err) {
-        console.warn(`Aviso ao gravar foto local ${photo.name}:`, err);
-      }
-    }
-  }
-
-  // Atualiza memorização do handle no IndexedDB
   await salvarHandleIndexedDB(dirHandle);
 
   return {
     totalFotos: workspace.photos.length,
     totalNcs: workspace.registrosNc.length,
+    totalArquivos: totalArquivosSalvos,
   };
 }
 
 /**
- * Carrega o estado e restaura as fotos da pasta geradorBD para a modalidade ativa.
+ * Carrega o estado, fotos e arquivos da modalidade a partir da estrutura padronizada:
+ * geradorBD/<modalidade>/estado/estado.json
+ * geradorBD/<modalidade>/midia/fotos/
+ * geradorBD/<modalidade>/midia/arquivos/
  */
 export async function carregarEstadoDeGeradorBD(
   dirHandle: FileSystemDirectoryHandle,
@@ -312,22 +354,41 @@ export async function carregarEstadoDeGeradorBD(
   photos: UploadedPhotoItem[];
   pistaPersistida: string;
   trechoPersistido: string;
+  documentoAnteriorFile: File | null;
+  planilhaElegibilidadeFile: File | null;
 }> {
-  const nomeJson = obterNomeArquivoJson(tipo, categoria);
-  const pastaModalidade = obterPastaModalidade(tipo, categoria);
+  const pastaModalidadeNome = obterPastaModalidade(tipo, categoria);
 
-  let fileHandle: FileSystemFileHandle;
+  let modHandle: FileSystemDirectoryHandle;
   try {
-    fileHandle = await dirHandle.getFileHandle(nomeJson, { create: false });
+    modHandle = await dirHandle.getDirectoryHandle(pastaModalidadeNome, { create: false });
   } catch {
     throw new Error(
-      `Nenhum registro encontrado para "${tipo} - ${categoria}". O arquivo "${nomeJson}" não existe na pasta geradorBD.`
+      `Nenhum dado salvo encontrado para "${tipo} - ${categoria}". A pasta "${pastaModalidadeNome}" não existe em geradorBD.`
     );
   }
 
-  const file = await fileHandle.getFile();
-  const text = await file.text();
-  const payload = JSON.parse(text);
+  // 1. Tenta carregar estado/estado.json (ou fallback para formato legado da raiz)
+  let payload: any = null;
+  try {
+    const estadoHandle = await modHandle.getDirectoryHandle("estado", { create: false });
+    const fileHandle = await estadoHandle.getFileHandle("estado.json", { create: false });
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    payload = JSON.parse(text);
+  } catch {
+    // Tenta formato de migração caso exista na raiz do modHandle
+    try {
+      const legacyJsonName = `${pastaModalidadeNome}.json`;
+      const legacyHandle = await dirHandle.getFileHandle(legacyJsonName, { create: false });
+      const legacyFile = await legacyHandle.getFile();
+      payload = JSON.parse(await legacyFile.text());
+    } catch {
+      throw new Error(
+        `O arquivo "estado/estado.json" não foi localizado dentro de "${pastaModalidadeNome}".`
+      );
+    }
+  }
 
   const fiscalizacoes: FiscalizacaoItem[] =
     payload.temp_fiscalizacoes || payload.fiscalizacoes || [];
@@ -336,17 +397,11 @@ export async function carregarEstadoDeGeradorBD(
   const pistaPersistida: string = payload.pista_persistida || "";
   const trechoPersistido: string = payload.trecho_persistido || "";
 
+  // 2. Restaura Fotos de midia/fotos/
   const fotosRestauradas: UploadedPhotoItem[] = [];
   try {
-    const modHandle = await dirHandle.getDirectoryHandle(pastaModalidade, {
-      create: false,
-    });
-    const midiaHandle = await modHandle.getDirectoryHandle("midia", {
-      create: false,
-    });
-    const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", {
-      create: false,
-    });
+    const midiaHandle = await modHandle.getDirectoryHandle("midia", { create: false });
+    const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", { create: false });
 
     const metaMap = new Map<string, any>();
     if (Array.isArray(payload.meta_fotos)) {
@@ -379,7 +434,37 @@ export async function carregarEstadoDeGeradorBD(
       }
     }
   } catch {
-    // Pasta de fotos ainda não existia ou vazia
+    // Midia/fotos ainda não existe ou vazia
+  }
+
+  // 3. Restaura Arquivos Anexos de midia/arquivos/
+  let documentoAnteriorFile: File | null = null;
+  let planilhaElegibilidadeFile: File | null = null;
+
+  try {
+    const midiaHandle = await modHandle.getDirectoryHandle("midia", { create: false });
+    const arquivosHandle = await midiaHandle.getDirectoryHandle("arquivos", { create: false });
+
+    const metaArquivos: Array<{ slot: string; nome: string }> = payload.meta_arquivos || [];
+
+    for await (const [name, entry] of (arquivosHandle as any).entries()) {
+      if (entry.kind === "file") {
+        try {
+          const arqFile = await (entry as FileSystemFileHandle).getFile();
+          const meta = metaArquivos.find((m) => m.nome === name);
+
+          if (meta?.slot === "documentoAnterior" || name.endsWith(".docx") || name.endsWith(".pdf")) {
+            if (!documentoAnteriorFile) documentoAnteriorFile = arqFile;
+          } else if (meta?.slot === "planilhaElegibilidade" || name.endsWith(".xlsx") || name.endsWith(".xls")) {
+            if (!planilhaElegibilidadeFile) planilhaElegibilidadeFile = arqFile;
+          }
+        } catch (errArq) {
+          console.warn(`Erro ao ler anexo ${name}:`, errArq);
+        }
+      }
+    }
+  } catch {
+    // Midia/arquivos ainda não existe ou vazia
   }
 
   await salvarHandleIndexedDB(dirHandle);
@@ -390,5 +475,7 @@ export async function carregarEstadoDeGeradorBD(
     photos: fotosRestauradas,
     pistaPersistida,
     trechoPersistido,
+    documentoAnteriorFile,
+    planilhaElegibilidadeFile,
   };
 }
