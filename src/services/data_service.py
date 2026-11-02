@@ -43,7 +43,6 @@ def desnormalizar_fiscalizacoes(temp_fiscalizacoes: list, temp_nc: list) -> list
                 "Ponto de Atenção": "",
                 "Pista": "",
                 "Trecho": "",
-                "Codificação": "",
                 "Identificação": "",
                 "Direção (faixa)": "",
                 "Fundamento da infração": "",
@@ -59,13 +58,16 @@ def desnormalizar_fiscalizacoes(temp_fiscalizacoes: list, temp_nc: list) -> list
                     "Não conformidade": nc.get("Não Conformidade", nc.get("Não conformidade", "")),
                     "Ponto de Atenção": nc.get("Ponto de Atenção", ""),
                     "Pista": nc.get("Pista", ""),
-                    "Trecho": nc.get("Trecho", nc.get("Codificação", "")),
-                    "Codificação": nc.get("Codificação", nc.get("Trecho", "")),
-                    "Identificação": nc.get("Identificação", ""),
+                    "Trecho": nc.get("Trecho", ""),
+                    "Identificação": nc.get("Identificação", nc.get("Codificação", "")),
+                    "Codificação": nc.get("Codificação", nc.get("Identificação", "")),
                     "Direção (faixa)": nc.get("Direção (faixa)", ""),
                     "Fundamento da infração": nc.get("Fundamento da infração", ""),
                     "Determinação": nc.get("Determinação", ""),
-                    "Situação": nc.get("Situação", "Pendente")
+                    "Situação": nc.get("Situação", "Pendente"),
+                    "grupo_relacao": nc.get("grupo_relacao", ""),
+                    "is_relacionado": nc.get("is_relacionado", False),
+                    "Nº": nc.get("Nº", "")
                 })
 
     return flat_fiscalizacoes
@@ -93,18 +95,10 @@ def gerar_planilha_excel_buffer(temp_fiscalizacoes: list, temp_nc: list) -> io.B
     return excel_buffer
 
 
-def salvar_fotos_em_diretorio(
-    fotos: list, 
-    destino_dir: str, 
-    otimizar: bool = False, 
-    target_size_kb: int = 500
-) -> None:
+def salvar_fotos_em_diretorio(fotos: list, destino_dir: str) -> None:
     """
     Salva uma lista de arquivos de imagem (Streamlit UploadedFile ou similares)
     no diretório de destino especificado de forma segura.
-
-    Se otimizar=True, comprime e redimensiona a foto para aproximadamente target_size_kb (padrão 500 KB)
-    mantendo alta resolução e qualidade visual nítida para o documento Word, preservando metadados EXIF.
     """
     if not fotos or not destino_dir:
         return
@@ -121,26 +115,12 @@ def salvar_fotos_em_diretorio(
                 except Exception:
                     pass
 
-            if otimizar:
-                from services.image_service import comprimir_imagem
-                conteudo_bytes = comprimir_imagem(photo, target_size_kb=target_size_kb)
-                with open(foto_path, "wb") as f:
-                    f.write(conteudo_bytes)
-            else:
-                with open(foto_path, "wb") as f:
-                    if hasattr(photo, "getbuffer"):
-                        f.write(photo.getbuffer())
-                    elif hasattr(photo, "read"):
-                        f.write(photo.read())
-                    elif isinstance(photo, (bytes, bytearray)):
-                        f.write(bytes(photo))
-        except Exception:
-            # Silencia e sanitiza conforme LGPD (Art. 46), sem vazar paths locais no console
-            pass
-        finally:
-            if hasattr(photo, "seek"):
-                try:
-                    photo.seek(0)
-                except Exception:
-                    pass
-
+            with open(foto_path, "wb") as f:
+                if hasattr(photo, "getbuffer"):
+                    f.write(photo.getbuffer())
+                elif hasattr(photo, "read"):
+                    f.write(photo.read())
+                elif isinstance(photo, bytes):
+                    f.write(photo)
+        except Exception as e:
+            print(f"Erro ao salvar foto {foto_nome} em {destino_dir}: {e}")

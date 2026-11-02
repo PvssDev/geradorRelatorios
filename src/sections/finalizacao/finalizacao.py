@@ -83,7 +83,7 @@ def _obter_caminho_foto_valido(foto_val, fotos_dir):
     return None
 
 def _obter_texto_localizacao_cra(rec: dict) -> str:
-    val = str(rec.get("Codificação") or rec.get("Trecho", "")).strip()
+    val = str(rec.get("Codificação") or rec.get("Identificação") or rec.get("Trecho", "")).strip()
     return val
 
 def _formatar_trecho_caption(rec: dict, tipo_relatorio: str, obs_text: str = "", cod_custom: str = None) -> str:
@@ -411,24 +411,18 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 if str(tipo_relatorio).upper() == "CRA":
                     cod_val = cod_grupo_cra or _obter_texto_localizacao_cra(rec)
                     faixa_val = faixa_grupo_cra or rec.get("Direção (faixa)", "")
-                    if siglas_grupo_cra:
-                        caption_text = formatar_legenda_foto(
-                            num=num,
-                            codificacao=cod_val,
-                            siglas_ou_ncs=siglas_grupo_cra,
-                            faixa=faixa_val,
-                            data_foto=data_foto
-                        )
-                    elif obs_text_clean.lower().startswith("foto ") or obs_text_clean.lower().startswith("foto\xa0"):
-                        caption_text = obs_text_clean
-                    else:
-                        caption_text = formatar_legenda_foto(
-                            num=num,
-                            codificacao=cod_val,
-                            siglas_ou_ncs=obs_text_clean,
-                            faixa=faixa_val,
-                            data_foto=data_foto
-                        )
+                    siglas_target = (
+                        siglas_grupo_cra
+                        or _limpar_valor_campo(rec.get("Não Conformidade") or rec.get("Não conformidade") or rec.get("Ponto de Atenção") or "")
+                        or obs_text_clean
+                    )
+                    caption_text = formatar_legenda_foto(
+                        num=num,
+                        codificacao=cod_val,
+                        siglas_ou_ncs=siglas_target,
+                        faixa=faixa_val,
+                        data_foto=data_foto
+                    )
                 elif obs_text_clean.lower().startswith("foto ") or obs_text_clean.lower().startswith("foto\xa0"):
                     caption_text = obs_text_clean
                 else:
@@ -511,24 +505,18 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     if str(tipo_relatorio).upper() == "CRA":
                         cod_l = cod_custom_rel or _obter_texto_localizacao_cra(rec_left)
                         faixa_l = faixa_custom_rel or rec_left.get("Direção (faixa)", "")
-                        if siglas_grupo_cra:
-                            desc_text_l = formatar_legenda_foto(
-                                num=num_l,
-                                codificacao=cod_l,
-                                siglas_ou_ncs=siglas_grupo_cra,
-                                faixa=faixa_l,
-                                data_foto=data_foto_l
-                            )
-                        elif obs_l.lower().startswith("foto ") or obs_l.lower().startswith("foto\xa0"):
-                            desc_text_l = obs_l
-                        else:
-                            desc_text_l = formatar_legenda_foto(
-                                num=num_l,
-                                codificacao=cod_l,
-                                siglas_ou_ncs=obs_l,
-                                faixa=faixa_l,
-                                data_foto=data_foto_l
-                            )
+                        siglas_target_l = (
+                            siglas_grupo_cra
+                            or _limpar_valor_campo(rec_left.get("Não Conformidade") or rec_left.get("Não conformidade") or rec_left.get("Ponto de Atenção") or "")
+                            or obs_l
+                        )
+                        desc_text_l = formatar_legenda_foto(
+                            num=num_l,
+                            codificacao=cod_l,
+                            siglas_ou_ncs=siglas_target_l,
+                            faixa=faixa_l,
+                            data_foto=data_foto_l
+                        )
                     elif obs_l.lower().startswith("foto ") or obs_l.lower().startswith("foto\xa0"):
                         desc_text_l = obs_l
                     else:
@@ -555,24 +543,18 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         if str(tipo_relatorio).upper() == "CRA":
                             cod_r = cod_custom_rel or _obter_texto_localizacao_cra(rec_right)
                             faixa_r = faixa_custom_rel or rec_right.get("Direção (faixa)", "")
-                            if siglas_grupo_cra:
-                                desc_text_r = formatar_legenda_foto(
-                                    num=num_r,
-                                    codificacao=cod_r,
-                                    siglas_ou_ncs=siglas_grupo_cra,
-                                    faixa=faixa_r,
-                                    data_foto=data_foto_r
-                                )
-                            elif obs_r.lower().startswith("foto ") or obs_r.lower().startswith("foto\xa0"):
-                                desc_text_r = obs_r
-                            else:
-                                desc_text_r = formatar_legenda_foto(
-                                    num=num_r,
-                                    codificacao=cod_r,
-                                    siglas_ou_ncs=obs_r,
-                                    faixa=faixa_r,
-                                    data_foto=data_foto_r
-                                )
+                            siglas_target_r = (
+                                siglas_grupo_cra
+                                or _limpar_valor_campo(rec_right.get("Não Conformidade") or rec_right.get("Não conformidade") or rec_right.get("Ponto de Atenção") or "")
+                                or obs_r
+                            )
+                            desc_text_r = formatar_legenda_foto(
+                                num=num_r,
+                                codificacao=cod_r,
+                                siglas_ou_ncs=siglas_target_r,
+                                faixa=faixa_r,
+                                data_foto=data_foto_r
+                            )
                         elif obs_r.lower().startswith("foto ") or obs_r.lower().startswith("foto\xa0"):
                             desc_text_r = obs_r
                         else:

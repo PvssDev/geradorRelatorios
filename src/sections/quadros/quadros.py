@@ -145,17 +145,24 @@ def agrupar_registros(df, report_config=None):
     records = df.to_dict('records')
     
     if is_cra:
-        # 1. Agrupar fotos por grupo_relacao
+        from core.rules.cra_rules import combinar_faixas_relacionadas_cra
+
+        # 1. Agrupar fotos e combinar faixas por grupo_relacao
         grupo_fotos = {}
+        grupo_faixa_sigla = {}
         for rec in records:
             grp = _limpar_valor_campo(rec.get("grupo_relacao", ""))
             if not grp:
                 grp = f"{_limpar_valor_campo(rec.get('Direção (faixa)', ''))}_{_limpar_valor_campo(rec.get('Fundamento da infração', ''))}_{_limpar_valor_campo(rec.get('Determinação', ''))}"
             num_foto = rec.get("Nº")
+            faixa_item = _limpar_valor_campo(rec.get("Direção (faixa)", ""))
             if grp not in grupo_fotos:
                 grupo_fotos[grp] = []
+                grupo_faixa_sigla[grp] = ""
             if num_foto not in grupo_fotos[grp]:
                 grupo_fotos[grp].append(num_foto)
+            if faixa_item:
+                grupo_faixa_sigla[grp] = combinar_faixas_relacionadas_cra(grupo_faixa_sigla[grp], faixa_item)
         
         # 2. Formatar string de fotos de cada grupo
         grupo_fotos_str = {}
@@ -176,29 +183,44 @@ def agrupar_registros(df, report_config=None):
                 s = f"Fotos {', '.join(nums_formatted[:-1])} e {nums_formatted[-1]}"
             grupo_fotos_str[grp] = s
 
+        faixa_extenso_map = {
+            "FE": "Esquerda",
+            "FD": "Direita",
+            "FED": "Esquerda e Direita",
+        }
+
         # 3. Preparar registros da tabela para o CRA: registros com mesma Codificação e mesma NC são desduplicados; codificações diferentes permanecem em linhas separadas
         grouped = []
-        chaves_cra = ["grupo_relacao", "Não Conformidade", "Ponto de Atenção", "Codificação"]
         for rec in records:
             found = False
+            rec_cod = _limpar_valor_campo(rec.get("Codificação", "")) or _limpar_valor_campo(rec.get("Identificação", ""))
+            rec_nc = _limpar_valor_campo(rec.get("Não Conformidade", "")) or _limpar_valor_campo(rec.get("Não conformidade", ""))
+            rec_pa = _limpar_valor_campo(rec.get("Ponto de Atenção", ""))
+            rec_grp = _limpar_valor_campo(rec.get("grupo_relacao", ""))
+
             for g_rec in grouped:
-                match = True
-                for k in chaves_cra:
-                    v1 = _limpar_valor_campo(rec.get(k, ""))
-                    v2 = _limpar_valor_campo(g_rec.get(k, ""))
-                    if v1 != v2:
-                        match = False
-                        break
-                if match:
+                g_cod = _limpar_valor_campo(g_rec.get("Codificação", "")) or _limpar_valor_campo(g_rec.get("Identificação", ""))
+                g_nc = _limpar_valor_campo(g_rec.get("Não Conformidade", "")) or _limpar_valor_campo(g_rec.get("Não conformidade", ""))
+                g_pa = _limpar_valor_campo(g_rec.get("Ponto de Atenção", ""))
+                g_grp = _limpar_valor_campo(g_rec.get("grupo_relacao", ""))
+
+                if (rec_grp == g_grp) and (rec_nc == g_nc) and (rec_pa == g_pa) and (rec_cod == g_cod):
                     found = True
                     break
             if not found:
                 new_g = rec.copy()
+                if rec_cod:
+                    if not new_g.get("Codificação"):
+                        new_g["Codificação"] = rec_cod
+                    if not new_g.get("Identificação"):
+                        new_g["Identificação"] = rec_cod
                 grp = _limpar_valor_campo(rec.get("grupo_relacao", ""))
                 if not grp:
                     grp = f"{_limpar_valor_campo(rec.get('Direção (faixa)', ''))}_{_limpar_valor_campo(rec.get('Fundamento da infração', ''))}_{_limpar_valor_campo(rec.get('Determinação', ''))}"
                 fotos_str = grupo_fotos_str.get(grp, "")
-                faixa = _limpar_valor_campo(rec.get("Direção (faixa)", ""))
+                sigla_f_grp = grupo_faixa_sigla.get(grp, "")
+                faixa = faixa_extenso_map.get(sigla_f_grp) or _limpar_valor_campo(rec.get("Direção (faixa)", ""))
+                new_g["Direção (faixa)"] = faixa
                 new_g["localizacao_formatada"] = f"{faixa}/\n{fotos_str}" if (faixa and fotos_str) else (faixa or fotos_str)
                 new_g["_resolved_grupo"] = grp
                 grouped.append(new_g)
@@ -221,8 +243,8 @@ def agrupar_registros(df, report_config=None):
     grouped = []
     
     chaves = [
-        "Não Conformidade", "Ponto de Atenção",
-        "Pista", "Codificação", "Trecho", "Observações",
+        "Não Conformidade", "Não conformidade", "Ponto de Atenção",
+        "Pista", "Codificação", "Identificação", "Trecho", "Observações",
         "Fundamento da infração", "Determinação"
     ]
     if is_cra:
@@ -401,11 +423,11 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         det = _limpar_valor_campo(rec.get("Determinação", ""))
         
         # A coluna CODIFICAÇÃO (CRA) ou IDENTIFICAÇÃO (demais)
-        if report_config.key == "CRA":
-            cod_val = _limpar_valor_campo(rec.get("Codificação", ""))
-            row.cells[0].text = str(cod_val if cod_val else (siglas_str if siglas_str else ident))
-        else:
-            row.cells[0].text = str(siglas_str if siglas_str else ident)
+        codigo_final = (
+            _limpar_valor_campo(rec.get("Codificação", ""))
+            or ident
+        )
+        row.cells[0].text = str(codigo_final if codigo_final else (siglas_str if siglas_str else f"{idx + 1:02d}"))
         row.cells[1].text = str(desc)
         row.cells[2].text = str(localizacao)
         row.cells[3].text = str(fund)

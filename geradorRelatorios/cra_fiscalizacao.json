@@ -1,0 +1,26 @@
+{
+  "tipo_relatorio": "CRA",
+  "categoria_relatorio": "Fiscalização",
+  "temp_fiscalizacoes": [
+    {
+      "ID da Fiscalização": "xxx",
+      "Data": "27/10/2026",
+      "Hora": "",
+      "Cidade": "",
+      "Local": "Rota do Atlântico",
+      "Pessoal Responsável": "Alcides Vieira de Azevedo Bezerra, Enildo Manoel da Silva Júnior, Cícero Ronaldo Mendes de Andrade Júnior, Maria Fernanda da Silva Novaes, Eulina Menezes Maciel, Manuel Lucas Nascimento do Espírito Santo",
+      "Coordenador": "Maria Ângela Albuquerque de Freitas",
+      "Contrato": "CT. nº 043/2011",
+      "Período": "",
+      "Relatório Gerado": false
+    }
+  ],
+  "temp_nc": [],
+  "manual_relacao_map": {},
+  "pista_persistida": "",
+  "trecho_persistido": "",
+  "codificacao_persistida": "",
+  "fundamento_persistido": "",
+  "determinacao_persistida": "",
+  "faixa_persistida": ""
+}

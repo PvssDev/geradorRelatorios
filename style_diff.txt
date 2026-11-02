@@ -1,0 +1,126 @@
+﻿commit b8550cbcc6e45e268006b2a24f08f928f76374a3
+Author: Pedro Vinicius Silva de Souza <pedrovindev@gmail.com>
+Date:   Thu Oct 1 10:45:36 2026 -0300
+
+    feat(reports): unificar suporte e divis├úo din├ómica de pontos de aten├º├úo
+
+diff --git a/src/style.css b/src/style.css
+index 9af5896..dbd5b2a 100644
+--- a/src/style.css
++++ b/src/style.css
+@@ -449,6 +449,115 @@ button[aria-haspopup="dialog"]:hover * {
+     background-color: transparent !important;
+ }
+ 
++/* ==========================================
++   ESTADO DESABILITADO NATIVO / BLOQUEADO
++   Garante visual cinza apagado e cursor de bloqueio
++   ========================================== */
++button:disabled,
++button[disabled],
++div.stButton>button:disabled,
++div.stButton>button[disabled],
++div.stDownloadButton>button:disabled,
++div.stDownloadButton>button[disabled] {
++    opacity: 0.45 !important;
++    cursor: not-allowed !important;
++    background-color: #c4ccd3 !important;
++    border: 1.5px solid #9aa8b5 !important;
++    color: #617385 !important;
++    box-shadow: none !important;
++    transform: none !important;
++    pointer-events: none !important;
++}
++
++button:disabled *,
++button[disabled] *,
++div.stButton>button:disabled *,
++div.stButton>button[disabled] *,
++div.stDownloadButton>button:disabled *,
++div.stDownloadButton>button[disabled] * {
++    color: #617385 !important;
++    fill: #617385 !important;
++    opacity: 0.75 !important;
++}
++
++button:disabled:hover,
++div.stButton>button:disabled:hover {
++    background-color: #c4ccd3 !important;
++    border-color: #9aa8b5 !important;
++    transform: none !important;
++    box-shadow: none !important;
++}
++
++/* ==========================================
++   BOT├âO RELACIONAR (FISCALIZA├ç├òES)
++   Transi├º├úo expl├¡cita entre Estado Dispon├¡vel e Indispon├¡vel
++   ========================================== */
++/* Estado DISPON├ìVEL (Mesma estiliza├º├úo dos bot├Áes cinzas do sistema, com amplo respiro) */
++div[class*="st-key-btn_relacionar"] button:not(:disabled) {
++    background-color: #D7D8D9 !important;
++    color: #011A33 !important;
++    border: 1.5px solid #2F5173 !important;
++    border-radius: 6px !important;
++    font-weight: 500 !important;
++    cursor: pointer !important;
++    opacity: 1 !important;
++    pointer-events: auto !important;
++    white-space: nowrap !important;
++    padding-left: 16px !important;
++    padding-right: 16px !important;
++    gap: 8px !important;
++    box-shadow: 0 1px 3px rgba(1, 26, 51, 0.08) !important;
++    transition: background-color 0.2s ease, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease !important;
++}
++
++div[class*="st-key-btn_relacionar"] button:not(:disabled) * {
++    color: #011A33 !important;
++    fill: #011A33 !important;
++    opacity: 1 !important;
++    background-color: transparent !important;
++}
++
++div[class*="st-key-btn_relacionar"] button:not(:disabled):hover {
++    background-color: #2F5173 !important;
++    border-color: #0D2740 !important;
++    color: #D7D8D9 !important;
++    transform: translateY(-1px) !important;
++    box-shadow: 0 4px 8px rgba(1, 26, 51, 0.15) !important;
++}
++
++div[class*="st-key-btn_relacionar"] button:not(:disabled):hover * {
++    color: #D7D8D9 !important;
++    fill: #D7D8D9 !important;
++}
++
++div[class*="st-key-btn_relacionar"] button:not(:disabled):active {
++    transform: scale(0.98) !important;
++}
++
++/* Estado INDISPON├ìVEL (Cinza apagado, inativo, desabilitado) */
++div[class*="st-key-btn_relacionar"] button:disabled,
++div[class*="st-key-btn_relacionar"] button[disabled] {
++    opacity: 0.38 !important;
++    cursor: not-allowed !important;
++    background-color: #cfd6dc !important;
++    border: 1.5px dashed #a0adb9 !important;
++    color: #758696 !important;
++    box-shadow: none !important;
++    transform: none !important;
++    pointer-events: none !important;
++    white-space: nowrap !important;
++    padding-left: 16px !important;
++    padding-right: 16px !important;
++    gap: 8px !important;
++}
++
++div[class*="st-key-btn_relacionar"] button:disabled *,
++div[class*="st-key-btn_relacionar"] button[disabled] * {
++    color: #758696 !important;
++    fill: #758696 !important;
++    opacity: 0.70 !important;
++}
++
+ /* ==========================================
+    BOT├òES QUADRADOS DE ├ìCONES / CONFIGURA├ç├âO / SWITCHES
+    (ÔÜÖ´©Å, ­ƒöä, ­ƒôï, ­ƒùæ´©Å, ­ƒöì, etc.)
