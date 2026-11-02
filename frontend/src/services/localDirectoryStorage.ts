@@ -3,9 +3,8 @@
  * Serviço de Persistência Local por Pasta (geradorBD).
  * 
  * Permite salvar e carregar atomicamente o estado da modalidade ativa
- * (CRA, CRC, SOCICAM x Fiscalização, Monitoramento) e suas respectivas fotos
- * diretamente no disco do usuário em uma pasta chamada "geradorBD",
- * mantendo conformidade estrita com LGPD (sem tráfego de dados para a nuvem).
+ * e fotos diretamente no disco do usuário em uma pasta chamada "geradorBD",
+ * com memorização do handle no IndexedDB para reconexão automática.
  */
 
 import {
@@ -22,6 +21,118 @@ export class PastaNaoEncontradaError extends Error {
     super(message);
     this.name = "PastaNaoEncontradaError";
   }
+}
+
+const IDB_NAME = "arpe_gerador_relatorios_db";
+const IDB_STORE = "diretorio_handles";
+const IDB_KEY = "geradorBD_dir_handle";
+
+/**
+ * Abre o banco IndexedDB nativo do navegador.
+ */
+function abrirBancoIndexedDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB não disponível no navegador"));
+      return;
+    }
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Salva o FileSystemDirectoryHandle no IndexedDB para uso em sessões futuras.
+ */
+export async function salvarHandleIndexedDB(
+  handle: FileSystemDirectoryHandle
+): Promise<void> {
+  try {
+    const db = await abrirBancoIndexedDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.put(handle, IDB_KEY);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn("Aviso: Falha ao persistir handle no IndexedDB:", err);
+  }
+}
+
+/**
+ * Recupera o FileSystemDirectoryHandle previamente salvo no IndexedDB.
+ */
+export async function obterHandleSalvoIndexedDB(): Promise<FileSystemDirectoryHandle | null> {
+  try {
+    const db = await abrirBancoIndexedDB();
+    return await new Promise<FileSystemDirectoryHandle | null>((resolve) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.get(IDB_KEY);
+      req.onsuccess = () => resolve((req.result as FileSystemDirectoryHandle) || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Limpa o handle salvo no IndexedDB (desconectar).
+ */
+export async function limparHandleSalvoIndexedDB(): Promise<void> {
+  try {
+    const db = await abrirBancoIndexedDB();
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.delete(IDB_KEY);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+    });
+  } catch {
+    // Ignora
+  }
+}
+
+/**
+ * Verifica o status de conexão da pasta geradorBD de forma automática.
+ * Executada no boot da página ou ao revalidar.
+ */
+export async function verificarStatusConexaoPasta(): Promise<{
+  conectado: boolean;
+  handle: FileSystemDirectoryHandle | null;
+  nomePasta?: string;
+}> {
+  if (typeof window === "undefined" || !("showDirectoryPicker" in window)) {
+    return { conectado: false, handle: null };
+  }
+
+  const handle = await obterHandleSalvoIndexedDB();
+  if (!handle) {
+    return { conectado: false, handle: null };
+  }
+
+  try {
+    // Consulta a permissão sem abrir prompt invasivo
+    const perm = await (handle as any).queryPermission({ mode: "readwrite" });
+    if (perm === "granted") {
+      return { conectado: true, handle, nomePasta: handle.name };
+    }
+  } catch (err) {
+    console.warn("Erro ao checar permissão da pasta:", err);
+  }
+
+  return { conectado: false, handle: null, nomePasta: handle.name };
 }
 
 /**
@@ -49,16 +160,34 @@ export function obterPastaModalidade(
 }
 
 /**
- * Solicita ao usuário a seleção da pasta "geradorBD" via File System Access API.
- * Se o usuário selecionar "geradorBD" diretamente, usa ela.
- * Se o usuário selecionar uma pasta pai que contenha "geradorBD", acessa a subpasta.
- * Caso contrário, lança PastaNaoEncontradaError para instruir o usuário.
+ * Solicita ou reaproveita a pasta "geradorBD".
+ * Se forcePicker for false e houver handle salvo com permissão, reaproveita.
  */
-export async function solicitarPastaGeradorBD(): Promise<FileSystemDirectoryHandle> {
+export async function solicitarPastaGeradorBD(
+  forcePicker: boolean = false
+): Promise<FileSystemDirectoryHandle> {
   if (!("showDirectoryPicker" in window)) {
     throw new Error(
       "Seu navegador não suporta a File System Access API nativa. Recomendamos Google Chrome ou Microsoft Edge no Windows."
     );
+  }
+
+  // Tenta reaproveitar o handle salvo no IndexedDB se não for forçado
+  if (!forcePicker) {
+    const handleSalvo = await obterHandleSalvoIndexedDB();
+    if (handleSalvo) {
+      try {
+        let perm = await (handleSalvo as any).queryPermission({ mode: "readwrite" });
+        if (perm !== "granted") {
+          perm = await (handleSalvo as any).requestPermission({ mode: "readwrite" });
+        }
+        if (perm === "granted") {
+          return handleSalvo;
+        }
+      } catch (err) {
+        console.warn("Handle existente inválido, abrindo seletor:", err);
+      }
+    }
   }
 
   // Abre o explorador de arquivos nativo do SO
@@ -67,23 +196,27 @@ export async function solicitarPastaGeradorBD(): Promise<FileSystemDirectoryHand
     startIn: "documents",
   });
 
+  let targetHandle: FileSystemDirectoryHandle;
+
   // Caso 1: O usuário selecionou a própria pasta geradorBD
   if (pickedHandle.name.toLowerCase() === "geradorbd") {
-    return pickedHandle;
+    targetHandle = pickedHandle;
+  } else {
+    // Caso 2: O usuário selecionou uma pasta pai que contém geradorBD
+    try {
+      targetHandle = await pickedHandle.getDirectoryHandle("geradorBD", {
+        create: false,
+      });
+    } catch {
+      throw new PastaNaoEncontradaError(
+        `A pasta selecionada foi "${pickedHandle.name}". Para salvar ou carregar, selecione uma pasta chamada exatamente "geradorBD".`
+      );
+    }
   }
 
-  // Caso 2: O usuário selecionou uma pasta pai (ex: Documentos) que contém geradorBD
-  try {
-    const subHandle = await pickedHandle.getDirectoryHandle("geradorBD", {
-      create: false,
-    });
-    return subHandle;
-  } catch {
-    // Caso 3: Não é geradorBD e não contém geradorBD
-    throw new PastaNaoEncontradaError(
-      `A pasta selecionada foi "${pickedHandle.name}". Para salvar ou carregar, selecione uma pasta chamada exatamente "geradorBD".`
-    );
-  }
+  // Persiste no IndexedDB para conexões automáticas futuras
+  await salvarHandleIndexedDB(targetHandle);
+  return targetHandle;
 }
 
 /**
@@ -98,7 +231,6 @@ export async function salvarEstadoEmGeradorBD(
   const nomeJson = obterNomeArquivoJson(tipo, categoria);
   const pastaModalidade = obterPastaModalidade(tipo, categoria);
 
-  // 1. Monta o payload estruturado (compatível com a lógica canônica)
   const payload = {
     tipo_relatorio: tipo,
     categoria_relatorio: categoria,
@@ -118,13 +250,11 @@ export async function salvarEstadoEmGeradorBD(
     })),
   };
 
-  // 2. Grava atomicamente o arquivo JSON da modalidade
   const fileHandle = await dirHandle.getFileHandle(nomeJson, { create: true });
   const writableStream = await (fileHandle as any).createWritable();
   await writableStream.write(JSON.stringify(payload, null, 2));
   await writableStream.close();
 
-  // 3. Salva os binários das fotos na subpasta: geradorBD/<modalidade>/midia/fotos/
   if (workspace.photos.length > 0) {
     const modHandle = await dirHandle.getDirectoryHandle(pastaModalidade, {
       create: true,
@@ -142,7 +272,6 @@ export async function salvarEstadoEmGeradorBD(
         if (photo.file) {
           blob = photo.file;
         } else if (photo.previewUrl && photo.previewUrl.startsWith("data:")) {
-          // Converte dataUrl em Blob
           const res = await fetch(photo.previewUrl);
           blob = await res.blob();
         }
@@ -160,6 +289,9 @@ export async function salvarEstadoEmGeradorBD(
       }
     }
   }
+
+  // Atualiza memorização do handle no IndexedDB
+  await salvarHandleIndexedDB(dirHandle);
 
   return {
     totalFotos: workspace.photos.length,
@@ -184,13 +316,12 @@ export async function carregarEstadoDeGeradorBD(
   const nomeJson = obterNomeArquivoJson(tipo, categoria);
   const pastaModalidade = obterPastaModalidade(tipo, categoria);
 
-  // 1. Tenta abrir o arquivo JSON da modalidade
   let fileHandle: FileSystemFileHandle;
   try {
     fileHandle = await dirHandle.getFileHandle(nomeJson, { create: false });
   } catch {
     throw new Error(
-      `Nenhum registro encontrado para "${tipo} - ${categoria}". O arquivo "${nomeJson}" não existe na pasta geradorBD selecionada.`
+      `Nenhum registro encontrado para "${tipo} - ${categoria}". O arquivo "${nomeJson}" não existe na pasta geradorBD.`
     );
   }
 
@@ -205,7 +336,6 @@ export async function carregarEstadoDeGeradorBD(
   const pistaPersistida: string = payload.pista_persistida || "";
   const trechoPersistido: string = payload.trecho_persistido || "";
 
-  // 2. Restaura as fotos físicas da pasta geradorBD/<modalidade>/midia/fotos/
   const fotosRestauradas: UploadedPhotoItem[] = [];
   try {
     const modHandle = await dirHandle.getDirectoryHandle(pastaModalidade, {
@@ -249,8 +379,10 @@ export async function carregarEstadoDeGeradorBD(
       }
     }
   } catch {
-    // Pasta de fotos ainda não existia ou vazia; prossegue com as fotos salvas em meta ou vazias
+    // Pasta de fotos ainda não existia ou vazia
   }
+
+  await salvarHandleIndexedDB(dirHandle);
 
   return {
     fiscalizacoes,

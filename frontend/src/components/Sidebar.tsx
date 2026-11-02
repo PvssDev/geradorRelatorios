@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   CloudUpload,
   Building2,
@@ -9,10 +9,12 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   MoreVertical,
   Save,
   FolderOpen,
   HardDrive,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../store/useReportStore";
@@ -20,6 +22,7 @@ import {
   solicitarPastaGeradorBD,
   salvarEstadoEmGeradorBD,
   carregarEstadoDeGeradorBD,
+  verificarStatusConexaoPasta,
   PastaNaoEncontradaError,
 } from "../services/localDirectoryStorage";
 import { PastaGeradorBDModal } from "./PastaGeradorBDModal";
@@ -53,6 +56,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     getActiveWorkspace,
     executarAutoPreenchimento,
     importarEstadoModalidade,
+    pastaLocalConectada,
+    nomePastaLocal,
+    setPastaLocalStatus,
   } = useReportStore();
   const ws = getActiveWorkspace();
 
@@ -60,7 +66,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [modalErrorMessage, setModalErrorMessage] = useState("");
-  const [lastPendingAction, setLastPendingAction] = useState<"salvar" | "carregar" | null>(null);
+  const [lastPendingAction, setLastPendingAction] = useState<"salvar" | "carregar" | "trocar" | null>(null);
+  const [storageOpen, setStorageOpen] = useState(false);
 
   const totalFotos = ws.photos.length;
   const ncsCount = ws.registrosNc.filter(
@@ -82,6 +89,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   else if (totalFotos > 0 && hasHeader) step = 3;
   else if (totalFotos > 0) step = 2;
 
+  // Identificação automática da pasta geradorBD na entrada do site
+  useEffect(() => {
+    verificarStatusConexaoPasta().then(({ conectado, nomePasta }) => {
+      setPastaLocalStatus(conectado, nomePasta);
+    });
+  }, [setPastaLocalStatus]);
+
   const handleDemo = () => {
     executarAutoPreenchimento();
     toast.success("Dados preenchidos automaticamente!");
@@ -97,27 +111,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setLastPendingAction("salvar");
 
     try {
-      const dirHandle = await solicitarPastaGeradorBD();
+      const dirHandle = await solicitarPastaGeradorBD(false);
       const res = await salvarEstadoEmGeradorBD(
         dirHandle,
         tipoRelatorio,
         categoriaRelatorio,
         ws
       );
+      setPastaLocalStatus(true, dirHandle.name);
       toast.success(
-        `Estado salvo com sucesso na pasta geradorBD! (${res.totalFotos} fotos, ${res.totalNcs} ocorrências)`
+        `Estado salvo com sucesso em ${dirHandle.name}! (${res.totalFotos} fotos, ${res.totalNcs} ocorrências)`
       );
     } catch (err: any) {
-      if (err.name === "AbortError") {
-        // Usuário cancelou o seletor do Windows
-        return;
-      }
+      if (err.name === "AbortError") return;
       if (err instanceof PastaNaoEncontradaError) {
+        setPastaLocalStatus(false);
         setModalErrorMessage(err.message);
         setShowFolderModal(true);
         return;
       }
       toast.error(`Falha ao salvar na pasta geradorBD: ${err.message || err}`);
+      verificarStatusConexaoPasta().then(({ conectado, nomePasta }) => {
+        setPastaLocalStatus(conectado, nomePasta);
+      });
     } finally {
       setIsSaving(false);
     }
@@ -129,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setLastPendingAction("carregar");
 
     try {
-      const dirHandle = await solicitarPastaGeradorBD();
+      const dirHandle = await solicitarPastaGeradorBD(false);
       const dados = await carregarEstadoDeGeradorBD(
         dirHandle,
         tipoRelatorio,
@@ -137,23 +153,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
       );
 
       importarEstadoModalidade(tipoRelatorio, categoriaRelatorio, dados);
+      setPastaLocalStatus(true, dirHandle.name);
       toast.success(
-        `Dados de ${tipoRelatorio} - ${categoriaRelatorio} carregados com sucesso! (${dados.photos.length} fotos restauradas)`
+        `Dados de ${tipoRelatorio} - ${categoriaRelatorio} carregados! (${dados.photos.length} fotos)`
       );
       if (onNavigate) onNavigate();
     } catch (err: any) {
-      if (err.name === "AbortError") {
-        // Usuário cancelou o seletor do Windows
-        return;
-      }
+      if (err.name === "AbortError") return;
       if (err instanceof PastaNaoEncontradaError) {
+        setPastaLocalStatus(false);
         setModalErrorMessage(err.message);
         setShowFolderModal(true);
         return;
       }
-      toast.error(`Falha ao carregar da pasta geradorBD: ${err.message || err}`);
+      toast.error(`Falha ao carregar de geradorBD: ${err.message || err}`);
+      verificarStatusConexaoPasta().then(({ conectado, nomePasta }) => {
+        setPastaLocalStatus(conectado, nomePasta);
+      });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTrocarPasta = async () => {
+    setLastPendingAction("trocar");
+    try {
+      const dirHandle = await solicitarPastaGeradorBD(true);
+      setPastaLocalStatus(true, dirHandle.name);
+      toast.success(`Pasta vinculada com sucesso: ${dirHandle.name}`);
+    } catch (err: any) {
+      if (err.name === "AbortError") return;
+      if (err instanceof PastaNaoEncontradaError) {
+        setPastaLocalStatus(false);
+        setModalErrorMessage(err.message);
+        setShowFolderModal(true);
+        return;
+      }
+      toast.error(`Erro ao vincular pasta: ${err.message || err}`);
     }
   };
 
@@ -162,6 +198,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       handleSalvar();
     } else if (lastPendingAction === "carregar") {
       handleCarregar();
+    } else {
+      handleTrocarPasta();
     }
   };
 
@@ -183,7 +221,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-xs font-extrabold tracking-tighter text-white">
               AR
             </span>
-            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-navy bg-nc" />
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-navy transition-colors ${
+                pastaLocalConectada ? "bg-emerald-500" : "bg-amber-500"
+              }`}
+              title={
+                pastaLocalConectada
+                  ? `geradorBD conectado (${nomePastaLocal || "ativo"})`
+                  : "Pasta geradorBD não vinculada"
+              }
+            />
           </button>
 
           {/* Centro: Ícones de Navegação */}
@@ -212,28 +259,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })}
           </nav>
 
-          {/* Rodapé: Persistência Local + Ação Rápida + Expandir */}
-          <div className="flex flex-col items-center gap-2.5">
+          {/* Rodapé: Ícone Compacto de Armazenamento Local com Bolinha + AutoPreencher + Expandir */}
+          <div className="flex flex-col items-center gap-3">
             <button
               type="button"
-              onClick={handleSalvar}
-              disabled={isSaving || isLoading}
-              title={`Salvar ${tipoRelatorio} na pasta local geradorBD`}
-              aria-label="Salvar na pasta local geradorBD"
-              className="grid h-10 w-10 place-items-center rounded-2xl text-accent hover:bg-sidebar-accent hover:text-white transition"
+              onClick={() => {
+                onToggleExpand();
+                setStorageOpen(true);
+              }}
+              title={
+                pastaLocalConectada
+                  ? `geradorBD conectado (clique para abrir opções)`
+                  : "geradorBD não vinculado (clique para conectar)"
+              }
+              aria-label="Armazenamento Local geradorBD"
+              className="relative grid h-10 w-10 place-items-center rounded-2xl bg-white/5 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-white transition"
             >
-              <Save className="h-4 w-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCarregar}
-              disabled={isSaving || isLoading}
-              title={`Carregar ${tipoRelatorio} da pasta local geradorBD`}
-              aria-label="Carregar da pasta local geradorBD"
-              className="grid h-10 w-10 place-items-center rounded-2xl text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-white transition"
-            >
-              <FolderOpen className="h-4 w-4" />
+              <HardDrive className="h-4 w-4" />
+              <span
+                className={`absolute top-1 right-1 h-2 w-2 rounded-full transition-colors ${
+                  pastaLocalConectada
+                    ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.9)]"
+                    : "bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.8)]"
+                }`}
+              />
             </button>
 
             <button
@@ -303,26 +352,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Bloco Central de Identidade da Modalidade */}
-          <div className="mt-5 flex flex-col items-center text-center">
-            <div className="relative grid h-14 w-14 place-items-center rounded-full border-2 border-accent/60 bg-sidebar-accent shadow-inner">
-              <span className="text-sm font-extrabold tracking-wider text-white">
+          {/* Bloco Central de Identidade da Modalidade com Bolinha Real */}
+          <div className="mt-6 flex flex-col items-center text-center">
+            <div className="relative grid h-16 w-16 place-items-center rounded-full border-2 border-accent/60 bg-sidebar-accent shadow-inner">
+              <span className="text-base font-extrabold tracking-wider text-white">
                 {tipoRelatorio}
               </span>
+              {/* Indicador de Status Real: Verde se conectado no disco, Laranja se não encontrado */}
               <span
-                className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-navy bg-ok"
-                title="Pasta local pronta para sincronizar"
+                className={`absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-navy transition-colors duration-300 ${
+                  pastaLocalConectada
+                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"
+                    : "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"
+                }`}
+                title={
+                  pastaLocalConectada
+                    ? `geradorBD conectado no disco (${nomePastaLocal || "ativo"})`
+                    : "Pasta geradorBD não vinculada (clique em Armazenamento Local)"
+                }
               />
             </div>
-            <div className="mt-2 text-xs font-bold text-white">
+            <div className="mt-2.5 text-sm font-bold text-white">
               {tipoRelatorio} · {categoriaRelatorio}
             </div>
-            <div className="text-[10px] text-sidebar-foreground/55">
+            <div className="text-[11px] text-sidebar-foreground/55">
               Agência de Regulação de PE
             </div>
 
-            {/* Mini Pílulas de Estatísticas */}
-            <div className="mt-3 grid w-full grid-cols-3 gap-1.5">
+            {/* Mini Pílulas de Estatísticas (Espaçamento e Legibilidade Restaurados) */}
+            <div className="mt-4 grid w-full grid-cols-3 gap-2">
               {[
                 ["Fotos", totalFotos],
                 ["NCs", ncsCount],
@@ -330,57 +388,113 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ].map(([l, v]) => (
                 <div
                   key={String(l)}
-                  className="rounded-xl bg-sidebar-accent/90 py-1.5 px-1 border border-white/5"
+                  className="rounded-2xl bg-sidebar-accent/90 py-2 px-1 border border-white/5"
                 >
-                  <div className="text-xs font-bold text-white">{v}</div>
-                  <div className="text-[9px] text-sidebar-foreground/60">{l}</div>
+                  <div className="text-sm font-bold text-white">{v}</div>
+                  <div className="text-[10px] text-sidebar-foreground/60">{l}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Seção Exclusiva de Persistência Local (geradorBD) */}
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-inner">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                <HardDrive className="h-3.5 w-3.5 text-accent" />
-                <span>Armazenamento Local</span>
+          {/* Gatilho Retrátil com Animação para Armazenamento Local (geradorBD) */}
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 overflow-hidden transition-all duration-300 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setStorageOpen(!storageOpen)}
+              className="flex w-full items-center justify-between p-3 text-left hover:bg-white/5 transition"
+              title="Clique para abrir ou recolher opções de salvamento local"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-7 w-7 place-items-center rounded-xl bg-accent/20 text-accent">
+                  <HardDrive className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>Armazenamento Local</span>
+                    <span
+                      className={`h-2 w-2 rounded-full transition-colors ${
+                        pastaLocalConectada
+                          ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+                          : "bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.8)]"
+                      }`}
+                    />
+                  </div>
+                  <div className="text-[10px] text-sidebar-foreground/60">
+                    {pastaLocalConectada ? "geradorBD conectado" : "Pasta não vinculada"}
+                  </div>
+                </div>
               </div>
-              <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[9px] font-mono font-bold text-accent">
-                geradorBD
-              </span>
-            </div>
-            <div className="mt-1 text-[10px] leading-tight text-sidebar-foreground/60">
-              Salvar ou carregar estado e fotos no seu disco.
-            </div>
 
-            <div className="mt-2.5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleSalvar}
-                disabled={isSaving || isLoading}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-accent px-2.5 py-2 text-[11px] font-bold text-white shadow hover:bg-accent/90 disabled:opacity-50 transition"
-                title={`Salvar dados e fotos de ${tipoRelatorio} na pasta geradorBD`}
-              >
-                <Save className="h-3.5 w-3.5" />
-                {isSaving ? "Salvando..." : "Salvar"}
-              </button>
+              <ChevronDown
+                className={`h-4 w-4 text-white/60 transition-transform duration-300 ${
+                  storageOpen ? "rotate-180 text-white" : ""
+                }`}
+              />
+            </button>
 
-              <button
-                type="button"
-                onClick={handleCarregar}
-                disabled={isSaving || isLoading}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-2.5 py-2 text-[11px] font-semibold text-white hover:bg-white/20 disabled:opacity-50 transition"
-                title={`Carregar dados salvos anteriormente de ${tipoRelatorio}`}
-              >
-                <FolderOpen className="h-3.5 w-3.5 text-white/80" />
-                {isLoading ? "Lendo..." : "Carregar"}
-              </button>
+            {/* Conteúdo com Animação Fluida (Sanfona) */}
+            <div
+              className={`grid transition-all duration-300 ease-in-out ${
+                storageOpen
+                  ? "grid-rows-[1fr] opacity-100 p-3 pt-0"
+                  : "grid-rows-[0fr] opacity-0 p-0 pointer-events-none"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="pt-2.5 border-t border-white/10 space-y-2.5">
+                  <div className="flex items-center justify-between text-[10px] text-white/70">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          pastaLocalConectada ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                      />
+                      {pastaLocalConectada
+                        ? `Conectado a ${nomePastaLocal || "geradorBD"}`
+                        : "Pasta não encontrada no disco"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleTrocarPasta}
+                      className="text-accent hover:underline flex items-center gap-1"
+                      title="Selecionar ou trocar pasta local"
+                    >
+                      <RefreshCw className="h-2.5 w-2.5" />
+                      {pastaLocalConectada ? "Trocar" : "Localizar"}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSalvar}
+                      disabled={isSaving || isLoading}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-accent px-2.5 py-2 text-[11px] font-bold text-white shadow hover:bg-accent/90 disabled:opacity-50 transition"
+                      title={`Salvar dados e fotos de ${tipoRelatorio} na pasta geradorBD`}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      {isSaving ? "Salvando..." : "Salvar"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCarregar}
+                      disabled={isSaving || isLoading}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-2.5 py-2 text-[11px] font-semibold text-white hover:bg-white/20 disabled:opacity-50 transition"
+                      title={`Carregar dados salvos anteriormente de ${tipoRelatorio}`}
+                    >
+                      <FolderOpen className="h-3.5 w-3.5 text-white/80" />
+                      {isLoading ? "Lendo..." : "Carregar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Menu de Navegação */}
-          <nav className="mt-4 space-y-1">
+          {/* Menu de Navegação (Espaçamento Original Restaurado) */}
+          <nav className="mt-5 space-y-1.5">
             {NAV_ITEMS.map(({ n, label, icon: Icon }) => {
               const cur = n === step;
               const done = n < step;
@@ -389,24 +503,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   key={n}
                   href={`#b${n}`}
                   onClick={onNavigate}
-                  className={`relative flex items-center gap-3 rounded-xl px-3.5 py-2 text-xs font-medium transition ${
+                  className={`relative flex items-center gap-3.5 rounded-2xl px-4 py-2.5 text-xs font-medium transition ${
                     cur
                       ? "bg-sidebar-accent text-white font-semibold shadow-sm"
                       : "text-sidebar-foreground/65 hover:bg-sidebar-accent/50 hover:text-white"
                   }`}
                 >
                   {cur && (
-                    <span className="absolute -left-6 h-6 w-1 rounded-r-full bg-accent" />
+                    <span className="absolute -left-6 h-7 w-1.5 rounded-r-full bg-accent" />
                   )}
                   <Icon
-                    className={`h-3.5 w-3.5 shrink-0 ${
+                    className={`h-4 w-4 shrink-0 ${
                       cur ? "text-accent" : "text-sidebar-foreground/60"
                     }`}
                   />
-                  <span className="flex-1 truncate text-[11px]">{label}</span>
+                  <span className="flex-1 truncate">{label}</span>
                   {done && (
-                    <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-ok text-[9px] text-white">
-                      <Check className="h-2 w-2" />
+                    <span className="grid h-4 w-4 place-items-center rounded-full bg-ok text-[10px] text-white">
+                      <Check className="h-2.5 w-2.5" />
                     </span>
                   )}
                 </a>
@@ -416,41 +530,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Card Inferior em Gradiente */}
-        <div className="mt-4 rounded-2xl border border-white/15 bg-gradient-to-br from-accent/40 via-sidebar-accent to-navy p-3.5 shadow-lg">
+        <div className="mt-6 rounded-3xl border border-white/15 bg-gradient-to-br from-accent/40 via-sidebar-accent to-navy p-4 shadow-lg">
           <div className="flex items-start justify-between">
-            <div className="grid h-8 w-8 place-items-center rounded-xl bg-white/15 text-white">
-              <Wand2 className="h-3.5 w-3.5" />
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-white/15 text-white">
+              <Wand2 className="h-4 w-4" />
             </div>
             <button
               type="button"
               onClick={() => onToggleDense(!dense)}
               title={`Densidade: ${dense ? "Compacta" : "Confortável"} (clique para alternar)`}
-              className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-semibold text-white/90 hover:bg-white/20 transition"
+              className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition"
             >
-              <MoreVertical className="h-2.5 w-2.5" />
+              <MoreVertical className="h-3 w-3" />
               {dense ? "Compacta" : "Confortável"}
             </button>
           </div>
 
-          <div className="mt-2 text-xs font-bold text-white">Ações Rápidas</div>
-          <div className="mt-0.5 text-[10px] leading-snug text-white/65">
+          <div className="mt-3 text-xs font-bold text-white">Ações Rápidas</div>
+          <div className="mt-0.5 text-[11px] leading-snug text-white/65">
             Preencha dados de teste ou vá direto para a emissão Word.
           </div>
 
-          <div className="mt-2.5 flex flex-col gap-1.5">
+          <div className="mt-3 flex flex-col gap-2">
             <button
               type="button"
               onClick={handleDemo}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-1.5 px-3 text-xs font-bold text-primary shadow hover:bg-secondary transition"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2 px-3 text-xs font-bold text-primary shadow hover:bg-secondary transition"
             >
-              <Wand2 className="h-3 w-3 text-accent" /> Auto preenchimento
+              <Wand2 className="h-3.5 w-3.5 text-accent" /> Auto preenchimento
             </button>
             <a
               href="#b5"
               onClick={onNavigate}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-1.5 px-3 text-[10px] font-semibold text-white hover:bg-white/20 transition"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-1.5 px-3 text-[11px] font-semibold text-white hover:bg-white/20 transition"
             >
-              <Rocket className="h-3 w-3" /> Ir para emissão
+              <Rocket className="h-3.5 w-3.5" /> Ir para emissão
             </a>
           </div>
         </div>

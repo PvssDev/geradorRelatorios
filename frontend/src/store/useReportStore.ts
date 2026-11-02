@@ -212,6 +212,11 @@ interface ReportStore {
   mapSiglas: Record<string, string>;
   locaisSocicam: string[];
 
+  // Status de conexão da pasta local geradorBD
+  pastaLocalConectada: boolean;
+  nomePastaLocal: string;
+  setPastaLocalStatus: (conectada: boolean, nome?: string) => void;
+
   // Workspaces isolados para os 6 estados
   workspaces: Record<StateKey, ModalityWorkspaceState>;
 
@@ -366,6 +371,11 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     SOCICAM_Fiscalização: createEmptyWorkspace(),
     SOCICAM_Monitoramento: createEmptyWorkspace(),
   },
+
+  pastaLocalConectada: false,
+  nomePastaLocal: "",
+  setPastaLocalStatus: (conectada, nome = "") =>
+    set({ pastaLocalConectada: conectada, nomePastaLocal: nome }),
 
   getActiveWorkspace: () => {
     const state = get();
