@@ -14,12 +14,14 @@ function Segmented<T extends string>({
   value,
   onChange,
   activeColor,
+  compact = false,
 }: {
   label: string;
   options: T[];
   value: T;
   onChange: (v: T) => void;
   activeColor?: string;
+  compact?: boolean;
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const buttonRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
@@ -51,16 +53,25 @@ function Segmented<T extends string>({
     return () => window.removeEventListener("resize", updateSlider);
   }, [updateSlider]);
 
+  // Recalibra o slider suavemente quando o cabeçalho encolhe ou expande
+  React.useEffect(() => {
+    const timer = setTimeout(updateSlider, 50);
+    return () => clearTimeout(timer);
+  }, [compact, updateSlider]);
+
   return (
-    <div className="flex items-center gap-2 rounded-full border border-[#d6e5f5] bg-[#edf4fb] p-1 pl-3.5 shadow-xs">
+    <div
+      className={`flex items-center gap-2 rounded-full border border-[#cbd5e1] bg-[#f1f5f9] shadow-xs transition-all duration-300 ${
+        compact ? "p-0.5 pl-3" : "p-1 pl-3.5"
+      }`}
+    >
       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#1e3a5a]">
         {label}
       </span>
       <div
         ref={containerRef}
-        className="relative flex items-center rounded-full bg-white/70 p-0.5 border border-[#d6e5f5]"
+        className="relative flex items-center rounded-full bg-white p-0.5 border border-[#cbd5e1]"
       >
-        {/* Bullet animado com cor temática dinâmica da concessão/tipo */}
         {sliderStyle.ready && (
           <div
             className="absolute top-0.5 bottom-0.5 rounded-full shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
@@ -79,7 +90,9 @@ function Segmented<T extends string>({
               ref={(el) => (buttonRefs.current[idx] = el)}
               type="button"
               onClick={() => onChange(o)}
-              className={`relative z-10 rounded-full px-3.5 py-1 text-xs font-bold transition-colors duration-200 ${
+              className={`relative z-10 rounded-full font-bold transition-all duration-200 ${
+                compact ? "px-3 py-0.5 text-[11px]" : "px-3.5 py-1 text-xs"
+              } ${
                 isAct
                   ? "text-white drop-shadow-xs"
                   : "text-[#334e68] hover:text-[#071d36]"
@@ -102,6 +115,19 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
     setCategoriaRelatorio,
   } = useReportStore();
 
+  const [scrolled, setScrolled] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      const isPast = window.scrollY > 20;
+      setScrolled((prev) => (prev !== isPast ? isPast : prev));
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
   const activePillColor = theme.primary;
 
@@ -114,42 +140,69 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
       : `ARPE · ${categoriaRelatorio} Rodoviária`;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#d8e5f2]/80 bg-white/80 backdrop-blur-md shadow-xs transition-colors duration-500">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-4 px-6 py-4">
-        <div className="flex items-center gap-4">
+    <header
+      className={`sticky top-0 z-30 border-b border-[#cbd5e1] transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+        scrolled
+          ? "bg-white/98 shadow-md shadow-slate-900/5 backdrop-blur-xl"
+          : "bg-white/95 shadow-xs backdrop-blur-xl"
+      }`}
+    >
+      <div
+        className={`mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+          scrolled ? "py-2 sm:py-2.5" : "py-4 sm:py-5"
+        }`}
+      >
+        {/* Bloco de Título e Marca */}
+        <div className="flex items-center gap-3 sm:gap-4 transition-all duration-300">
           <button
             type="button"
             aria-label="Abrir menu"
-            className="lg:hidden grid h-10 w-10 place-items-center rounded-xl border border-[#d6e5f5] bg-[#edf4fb] text-[#1e3a5a]"
+            className="lg:hidden grid h-9 w-9 place-items-center rounded-xl border border-[#cbd5e1] bg-[#edf4fb] text-[#1e3a5a] transition hover:bg-[#dbeafe]"
             onClick={onToggleMobileMenu}
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#071d36] text-white shadow-card">
-            <FileText className="h-6 w-6 text-white" />
+          <span
+            className={`grid shrink-0 place-items-center rounded-2xl bg-[#071d36] text-white shadow-card transition-all duration-300 ${
+              scrolled ? "h-9 w-9 rounded-xl" : "h-12 w-12 rounded-2xl"
+            }`}
+          >
+            <FileText
+              className={`transition-all duration-300 ${
+                scrolled ? "h-4 w-4" : "h-6 w-6"
+              }`}
+            />
           </span>
 
-          <div>
+          <div className="flex flex-col justify-center transition-all duration-300">
             <div
-              className="text-[11px] font-bold uppercase tracking-[0.22em] transition-colors duration-300"
+              className={`font-bold uppercase tracking-[0.2em] transition-all duration-300 leading-tight ${
+                scrolled ? "text-[9px] mb-0.5" : "text-[11px] mb-1"
+              }`}
               style={{ color: theme.primary }}
             >
               {kicker}
             </div>
-            <h1 className="text-3xl font-extrabold leading-none tracking-tight text-[#071d36] sm:text-4xl">
+            <h1
+              className={`font-extrabold leading-none tracking-tight text-[#071d36] transition-all duration-300 ${
+                scrolled ? "text-xl sm:text-2xl" : "text-3xl sm:text-4xl"
+              }`}
+            >
               Gerador de Relatórios
             </h1>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Seletores Segmentados de Concessão e Tipo */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 transition-all duration-300">
           <Segmented
             label="Concessão"
             options={tipos}
             value={tipoRelatorio}
             onChange={setTipoRelatorio}
             activeColor={theme.primary}
+            compact={scrolled}
           />
           <Segmented
             label="Tipo"
@@ -157,6 +210,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
             value={categoriaRelatorio}
             onChange={setCategoriaRelatorio}
             activeColor={activePillColor}
+            compact={scrolled}
           />
         </div>
       </div>
