@@ -3,8 +3,11 @@
  * Serviço de Persistência Local por Pasta (geradorBD).
  * 
  * Organiza a persistência das 6 modalidades na pasta local "geradorBD"
- * de forma modular e estruturada:
+ * com reconciliação bidirecional (pruning):
+ * - Ao salvar, arquivos e fotos excluídos na UI são apagados fisicamente do disco.
+ * - Ao carregar, apenas as mídias salvas ativas são restauradas.
  * 
+ * Estrutura:
  * geradorBD/
  * └── <modalidade>/               (ex: cra_fiscalizacao, cra_monitoramento, etc.)
  *     ├── estado/
@@ -215,6 +218,9 @@ export async function solicitarPastaGeradorBD(
  * geradorBD/<modalidade>/estado/estado.json
  * geradorBD/<modalidade>/midia/fotos/
  * geradorBD/<modalidade>/midia/arquivos/
+ * 
+ * Reconciliação (Pruning):
+ * - Fotos e arquivos removidos na UI são DELETADOS fisicamente do disco rígido.
  */
 export async function salvarEstadoEmGeradorBD(
   dirHandle: FileSystemDirectoryHandle,
@@ -235,6 +241,53 @@ export async function salvarEstadoEmGeradorBD(
   const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", { create: true });
   const arquivosHandle = await midiaHandle.getDirectoryHandle("arquivos", { create: true });
 
+  // --------------------------------------------------------------------------
+  // RECONCILIAÇÃO DE ARQUIVOS ANEXOS (Exclui órfãos do disco)
+  // --------------------------------------------------------------------------
+  const nomesArquivosAtivos = new Set<string>();
+  if (workspace.documentoAnteriorFile) {
+    nomesArquivosAtivos.add(workspace.documentoAnteriorFile.name);
+  }
+  if (workspace.planilhaElegibilidadeFile) {
+    nomesArquivosAtivos.add(workspace.planilhaElegibilidadeFile.name);
+  }
+
+  try {
+    for await (const [nome, entry] of (arquivosHandle as any).entries()) {
+      if (entry.kind === "file" && !nomesArquivosAtivos.has(nome)) {
+        try {
+          await (arquivosHandle as any).removeEntry(nome);
+        } catch (errRemArq) {
+          console.warn(`Aviso ao remover anexo órfão ${nome}:`, errRemArq);
+        }
+      }
+    }
+  } catch (errScanArq) {
+    console.warn("Aviso ao escanear anexos:", errScanArq);
+  }
+
+  // --------------------------------------------------------------------------
+  // RECONCILIAÇÃO DE FOTOS (Exclui fotos apagadas da UI do disco)
+  // --------------------------------------------------------------------------
+  const nomesFotosAtivas = new Set(workspace.photos.map((p) => p.name));
+
+  try {
+    for await (const [nome, entry] of (fotosHandle as any).entries()) {
+      if (entry.kind === "file" && !nomesFotosAtivas.has(nome)) {
+        try {
+          await (fotosHandle as any).removeEntry(nome);
+        } catch (errRemFoto) {
+          console.warn(`Aviso ao remover foto órfã ${nome}:`, errRemFoto);
+        }
+      }
+    }
+  } catch (errScanFoto) {
+    console.warn("Aviso ao escanear fotos:", errScanFoto);
+  }
+
+  // --------------------------------------------------------------------------
+  // GRAVAÇÃO DOS ARQUIVOS ATIVOS
+  // --------------------------------------------------------------------------
   let totalArquivosSalvos = 0;
   const metaArquivos: Array<{ slot: string; nome: string; size: number; type: string }> = [];
 
@@ -278,7 +331,7 @@ export async function salvarEstadoEmGeradorBD(
     }
   }
 
-  // Salva fotos em midia/fotos/
+  // Salva fotos ativas em midia/fotos/
   for (const photo of workspace.photos) {
     try {
       let blob: Blob | null = null;
@@ -343,6 +396,9 @@ export async function salvarEstadoEmGeradorBD(
  * geradorBD/<modalidade>/estado/estado.json
  * geradorBD/<modalidade>/midia/fotos/
  * geradorBD/<modalidade>/midia/arquivos/
+ * 
+ * Reconciliação na leitura:
+ * - Restaura estritamente as fotos e arquivos declarados em estado.json.
  */
 export async function carregarEstadoDeGeradorBD(
   dirHandle: FileSystemDirectoryHandle,
@@ -368,7 +424,7 @@ export async function carregarEstadoDeGeradorBD(
     );
   }
 
-  // 1. Tenta carregar estado/estado.json (ou fallback para formato legado da raiz)
+  // 1. Carrega estado/estado.json (ou fallback para formato legado)
   let payload: any = null;
   try {
     const estadoHandle = await modHandle.getDirectoryHandle("estado", { create: false });
@@ -377,7 +433,6 @@ export async function carregarEstadoDeGeradorBD(
     const text = await file.text();
     payload = JSON.parse(text);
   } catch {
-    // Tenta formato de migração caso exista na raiz do modHandle
     try {
       const legacyJsonName = `${pastaModalidadeNome}.json`;
       const legacyHandle = await dirHandle.getFileHandle(legacyJsonName, { create: false });
@@ -397,39 +452,49 @@ export async function carregarEstadoDeGeradorBD(
   const pistaPersistida: string = payload.pista_persistida || "";
   const trechoPersistido: string = payload.trecho_persistido || "";
 
-  // 2. Restaura Fotos de midia/fotos/
+  // 2. Restaura Fotos de midia/fotos/ respeitando meta_fotos (fonte da verdade)
   const fotosRestauradas: UploadedPhotoItem[] = [];
   try {
     const midiaHandle = await modHandle.getDirectoryHandle("midia", { create: false });
     const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", { create: false });
 
-    const metaMap = new Map<string, any>();
-    if (Array.isArray(payload.meta_fotos)) {
-      for (const m of payload.meta_fotos) {
-        if (m.name) metaMap.set(m.name, m);
-      }
-    }
-
-    let order = 0;
-    for await (const [name, entry] of (fotosHandle as any).entries()) {
-      if (entry.kind === "file") {
+    if (Array.isArray(payload.meta_fotos) && payload.meta_fotos.length > 0) {
+      // Carrega exatamente as fotos salvas no metadado
+      for (const meta of payload.meta_fotos) {
+        if (!meta.name) continue;
         try {
-          const entryFile = await (entry as FileSystemFileHandle).getFile();
-          const meta = metaMap.get(name);
-          const photoId = meta?.id || `foto-${Date.now()}-${order}`;
-          const uploadOrder =
-            typeof meta?.uploadOrder === "number" ? meta.uploadOrder : order++;
+          const entryFileHandle = await fotosHandle.getFileHandle(meta.name, { create: false });
+          const entryFile = await entryFileHandle.getFile();
           const previewUrl = URL.createObjectURL(entryFile);
-
           fotosRestauradas.push({
-            id: photoId,
+            id: meta.id || `foto-${Date.now()}-${meta.uploadOrder || 0}`,
             name: entryFile.name,
             file: entryFile,
             previewUrl,
-            uploadOrder,
+            uploadOrder: typeof meta.uploadOrder === "number" ? meta.uploadOrder : fotosRestauradas.length,
           });
-        } catch (errFoto) {
-          console.warn(`Erro ao ler arquivo de foto ${name}:`, errFoto);
+        } catch (errFotoFaltante) {
+          console.warn(`Foto salva no metadado não encontrada fisicamente: ${meta.name}`);
+        }
+      }
+    } else {
+      // Fallback para varredura física se meta_fotos não existir (legado)
+      let order = 0;
+      for await (const [name, entry] of (fotosHandle as any).entries()) {
+        if (entry.kind === "file") {
+          try {
+            const entryFile = await (entry as FileSystemFileHandle).getFile();
+            const previewUrl = URL.createObjectURL(entryFile);
+            fotosRestauradas.push({
+              id: `foto-${Date.now()}-${order}`,
+              name: entryFile.name,
+              file: entryFile,
+              previewUrl,
+              uploadOrder: order++,
+            });
+          } catch (errFoto) {
+            console.warn(`Erro ao ler arquivo de foto ${name}:`, errFoto);
+          }
         }
       }
     }
@@ -437,7 +502,7 @@ export async function carregarEstadoDeGeradorBD(
     // Midia/fotos ainda não existe ou vazia
   }
 
-  // 3. Restaura Arquivos Anexos de midia/arquivos/
+  // 3. Restaura Arquivos Anexos de midia/arquivos/ respeitando meta_arquivos
   let documentoAnteriorFile: File | null = null;
   let planilhaElegibilidadeFile: File | null = null;
 
@@ -447,19 +512,36 @@ export async function carregarEstadoDeGeradorBD(
 
     const metaArquivos: Array<{ slot: string; nome: string }> = payload.meta_arquivos || [];
 
-    for await (const [name, entry] of (arquivosHandle as any).entries()) {
-      if (entry.kind === "file") {
+    if (metaArquivos.length > 0) {
+      for (const meta of metaArquivos) {
+        if (!meta.nome) continue;
         try {
-          const arqFile = await (entry as FileSystemFileHandle).getFile();
-          const meta = metaArquivos.find((m) => m.nome === name);
+          const arqFileHandle = await arquivosHandle.getFileHandle(meta.nome, { create: false });
+          const arqFile = await arqFileHandle.getFile();
 
-          if (meta?.slot === "documentoAnterior" || name.endsWith(".docx") || name.endsWith(".pdf")) {
-            if (!documentoAnteriorFile) documentoAnteriorFile = arqFile;
-          } else if (meta?.slot === "planilhaElegibilidade" || name.endsWith(".xlsx") || name.endsWith(".xls")) {
-            if (!planilhaElegibilidadeFile) planilhaElegibilidadeFile = arqFile;
+          if (meta.slot === "documentoAnterior") {
+            documentoAnteriorFile = arqFile;
+          } else if (meta.slot === "planilhaElegibilidade") {
+            planilhaElegibilidadeFile = arqFile;
           }
-        } catch (errArq) {
-          console.warn(`Erro ao ler anexo ${name}:`, errArq);
+        } catch (errArqFaltante) {
+          console.warn(`Anexo declarado não encontrado fisicamente: ${meta.nome}`);
+        }
+      }
+    } else {
+      // Fallback legado por extensão
+      for await (const [name, entry] of (arquivosHandle as any).entries()) {
+        if (entry.kind === "file") {
+          try {
+            const arqFile = await (entry as FileSystemFileHandle).getFile();
+            if (name.endsWith(".docx") || name.endsWith(".pdf")) {
+              if (!documentoAnteriorFile) documentoAnteriorFile = arqFile;
+            } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+              if (!planilhaElegibilidadeFile) planilhaElegibilidadeFile = arqFile;
+            }
+          } catch (errArq) {
+            console.warn(`Erro ao ler anexo ${name}:`, errArq);
+          }
         }
       }
     }
