@@ -12,6 +12,22 @@ frontend/node_modules/
 frontend/dist/
 .vercel/
 
+# Dados locais e Caches (LGPD)
+geradorRelatorios/
+*.json.bak
+*.bak
+
+# Relatorios e documentos gerados
+*.docx
+!template*.docx
+
+# Dumps e logs de terminal
+diff.txt
+ec0ded1_app.txt
+show.txt
+style_diff.txt
+python
+
 # Testes e rascunhos locais
 scratch/
 scratch_*.py
@@ -21,7 +37,6 @@ ref_paragraphs.txt
 htmlcov/
 .coverage
 coverage.xml
-.docx
 
 # Python
 *.pyc
