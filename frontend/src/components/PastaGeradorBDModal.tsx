@@ -1,5 +1,6 @@
 import React from "react";
 import { Folder, FolderPlus, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
 
 interface PastaGeradorBDModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ export const PastaGeradorBDModal: React.FC<PastaGeradorBDModalProps> = ({
   onSelectFolder,
   errorMessage,
 }) => {
+  useLockBodyScroll(isOpen);
+
   if (!isOpen) return null;
 
   return (

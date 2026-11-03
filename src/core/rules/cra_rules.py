@@ -489,6 +489,9 @@ def formatar_legenda_foto_cra(
     cod_part = f"{cod_clean} " if cod_clean else ""
 
     if isinstance(siglas_ou_ncs, str):
+        siglas_str_clean = siglas_ou_ncs.strip()
+        if (siglas_str_clean.lower().startswith("foto ") or siglas_str_clean.lower().startswith("foto\xa0")) and cod_clean and cod_clean in siglas_str_clean:
+            return siglas_str_clean
         siglas_lista = [s.strip() for s in siglas_ou_ncs.split(",") if s.strip()]
     elif isinstance(siglas_ou_ncs, (list, tuple, set)):
         siglas_lista = [str(s).strip() for s in siglas_ou_ncs if str(s).strip()]

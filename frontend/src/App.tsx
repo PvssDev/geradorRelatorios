@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from "react";
 import { Toaster } from "sonner";
 import { Sidebar } from "./components/Sidebar";
 import { TopHeader } from "./components/TopHeader";
-import { TechDotMatrixBackground } from "./components/TechDotMatrixBackground";
 import { useClickOutside } from "./hooks/useClickOutside";
 import { FiscalizacaoForm } from "./components/FiscalizacaoForm";
 import { UploadPanel } from "./components/UploadPanel";
@@ -20,11 +19,23 @@ import { fetchBootstrapConfig } from "./services/api";
 import { useReportStore } from "./store/useReportStore";
 import { getConcessionTheme } from "./utils/concessionTheme";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useLockBodyScroll } from "./hooks/useLockBodyScroll";
 
 const AppContent: React.FC = () => {
   const { hydrateBootstrapConfig, tipoRelatorio, categoriaRelatorio } =
     useReportStore();
+
+  const [performanceMode, setPerformanceMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("arpe_perf_mode") === "true";
+    } catch {
+      return false;
+    }
+  });
+
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
+  const craDefaultTheme = getConcessionTheme("CRA", "Fiscalização");
+  const activeBgTheme = performanceMode ? craDefaultTheme : theme;
 
   // No desktop, alterna entre a barra estreita de ícones (false = 76px) e o card expandido (true = 288px)
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(false);
@@ -43,6 +54,23 @@ const AppContent: React.FC = () => {
   // No mobile (< lg), controla o drawer flutuante
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dense, setDense] = useState(false);
+
+  const handleTogglePerformanceMode = (val: boolean) => {
+    setPerformanceMode(val);
+    try {
+      localStorage.setItem("arpe_perf_mode", String(val));
+    } catch {}
+    // Dispara evento customizado para que os componentes inscritos no tema atualizem instantaneamente
+    window.dispatchEvent(new Event("storage"));
+  };
+
+  // Garante que o App re-renderize quando o modo mudar
+  const [, setRerenderKey] = useState(0);
+  useEffect(() => {
+    const handleStorage = () => setRerenderKey((k) => k + 1);
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   const [staffModalMode, setStaffModalMode] = useState<
     "responsaveis" | "coordenadores" | null
@@ -67,6 +95,16 @@ const AppContent: React.FC = () => {
   const [editModalTab, setEditModalTab] = useState<"fisc" | "nc">("nc");
   const [showEditModal, setShowEditModal] = useState(false);
 
+  const hasAnyModalOpen = Boolean(
+    staffModalMode ||
+    showContratosModal ||
+    showCustomNcModal ||
+    showGalleryModal ||
+    showRelacionarModal ||
+    showEditModal
+  );
+  useLockBodyScroll(hasAnyModalOpen);
+
   useEffect(() => {
     fetchBootstrapConfig()
       .then((cfg) => {
@@ -81,70 +119,19 @@ const AppContent: React.FC = () => {
     <div
       className="relative min-h-screen transition-colors duration-700 ease-in-out"
       style={{
-        backgroundColor: theme.lightBg,
+        backgroundColor: activeBgTheme.lightBg,
       }}
     >
       <Toaster position="top-right" richColors closeButton />
 
-      {/* Camada UI/UX Atmosférica: Aurora Mesh Gradient com Orbes Orgânicos e Micro-Grid */}
+      {/* Fundo Corporativo em Degradê Otimizado (0% CPU, processado via GPU) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
-      >
-        {/* Orbe 1 (Topo-Centro / Primário Concessão) */}
-        <div
-          className="absolute -top-32 left-1/4 h-[550px] w-[550px] -translate-x-1/2 rounded-full blur-[110px] transition-all duration-1000 ease-out"
-          style={{
-            backgroundColor: theme.primary,
-            opacity: 0.18,
-          }}
-        />
-
-        {/* Orbe 2 (Topo-Direita / Secundário Harmônico) */}
-        <div
-          className="absolute -top-24 right-10 h-[600px] w-[600px] rounded-full blur-[130px] transition-all duration-1000 ease-out"
-          style={{
-            backgroundColor: theme.secondary,
-            opacity: 0.16,
-          }}
-        />
-
-        {/* Orbe 3 (Centro-Fundo / Glow de Profundidade) */}
-        <div
-          className="absolute top-1/3 left-1/3 h-[700px] w-[700px] -translate-x-1/2 rounded-full blur-[140px] transition-all duration-1000 ease-out"
-          style={{
-            backgroundColor: theme.accentGlow,
-            opacity: 0.11,
-          }}
-        />
-
-        {/* Gradiente Conectivo & Iluminação de Superfície */}
-        <div
-          className="absolute inset-0 transition-all duration-700 ease-in-out"
-          style={{
-            background: `radial-gradient(ellipse 120% 80% at 50% 0%, transparent 40%, ${theme.lightBg} 95%), linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.45) 80%, rgba(255, 255, 255, 0.8) 100%)`,
-          }}
-        />
-
-        {/* Matriz Técnica de Pontos com Relevo Topográfico Reativo (Grid & Dot Matrix Halftone) */}
-        <TechDotMatrixBackground
-          tipo={tipoRelatorio}
-          categoria={categoriaRelatorio}
-          primaryColor={theme.primary}
-          secondaryColor={theme.secondary}
-        />
-        <div
-          className="hidden"
-          style={{
-
-            backgroundSize: "28px 28px",
-            maskImage:
-              "linear-gradient(to bottom, black 20%, rgba(0,0,0,0.4) 60%, transparent 100%)",
-            WebkitMaskImage:
-              "linear-gradient(to bottom, black 20%, rgba(0,0,0,0.4) 60%, transparent 100%)",
-          }}
-        />
-      </div>
+        className="pointer-events-none fixed inset-0 z-0 overflow-hidden transition-colors duration-700 ease-in-out opacity-75"
+        style={{
+          background: `radial-gradient(ellipse 135% 85% at 50% -15%, ${activeBgTheme.primary}18 0%, ${activeBgTheme.lightBorder} 38%, ${activeBgTheme.lightBg} 72%, #ffffff 100%)`,
+        }}
+      />
 
       {/* Sidebar Desktop Infinita (Topo, Base e Esquerda colados na tela): Alterna entre 76px e 288px com Animação Fluida */}
       <div
@@ -163,6 +150,8 @@ const AppContent: React.FC = () => {
           onToggleExpand={() => setSidebarExpanded((prev) => !prev)}
           dense={dense}
           onToggleDense={setDense}
+          performanceMode={performanceMode}
+          onTogglePerformanceMode={handleTogglePerformanceMode}
         />
       </div>
 
@@ -191,6 +180,8 @@ const AppContent: React.FC = () => {
             onNavigate={() => setMobileMenuOpen(false)}
             dense={dense}
             onToggleDense={setDense}
+            performanceMode={performanceMode}
+            onTogglePerformanceMode={handleTogglePerformanceMode}
           />
         </div>
       </div>

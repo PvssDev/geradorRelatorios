@@ -29,6 +29,7 @@ style_diff.txt
 python
 
 # Testes e rascunhos locais
+tests/
 scratch/
 scratch_*.py
 test_out.docx
