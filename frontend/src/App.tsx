@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Toaster } from "sonner";
 import { Sidebar } from "./components/Sidebar";
 import { TopHeader } from "./components/TopHeader";
+import { TechDotMatrixBackground } from "./components/TechDotMatrixBackground";
+import { useClickOutside } from "./hooks/useClickOutside";
 import { FiscalizacaoForm } from "./components/FiscalizacaoForm";
 import { UploadPanel } from "./components/UploadPanel";
 import { RegistroNcForm } from "./components/RegistroNcForm";
@@ -26,6 +28,18 @@ const AppContent: React.FC = () => {
 
   // No desktop, alterna entre a barra estreita de ícones (false = 76px) e o card expandido (true = 288px)
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(false);
+  const desktopSidebarRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o menu lateral desktop ao clicar fora de sua área
+  useClickOutside(
+    desktopSidebarRef,
+    () => {
+      if (sidebarExpanded) {
+        setSidebarExpanded(false);
+      }
+    },
+    sidebarExpanded
+  );
   // No mobile (< lg), controla o drawer flutuante
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dense, setDense] = useState(false);
@@ -112,11 +126,17 @@ const AppContent: React.FC = () => {
           }}
         />
 
-        {/* Micro-Grid Arquitetural / Engenharia Reguladora (Toque Refinado Linear / Vercel) */}
+        {/* Matriz Técnica de Pontos com Relevo Topográfico Reativo (Grid & Dot Matrix Halftone) */}
+        <TechDotMatrixBackground
+          tipo={tipoRelatorio}
+          categoria={categoriaRelatorio}
+          primaryColor={theme.primary}
+          secondaryColor={theme.secondary}
+        />
         <div
-          className="absolute inset-0 opacity-[0.035]"
+          className="hidden"
           style={{
-            backgroundImage: `radial-gradient(#071d36 1px, transparent 1px)`,
+
             backgroundSize: "28px 28px",
             maskImage:
               "linear-gradient(to bottom, black 20%, rgba(0,0,0,0.4) 60%, transparent 100%)",
@@ -128,8 +148,14 @@ const AppContent: React.FC = () => {
 
       {/* Sidebar Desktop Infinita (Topo, Base e Esquerda colados na tela): Alterna entre 76px e 288px com Animação Fluida */}
       <div
+        ref={desktopSidebarRef}
+        onClick={() => {
+          if (!sidebarExpanded) {
+            setSidebarExpanded(true);
+          }
+        }}
         className={`fixed inset-y-0 left-0 z-40 hidden lg:block transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
-          sidebarExpanded ? "w-72" : "w-[76px]"
+          sidebarExpanded ? "w-72" : "w-[76px] cursor-pointer"
         }`}
       >
         <Sidebar
