@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Toaster } from "sonner";
 import { Sidebar } from "./components/Sidebar";
 import { TopHeader } from "./components/TopHeader";
+import { TechDotMatrixBackground } from "./components/TechDotMatrixBackground";
 import { useClickOutside } from "./hooks/useClickOutside";
 import { FiscalizacaoForm } from "./components/FiscalizacaoForm";
 import { UploadPanel } from "./components/UploadPanel";
@@ -125,11 +126,17 @@ const AppContent: React.FC = () => {
           }}
         />
 
-        {/* Micro-Grid Arquitetural / Engenharia Reguladora (Toque Refinado Linear / Vercel) */}
+        {/* Matriz Técnica de Pontos com Relevo Topográfico Reativo (Grid & Dot Matrix Halftone) */}
+        <TechDotMatrixBackground
+          tipo={tipoRelatorio}
+          categoria={categoriaRelatorio}
+          primaryColor={theme.primary}
+          secondaryColor={theme.secondary}
+        />
         <div
-          className="absolute inset-0 opacity-[0.035]"
+          className="hidden"
           style={{
-            backgroundImage: `radial-gradient(#071d36 1px, transparent 1px)`,
+
             backgroundSize: "28px 28px",
             maskImage:
               "linear-gradient(to bottom, black 20%, rgba(0,0,0,0.4) 60%, transparent 100%)",
