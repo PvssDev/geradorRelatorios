@@ -11,10 +11,32 @@ export interface ConcessionTheme {
   lightBorder: string;
 }
 
+export function isPerformanceModeActive(): boolean {
+  try {
+    return localStorage.getItem("arpe_perf_mode") === "true";
+  } catch {
+    return false;
+  }
+}
+
 export function getConcessionTheme(
   tipo: TipoRelatorio,
-  categoria: CategoriaRelatorio = "Fiscalização"
+  categoria: CategoriaRelatorio = "Fiscalização",
+  forceDynamic: boolean = false
 ): ConcessionTheme {
+  // Quando o modo de cor fixa estiver ativo, fixa os detalhes na cor padrão de CRA Fiscalização
+  if (!forceDynamic && isPerformanceModeActive()) {
+    return {
+      primary: "#2563eb", // Azul Royal
+      secondary: "#0ea5e9", // Sky blue luminoso
+      accentGlow: "#6366f1", // Índigo corporativo
+      badgeBg: "bg-[#2563eb]",
+      textPrimary: "text-[#2563eb]",
+      borderLeft: "border-l-[#2563eb]",
+      lightBg: "#f0f6ff",
+      lightBorder: "#bfdbfe",
+    };
+  }
   const isMonitoring = categoria === "Monitoramento";
 
   if (isMonitoring) {

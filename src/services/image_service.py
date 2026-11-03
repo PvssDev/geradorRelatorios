@@ -258,3 +258,43 @@ def extrair_data_original_foto(photo_source) -> str:
         pass
 
     return "xx/xx/xxxx"
+
+def verificar_foto_elegivel_relacionar(current_photo, temp_nc: list) -> tuple[bool, str]:
+    """
+    Verifica se a foto atual selecionada no carrossel pode ter a opção de relacionar habilitada.
+    """
+    if not temp_nc:
+        return False, "Adicione um registro primeiro para habilitar o relacionamento de fotos."
+
+    last_nc = temp_nc[-1]
+    if last_nc.get("is_relacionado", False):
+        return False, "O registro anterior já faz parte de um relacionamento e não pode receber outro relacionamento."
+
+    if not current_photo:
+        return False, "Selecione uma foto no carrossel para relacionar."
+
+    curr_nome = extrair_nome_foto(current_photo).lower()
+    if not curr_nome:
+        return False, "Foto selecionada inválida."
+
+    curr_root, _ = os.path.splitext(curr_nome)
+
+    ant_foto = last_nc.get("Foto")
+    ant_nome = extrair_nome_foto(ant_foto).lower()
+    ant_root, _ = os.path.splitext(ant_nome)
+
+    if (curr_nome and curr_nome == ant_nome) or (curr_root and curr_root == ant_root):
+        return False, "Esta foto já é a foto do registro anterior."
+
+    for nc in temp_nc:
+        for campo in ("Foto", "Foto Anterior"):
+            f_val = nc.get(campo)
+            if f_val:
+                f_nome = extrair_nome_foto(f_val).lower()
+                f_root, _ = os.path.splitext(f_nome)
+                if (curr_nome and curr_nome == f_nome) or (curr_root and curr_root == f_root):
+                    if nc.get("is_relacionado", False):
+                        return False, "Esta foto já foi relacionada e não pode ser relacionada novamente."
+                    return False, "Esta foto já foi adicionada a uma ocorrência e não pode ser relacionada."
+
+    return True, "Relacionar a foto selecionada ao último registro cadastrado."

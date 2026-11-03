@@ -15,6 +15,8 @@ import {
   FolderOpen,
   HardDrive,
   RefreshCw,
+  Palette,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../store/useReportStore";
@@ -33,6 +35,8 @@ interface SidebarProps {
   onNavigate?: () => void;
   dense: boolean;
   onToggleDense: (d: boolean) => void;
+  performanceMode: boolean;
+  onTogglePerformanceMode: (p: boolean) => void;
 }
 
 const NAV_ITEMS = [
@@ -49,6 +53,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   dense,
   onToggleDense,
+  performanceMode,
+  onTogglePerformanceMode,
 }) => {
   const {
     tipoRelatorio,
@@ -542,15 +548,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-white/15 text-white">
               <Wand2 className="h-4 w-4" />
             </div>
-            <button
-              type="button"
-              onClick={() => onToggleDense(!dense)}
-              title={`Densidade: ${dense ? "Compacta" : "Confortável"} (clique para alternar)`}
-              className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition"
-            >
-              <MoreVertical className="h-3 w-3" />
-              {dense ? "Compacta" : "Confortável"}
-            </button>
+            <div className="flex flex-col items-end gap-1.5">
+              <button
+                type="button"
+                onClick={() => onToggleDense(!dense)}
+                title={`Densidade: ${dense ? "Compacta" : "Confortável"} (clique para alternar)`}
+                className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition"
+              >
+                <MoreVertical className="h-3 w-3" />
+                {dense ? "Compacta" : "Confortável"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onTogglePerformanceMode(!performanceMode)}
+                title={`Modo de Renderização: ${performanceMode ? "Desempenho" : "Padrão"} (clique para alternar)`}
+                className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition"
+              >
+                <Zap className={`h-3 w-3 ${performanceMode ? "text-amber-300" : "text-white/70"}`} />
+                {performanceMode ? "Desempenho" : "Padrão"}
+              </button>
+            </div>
           </div>
 
           <div className="mt-3 text-xs font-bold text-white">Ações Rápidas</div>
