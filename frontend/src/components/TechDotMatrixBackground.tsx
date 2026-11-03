@@ -64,14 +64,12 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
   const colorCurrentRef = useRef<{ r: number; g: number; b: number }>({ r: 30, g: 58, b: 138 });
   const colorTargetRef = useRef<{ r: number; g: number; b: number }>({ r: 30, g: 58, b: 138 });
   const isTransitioningRef = useRef<boolean>(true);
-  const transitionStartRef = useRef<number>(performance.now());
-  const gridDimsRef = useRef<{ cols: number; rows: number }>({ cols: 32, rows: 20 });
+  const gridDimsRef = useRef<{ cols: number; rows: number }>({ cols: 34, rows: 22 });
 
   // Atualiza a cor alvo sempre que primaryColor mudar
   useEffect(() => {
     colorTargetRef.current = parseColorToRgb(primaryColor);
     isTransitioningRef.current = true;
-    transitionStartRef.current = performance.now();
   }, [primaryColor]);
 
   // Função matemática para calcular elevação e deslocamento de cada ponto (6 combinações)
@@ -90,7 +88,7 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
     const isMonitoramento = c === "Monitoramento";
 
     if (t === "CRA") {
-      // CRA: Relevo Rodoviário Longitudinal (faixas de rolamento, aclives e curvas de nível de Suape)
+      // CRA: Relevo Rodoviário Longitudinal (faixas de rolamento, taludes e curvas de nível de Suape)
       if (!isMonitoramento) {
         // Fiscalização: Duas faixas paralelas com relevo central (pista dupla)
         const wave1 = Math.sin(u * Math.PI * 3 + v * 1.5) * 0.5 + 0.5;
@@ -116,11 +114,14 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
         dispY = -elevation * 48;
         dispX = Math.cos(diag * 4) * 16 * elevation;
       } else {
-        // Monitoramento: Vetores de curvatura em arco estaiado da ponte do Paiva
-        const distFromCenter = Math.hypot(u - 0.5, v - 0.3);
-        elevation = Math.max(0, 1 - distFromCenter * 1.8);
-        dispY = -Math.pow(elevation, 1.5) * 40;
-        dispX = (u - 0.5) * 25 * elevation;
+        // Monitoramento: Fita contínua de ondas costeiras perimetrais de margem a margem (sem bordas vazias!)
+        const wave1 = Math.sin(u * Math.PI * 3.2 + v * 1.6) * 0.5 + 0.5;
+        const wave2 = Math.cos(u * Math.PI * 2.2 - v * 2.0) * 0.5 + 0.5;
+        // Assegura sustentação de elevação ativa inclusive nas extremidades laterais
+        const edgeLift = 0.35 + 0.65 * Math.sin(u * Math.PI * 0.9 + 0.15);
+        elevation = Math.min(1, (wave1 * 0.6 + wave2 * 0.4) * edgeLift + 0.12);
+        dispY = -elevation * 42;
+        dispX = Math.sin(v * Math.PI * 2.5 + u * 2) * 16 * elevation;
       }
     } else {
       // SOCICAM: Grelha Arquitetônica e Cúpulas de Terminais Rodoviários (Recife, Caruaru, Garanhuns, Petrolina)
@@ -133,13 +134,13 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
         dispY = -elevation * 38;
         dispX = (u - cx) * 30 * elevation;
       } else {
-        // Monitoramento: Matriz nodal de 4 quadrantes (terminais intermunicipais)
-        const d1 = Math.hypot(u - 0.35, v - 0.35);
-        const d2 = Math.hypot(u - 0.68, v - 0.52);
-        const e1 = Math.max(0, 1 - d1 * 3.5);
-        const e2 = Math.max(0, 1 - d2 * 3.5);
-        elevation = Math.min(1, e1 + e2);
-        dispY = -elevation * 34;
+        // Monitoramento: Matriz nodal de múltiplos quadrantes (terminais intermunicipais)
+        const d1 = Math.hypot(u - 0.32, v - 0.35);
+        const d2 = Math.hypot(u - 0.72, v - 0.55);
+        const e1 = Math.max(0, 1 - d1 * 3.2);
+        const e2 = Math.max(0, 1 - d2 * 3.2);
+        elevation = Math.min(1, e1 + e2 + 0.1);
+        dispY = -elevation * 36;
         dispX = (Math.sin(u * 10) * 8) * elevation;
       }
     }
@@ -148,10 +149,10 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
     const targetX = u * w + dispX;
     const targetY = v * h + dispY;
 
-    // Escala do ponto baseada na elevação: cristas recebem pontos maiores e mais destacados
-    const targetRadius = 0.9 + elevation * 2.3;
-    // Opacidade refinada: sutil no plano base (~0.05), expressiva nas elevações (~0.22 a 0.28)
-    const targetAlpha = 0.045 + elevation * 0.18;
+    // Piso mínimo robusto para que os pontos de borda fiquem sempre nítidos e presentes
+    const targetRadius = 1.15 + elevation * 2.3;
+    // Opacidade refinada: plano base nítido (~0.075), expressiva nas elevações (~0.24 a 0.29)
+    const targetAlpha = 0.075 + elevation * 0.18;
 
     return {
       targetX,
@@ -175,17 +176,18 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
     canvas.width = w * dpr;
     canvas.height = h * dpr;
 
-    const cols = Math.max(20, Math.floor(w / 38));
-    const rows = Math.max(14, Math.floor(h / 38));
+    // Densidade calibrada para preenchimento harmônico
+    const cols = Math.max(24, Math.floor(w / 36));
+    const rows = Math.max(16, Math.floor(h / 36));
     gridDimsRef.current = { cols, rows };
 
     const newPoints: MatrixPoint[] = [];
 
     for (let j = 0; j < rows; j++) {
       for (let i = 0; i < cols; i++) {
-        // Margem de 4% nas bordas para arremate visual
-        const u = 0.04 + (i / (cols - 1)) * 0.92;
-        const v = 0.04 + (j / (rows - 1)) * 0.92;
+        // Cobertura completa de 1.5% a 98.5% para eliminar vazios nas bordas da tela
+        const u = 0.015 + (i / (cols - 1)) * 0.97;
+        const v = 0.015 + (j / (rows - 1)) * 0.97;
 
         const target = computePointTarget(u, v, w, h, tipo, categoria);
 
@@ -212,7 +214,6 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
 
     pointsRef.current = newPoints;
     isTransitioningRef.current = true;
-    transitionStartRef.current = performance.now();
   };
 
   // Atualiza os alvos dos pontos quando a concessão ou o tipo mudarem
@@ -240,7 +241,6 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
     }
 
     isTransitioningRef.current = true;
-    transitionStartRef.current = performance.now();
   }, [tipo, categoria]);
 
   // Listener de resize com debounce
@@ -261,7 +261,7 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
     };
   }, []);
 
-  // Loop de Renderização a 60 FPS com desaceleração em repouso
+  // Loop de Renderização a 60 FPS com Isolinhas Topográficas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -316,23 +316,59 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
         if (delta > maxDelta) maxDelta = delta;
       }
 
-      // 1. DESENHO DAS LINHAS PONTILHADAS TÉCNICAS (Grelhas de Elevação)
-      // Conecta horizontalmente pontos adjacentes com traçado pontilhado fino
+      /* ==================================================================== */
+      /* 1. OPÇÃO 2: ISOLINHAS TOPOGRÁFICAS DE ENGENHARIA (CURVAS DE NÍVEL)    */
+      /* ==================================================================== */
+      // Traçado técnico pontilhado unindo as cotas de altitude do terreno
       ctx.lineWidth = 1;
-      ctx.setLineDash([2, 5]);
+      ctx.setLineDash([3, 5]);
 
+      // Níveis de isocotas regulatórias (curvas de nível topográficas)
+      const isocotas = [0.25, 0.50, 0.75];
+
+      for (let cota of isocotas) {
+        ctx.beginPath();
+        let started = false;
+
+        // Delineia as isolinhas que cruzam a malha vetorial
+        for (let j = 0; j < rows; j++) {
+          for (let i = 0; i < cols; i++) {
+            const pt = points[j * cols + i];
+            if (!pt) continue;
+
+            // Ponto próximo à isocota (margem de tolerância)
+            if (Math.abs(pt.elevation - cota) < 0.12) {
+              if (!started) {
+                ctx.moveTo(pt.x, pt.y);
+                started = true;
+              } else {
+                ctx.lineTo(pt.x, pt.y);
+              }
+            }
+          }
+        }
+
+        if (started) {
+          // As cotas mais altas (cristas) ganham maior contraste técnico
+          const isoAlpha = 0.05 + cota * 0.08;
+          ctx.strokeStyle = `rgba(${rInt}, ${gInt}, ${bInt}, ${isoAlpha})`;
+          ctx.stroke();
+        }
+      }
+
+      // Linhas pontilhadas horizontais de grelha de referência
+      ctx.setLineDash([2, 5]);
       for (let j = 0; j < rows; j++) {
         const rowStartIdx = j * cols;
-        // Desenha linhas pontilhadas técnicas apenas em fileiras selecionadas ou onde há elevação
         if (j % 2 === 0 || tipo === "SOCICAM") {
           ctx.beginPath();
-          let lineHasElevation = false;
+          let lineElevation = false;
 
           for (let i = 0; i < cols; i++) {
             const pt = points[rowStartIdx + i];
             if (!pt) continue;
 
-            if (pt.elevation > 0.08) lineHasElevation = true;
+            if (pt.elevation > 0.1) lineElevation = true;
 
             if (i === 0) {
               ctx.moveTo(pt.x, pt.y);
@@ -341,15 +377,16 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
             }
           }
 
-          // A intensidade da linha acompanha a elevação do relevo
-          const lineAlpha = lineHasElevation ? 0.08 : 0.035;
+          const lineAlpha = lineElevation ? 0.085 : 0.04;
           ctx.strokeStyle = `rgba(${rInt}, ${gInt}, ${bInt}, ${lineAlpha})`;
           ctx.stroke();
         }
       }
 
-      // 2. DESENHO DA MATRIZ DE PONTOS (Dot Matrix Halftone)
-      ctx.setLineDash([]); // Restaura traço sólido para preenchimento dos círculos
+      /* ==================================================================== */
+      /* 2. MATRIZ DE PONTOS (Dot Matrix Halftone com Preenchimento Perimetral) */
+      /* ==================================================================== */
+      ctx.setLineDash([]); // Círculos sólidos
 
       for (let p of points) {
         if (p.radius <= 0.1 || p.alpha <= 0.005) continue;
@@ -359,8 +396,8 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
         ctx.fillStyle = `rgba(${rInt}, ${gInt}, ${bInt}, ${p.alpha})`;
         ctx.fill();
 
-        // Auréola sutil em pontos de alta elevação (cristas topográficas)
-        if (p.elevation > 0.55) {
+        // Auréola sutil em pontos de cristas topográficas
+        if (p.elevation > 0.52) {
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.radius + 1.8, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(${rInt}, ${gInt}, ${bInt}, ${p.alpha * 0.28})`;
@@ -370,7 +407,7 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
 
       ctx.restore();
 
-      // Se a transição se completou (delta mínimo e cor convergida), desacelera para economizar bateria
+      // Desaceleração em repouso após convergência (zero CPU)
       const colorDiff =
         Math.abs(colorCur.r - colorTar.r) +
         Math.abs(colorCur.g - colorTar.g) +
@@ -378,7 +415,6 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
 
       if (maxDelta < 0.04 && colorDiff < 0.5) {
         isTransitioningRef.current = false;
-        // Entra em repouso: aguarda próximo ciclo de evento sem disparar 60fps desnecessários
         animFrameRef.current = window.setTimeout(render, 300) as unknown as number;
       } else {
         animFrameRef.current = window.requestAnimationFrame(render);
@@ -404,4 +440,3 @@ export const TechDotMatrixBackground: React.FC<TechDotMatrixProps> = ({
     />
   );
 };
-
