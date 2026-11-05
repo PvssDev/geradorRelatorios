@@ -12,7 +12,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { useReportStore } from "../store/useReportStore";
-import { getConcessionTheme } from "../utils/concessionTheme";
+import { getConcessionTheme, isPerformanceModeActive } from "../utils/concessionTheme";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
 
 interface PhotoCarouselPanelProps {
@@ -37,6 +37,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
   const ws = getActiveWorkspace();
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
+  const isPerf = isPerformanceModeActive();
   const isMonitoring = categoriaRelatorio === "Monitoramento";
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [showAllOldModal, setShowAllOldModal] = useState(false);
@@ -289,42 +290,47 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
     const nextOldSrc = getOldImgSrc(nextOldItem);
 
     return (
-      <div className="relative overflow-hidden rounded-3xl border border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] p-5 sm:p-7 shadow-2xl backdrop-blur-xl">
-        {/* Keyframes de animação vertical física com aceleração elástica */}
-        <style>{`
-          @keyframes carouselSlideDown {
-            0% {
-              opacity: 0.35;
-              transform: translateY(-35px) scale(0.94);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-          @keyframes carouselSlideUp {
-            0% {
-              opacity: 0.35;
-              transform: translateY(35px) scale(0.94);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-          .anim-v-slide-next {
-            animation: carouselSlideDown 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-          .anim-v-slide-prev {
-            animation: carouselSlideUp 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-        `}</style>
+      <div className={`relative overflow-hidden rounded-2xl border p-4 sm:p-6 shadow-sm ${isPerf ? "bg-slate-900 border-slate-700" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
 
-        {/* Glow de iluminação no topo */}
-        <div
-          className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[550px] -translate-x-1/2 rounded-full blur-3xl opacity-20 transition-all duration-300"
-          style={{ backgroundColor: theme.primary }}
-        />
+        {/* Keyframes de animação vertical (Desativados no modo desempenho) */}
+        {!isPerf && (
+          <style>{`
+            @keyframes carouselSlideDown {
+              0% {
+                opacity: 0.35;
+                transform: translateY(-35px) scale(0.94);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            @keyframes carouselSlideUp {
+              0% {
+                opacity: 0.35;
+                transform: translateY(35px) scale(0.94);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            .anim-v-slide-next {
+              animation: carouselSlideDown 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+            .anim-v-slide-prev {
+              animation: carouselSlideUp 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+        )}
+
+        {/* Glow de iluminação no topo (Desativado no modo desempenho) */}
+        {!isPerf && (
+          <div
+            className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[550px] -translate-x-1/2 rounded-full blur-3xl opacity-20 transition-all duration-300"
+            style={{ backgroundColor: theme.primary }}
+          />
+        )}
 
         {/* Barra Superior Global */}
         <div className="relative z-10 mb-5 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wider text-slate-200">
@@ -413,8 +419,8 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 <ChevronUp className="h-5 w-5 stroke-[2.5]" />
               </button>
 
-              {/* Card Superior (Anterior em profundidade) */}
-              {prevOldItem && (
+              {/* Card Superior (Desativado no modo desempenho) */}
+              {!isPerf && prevOldItem && (
                 <div
                   key={`prev_old_${prevOldIdx}`}
                   onClick={handleOldPrev}
@@ -442,12 +448,12 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
               {/* Card Central Ativo (Foto Anterior Ativa) */}
               <div
                 key={`curr_old_${oldIdx}_${oldAnimKey}`}
-                className={`group relative z-30 flex aspect-[4/3] w-[92%] max-h-[70%] items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-2xl transition-all duration-300 ${
-                  oldDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"
+                className={`group relative z-30 flex aspect-[4/3] ${isPerf ? "w-full max-h-[85%]" : "w-[92%] max-h-[70%]"} items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
+                  isPerf ? "shadow-md" : `shadow-2xl transition-all duration-300 ${oldDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"}`
                 }`}
                 style={{
                   borderColor: theme.primary,
-                  boxShadow: `0 0 20px ${theme.primary}35`,
+                  boxShadow: isPerf ? undefined : `0 0 20px ${theme.primary}35`,
                 }}
               >
                 {oldSrc ? (
@@ -479,8 +485,8 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 )}
               </div>
 
-              {/* Card Inferior (Próximo em profundidade) */}
-              {nextOldItem && (
+              {/* Card Inferior (Desativado no modo desempenho) */}
+              {!isPerf && nextOldItem && (
                 <div
                   key={`next_old_${nextOldIdx}`}
                   onClick={handleOldNext}
@@ -576,8 +582,8 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 <ChevronUp className="h-5 w-5 stroke-[2.5]" />
               </button>
 
-              {/* Card Superior (Anterior em profundidade) */}
-              {prevNewPhoto && (
+              {/* Card Superior (Desativado no modo desempenho) */}
+              {!isPerf && prevNewPhoto && (
                 <div
                   key={`prev_new_${prevNewIdx}`}
                   onClick={handleNewPrev}
@@ -599,12 +605,12 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
               {/* Card Central Ativo (Foto Nova Ativa) */}
               <div
                 key={`curr_new_${newIdx}_${newAnimKey}`}
-                className={`group relative z-30 flex aspect-[4/3] w-[92%] max-h-[70%] items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-2xl transition-all duration-300 ${
-                  newDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"
+                className={`group relative z-30 flex aspect-[4/3] ${isPerf ? "w-full max-h-[85%]" : "w-[92%] max-h-[70%]"} items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
+                  isPerf ? "shadow-md" : `shadow-2xl transition-all duration-300 ${newDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"}`
                 }`}
                 style={{
                   borderColor: theme.primary,
-                  boxShadow: `0 0 20px ${theme.primary}40`,
+                  boxShadow: isPerf ? undefined : `0 0 20px ${theme.primary}40`,
                 }}
               >
                 {currentNewPhoto ? (
@@ -639,8 +645,8 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 )}
               </div>
 
-              {/* Card Inferior (Próximo em profundidade) */}
-              {nextNewPhoto && (
+              {/* Card Inferior (Desativado no modo desempenho) */}
+              {!isPerf && nextNewPhoto && (
                 <div
                   key={`next_new_${nextNewIdx}`}
                   onClick={handleNewNext}
@@ -815,10 +821,12 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
   const endDot = Math.min(totalFotos, startDot + maxDots);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] p-5 sm:p-7 shadow-2xl backdrop-blur-xl">
-      {/* Estilos inline para animação fluida física com aceleração elástica */}
-      <style>{`
-        @keyframes carouselSlideRight {
+    <div className={`relative overflow-hidden rounded-2xl border p-4 sm:p-6 shadow-sm ${isPerf ? "bg-slate-900 border-slate-700" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
+
+      {/* Estilos inline para animação fluida (Desativado no modo desempenho) */}
+      {!isPerf && (
+        <style>{`
+          @keyframes carouselSlideRight {
           0% {
             opacity: 0.35;
             transform: translateX(45px) scale(0.94);
@@ -845,12 +853,15 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
           animation: carouselSlideLeft 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
+      )}
 
-      {/* Iluminação ambiente no topo (Radial Glow) */}
-      <div
-        className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[500px] -translate-x-1/2 rounded-full blur-3xl opacity-20 transition-all duration-300"
-        style={{ backgroundColor: theme.primary }}
-      />
+      {/* Iluminação ambiente no topo (Radial Glow - Desativado no modo desempenho) */}
+      {!isPerf && (
+        <div
+          className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[500px] -translate-x-1/2 rounded-full blur-3xl opacity-20 transition-all duration-300"
+          style={{ backgroundColor: theme.primary }}
+        />
+      )}
 
       {/* Barra Superior de Informações & Ações */}
       <div className="relative z-10 mb-5 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wider text-slate-200">
@@ -920,7 +931,11 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
           disabled={totalFotos <= 1}
           onClick={handlePrev}
           aria-label="Foto anterior (looping)"
-          className="absolute left-2 sm:left-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+          className={`absolute left-2 sm:left-4 z-40 flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
+            isPerf
+              ? "border-slate-700 bg-slate-800 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-20 disabled:pointer-events-none shadow-sm"
+              : "rounded-full border-white/30 bg-white/90 text-slate-900 shadow-2xl backdrop-blur-md hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+          }`}
         >
           <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
         </button>
@@ -938,8 +953,8 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
             </div>
           ) : (
             <div className="relative flex w-full items-center justify-center">
-              {/* CARD ANTERIOR (ESQUERDA - SOBREPOSTO ATRÁS COM CLIQUE CIRCULAR) */}
-              {prevPhoto && (
+              {/* CARD ANTERIOR (Desativado no modo desempenho para corte de 70% de carga de renderização) */}
+              {!isPerf && prevPhoto && (
                 <div
                   key={`prev_${prevIdx}`}
                   onClick={handlePrev}
@@ -965,13 +980,11 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
               {currentPhoto && (
                 <div
                   key={`curr_${fotoIdx}_${animKey}`}
-                  className={`group relative z-30 w-[78%] sm:w-[72%] overflow-hidden rounded-3xl border-2 bg-slate-900 ${
-                    direction === "next" ? "anim-slide-next" : "anim-slide-prev"
-                  }`}
+                  className={`group relative z-30 ${isPerf ? "w-full max-w-xl rounded-2xl border-2 bg-slate-950 shadow-md" : `w-[78%] sm:w-[72%] overflow-hidden rounded-3xl border-2 bg-slate-900 ${direction === "next" ? "anim-slide-next" : "anim-slide-prev"}`}`}
                   style={{
                     aspectRatio: "4 / 3",
                     borderColor: theme.primary,
-                    boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+                    boxShadow: isPerf ? undefined : "0 20px 50px rgba(0,0,0,0.6)",
                   }}
                 >
                   <img
@@ -1018,8 +1031,8 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 </div>
               )}
 
-              {/* CARD POSTERIOR (DIREITA - SOBREPOSTO ATRÁS COM CLIQUE CIRCULAR) */}
-              {nextPhoto && (
+              {/* CARD POSTERIOR (Desativado no modo desempenho) */}
+              {!isPerf && nextPhoto && (
                 <div
                   key={`next_${nextIdx}`}
                   onClick={handleNext}
@@ -1050,7 +1063,11 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
           disabled={totalFotos <= 1}
           onClick={handleNext}
           aria-label="Próxima foto (looping)"
-          className="absolute right-2 sm:right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+          className={`absolute right-2 sm:right-4 z-40 flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
+            isPerf
+              ? "border-slate-700 bg-slate-800 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-20 disabled:pointer-events-none shadow-sm"
+              : "rounded-full border-white/30 bg-white/90 text-slate-900 shadow-2xl backdrop-blur-md hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+          }`}
         >
           <ChevronRight className="h-6 w-6 stroke-[2.5]" />
         </button>
@@ -1096,7 +1113,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
       {/* Prévia Automática da Legenda do Memorial Fotográfico (.docx) */}
       {currentPhoto && activeLegenda && (
-        <div className="relative z-10 mt-4 mx-auto w-full max-w-xl rounded-2xl border border-white/10 bg-black/45 px-4 py-2.5 text-center shadow-lg backdrop-blur-md transition-all duration-300">
+        <div className={`relative z-10 mt-4 mx-auto w-full max-w-xl rounded-2xl border px-4 py-2.5 text-center shadow-sm ${isPerf ? "bg-slate-950 border-slate-800" : "border-white/10 bg-black/45 shadow-lg backdrop-blur-md transition-all duration-300"}`}>
           <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">
             <span
               className="inline-block h-1.5 w-1.5 rounded-full animate-pulse"

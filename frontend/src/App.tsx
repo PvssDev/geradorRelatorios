@@ -117,19 +117,21 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      className="relative min-h-screen transition-colors duration-700 ease-in-out"
+      className={`relative min-h-screen ${performanceMode ? "perf-mode" : "transition-colors duration-700 ease-in-out"}`}
       style={{
         backgroundColor: activeBgTheme.lightBg,
       }}
     >
       <Toaster position="top-right" richColors closeButton />
 
-      {/* Fundo Corporativo em Degradê Otimizado (0% CPU, processado via GPU) */}
+      {/* Fundo Corporativo (No modo desempenho, usa fundo sólido leve sem radial-gradient) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 overflow-hidden transition-colors duration-700 ease-in-out opacity-75"
+        className={`pointer-events-none fixed inset-0 z-0 overflow-hidden ${performanceMode ? "" : "transition-colors duration-700 ease-in-out opacity-75"}`}
         style={{
-          background: `radial-gradient(ellipse 135% 85% at 50% -15%, ${activeBgTheme.primary}18 0%, ${activeBgTheme.lightBorder} 38%, ${activeBgTheme.lightBg} 72%, #ffffff 100%)`,
+          background: performanceMode
+            ? activeBgTheme.lightBg
+            : `radial-gradient(ellipse 135% 85% at 50% -15%, ${activeBgTheme.primary}18 0%, ${activeBgTheme.lightBorder} 38%, ${activeBgTheme.lightBg} 72%, #ffffff 100%)`,
         }}
       />
 
@@ -225,9 +227,13 @@ const AppContent: React.FC = () => {
               setShowRelacionarModal(true);
             }}
             onOpenGalleryModal={() => setShowGalleryModal(true)}
+            onOpenEditModal={(tab = "nc") => {
+              setEditModalTab(tab);
+              setShowEditModal(true);
+            }}
           />
 
-          {/* 04 e 05 · Auditoria & Tabela + Emissão e Exportação */}
+          {/* 04 · Emissão e Exportação do Relatório */}
           <SummaryAndActionsPanel
             onOpenEditModal={(tab = "nc") => {
               setEditModalTab(tab);
