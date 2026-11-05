@@ -103,3 +103,18 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ==========================================================================
+   MODO DESEMPENHO EXTREMO (ZERO-LAG PARA MÁQUINAS ANTIGAS)
+   Desativa filtros de desfoque gaussianos, animações contínuas e sombras pesadas
+   ========================================================================== */
+.perf-mode * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition-duration: 0.001ms !important;
+  animation-duration: 0.001ms !important;
+}
+
+.perf-mode {
+  scroll-behavior: auto !important;
+}

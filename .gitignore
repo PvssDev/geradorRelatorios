@@ -30,6 +30,8 @@ python
 
 # Testes e rascunhos locais
 tests/
+.tests
+.tests/
 scratch/
 scratch_*.py
 test_out.docx

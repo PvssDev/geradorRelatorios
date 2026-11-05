@@ -7,7 +7,10 @@ import {
   Link2,
   Wand2,
   ChevronRight,
+  ChevronDown,
+  Table2,
 } from "lucide-react";
+import { RegistrosCadastradosPanel } from "./RegistrosCadastradosPanel";
 import { toast } from "sonner";
 import { Card } from "./Card";
 import { PhotoCarouselPanel } from "./PhotoCarouselPanel";
@@ -23,6 +26,7 @@ interface RegistroNcFormProps {
   onOpenCustomNcModal: (onSelectSigla: (siglaOrDesc: string) => void) => void;
   onOpenRelacionarModal: (currentPhotoName?: string) => void;
   onOpenGalleryModal: () => void;
+  onOpenEditModal?: (tab?: "fisc" | "nc") => void;
 }
 
 const DIRECOES_CRA = ["Direita", "Esquerda"] as const;
@@ -77,7 +81,9 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
   onOpenCustomNcModal,
   onOpenRelacionarModal,
   onOpenGalleryModal,
+  onOpenEditModal,
 }) => {
+  const [isRegistrosExpanded, setIsRegistrosExpanded] = useState(false);
   const {
     tipoRelatorio,
     categoriaRelatorio,
@@ -955,7 +961,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
                 : "Adicionar Registro ao Relatório"}
             </span>
           </div>
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
             <ChevronRight className="h-4 w-4 stroke-[2.5]" />
           </span>
         </button>
@@ -985,6 +991,108 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           Envie ao menos uma foto no bloco 01 para habilitar o registro.
         </p>
       )}
+
+      {/* Trigger do Sumário Retrátil que Abre para Baixo (Accordion) */}
+      {(() => {
+        const baseRegs = ws.registrosNc.filter((r) => !r.is_relacionado);
+        const sanadasCount = baseRegs.filter((r) => r.Situação === "Sanada").length;
+        const pendentesCount = baseRegs.filter((r) => !r.Situação || r.Situação === "Pendente").length;
+
+        return (
+          <div className="mt-5 border-t border-slate-200/90 pt-4">
+            <div className={`transition-all duration-200 ${isRegistrosExpanded ? "shadow-lg shadow-indigo-950/5" : ""}`}>
+              <button
+                type="button"
+                onClick={() => setIsRegistrosExpanded((prev) => !prev)}
+                className={`group relative flex w-full items-center justify-between gap-4 p-4 text-left transition-all duration-200 active:translate-y-[1px] ${
+                  isRegistrosExpanded
+                    ? "rounded-t-2xl rounded-b-none border-t border-x border-b border-slate-300"
+                    : "rounded-2xl border border-slate-300 bg-slate-50/80 hover:bg-[#fafbff] hover:shadow-md shadow-sm"
+                }`}
+                style={{
+                  backgroundColor: isRegistrosExpanded ? theme.lightBg : undefined,
+                  borderBottomColor: isRegistrosExpanded ? theme.lightBorder : undefined,
+                }}
+            >
+              <div className="flex items-center gap-3.5">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-xs transition-transform duration-200 group-hover:scale-105"
+                  style={{
+                    backgroundColor: theme.lightBg,
+                    borderColor: theme.lightBorder,
+                    color: theme.primary,
+                  }}
+                >
+                  <Table2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900">
+                      {isMonitoring
+                        ? "Sumário de Auditoria e Ocorrências"
+                        : "Sumário de Registros Cadastrados"}
+                    </span>
+                    <span
+                      className="rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold shadow-xs"
+                      style={{
+                        backgroundColor: theme.lightBg,
+                        borderColor: theme.lightBorder,
+                        color: theme.primary,
+                      }}
+                    >
+                      {baseRegs.length} {baseRegs.length === 1 ? "achado" : "achados"}
+                    </span>
+                    {isMonitoring && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#008763] bg-[#e6fbf4] border border-[#a7f3d0] px-2 py-0.5 rounded-full text-[10px]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#008763]" />
+                          {sanadasCount} saneada(s)
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#b45309] bg-[#fffbeb] border border-[#fde68a] px-2 py-0.5 rounded-full text-[10px]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#b45309]" />
+                          {pendentesCount} pendente(s)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {isMonitoring
+                      ? `Clique para ${isRegistrosExpanded ? "recolher" : "abrir e gerenciar"} a tabela completa de ocorrências`
+                      : `Total de ${ws.registrosNc.length} foto(s) e ocorrências consolidadas no relatório`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 group-hover:text-slate-900 transition-colors shrink-0">
+                <span className="hidden sm:inline">
+                  {isRegistrosExpanded ? "Recolher Sumário" : "Expandir Sumário"}
+                </span>
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-full transition-transform duration-300 ${
+                    isRegistrosExpanded ? "rotate-180" : "rotate-0 bg-slate-100 text-slate-600"
+                  }`}
+                  style={
+                    isRegistrosExpanded
+                      ? {
+                          backgroundColor: theme.lightBg,
+                          color: theme.primary,
+                        }
+                      : undefined
+                  }
+                >
+                  <ChevronDown className="h-4 w-4 stroke-[2.5]" />
+                </span>
+              </div>
+            </button>
+
+              {/* Painel acoplado diretamente como extensão do botão */}
+              {isRegistrosExpanded && (
+                <RegistrosCadastradosPanel onOpenEditModal={onOpenEditModal || (() => {})} />
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </Card>
   );
 };
