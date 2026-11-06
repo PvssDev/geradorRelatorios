@@ -70,7 +70,7 @@ def test_gerar_relatorio_crc_pipeline(tmp_path):
 
     # Verifica texto e tabelas do documento gerado
     all_text = " ".join([p.text for p in doc.paragraphs])
-    assert "QUADRO 1 – NÃO CONFORMIDADES IDENTIFICADAS CRC - 27/05/2026" in all_text
+    assert "Quadro 1 – Determinações para Não Conformidades Identificadas – maio/2026" in all_text
 
     table_texts = [" ".join([c.text for row in t.rows for c in row.cells]) for t in doc.tables]
     combined_tables = " ".join(table_texts)

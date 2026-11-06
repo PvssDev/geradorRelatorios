@@ -196,23 +196,23 @@ def extrair_nome_foto(photo_source) -> str:
     return getattr(photo_source, "name", "").strip()
 
 
-def extrair_data_original_foto(photo_source) -> str:
+def extrair_data_original_foto(photo_source, fallback: str = "xx/xx/xxxx") -> str:
     """
     Extrai a data original (DateTimeOriginal) dos metadados EXIF da foto enviada.
     - Retorna a data formatada em 'DD/MM/YYYY'.
     - Busca estritamente a data original de criação/captura (tag 36867 / 0x9003)
       e NÃO utiliza a data de modificação da imagem (tag 306).
     - Em caso de ausência de metadados, erro de leitura, foto corrompida ou inexistente,
-      retorna 'xx/xx/xxxx'.
+      retorna o valor de `fallback` (padrão 'xx/xx/xxxx').
     """
     if not photo_source:
-        return "xx/xx/xxxx"
+        return fallback
 
     raw_date = None
     try:
         if isinstance(photo_source, str):
             if not os.path.exists(photo_source):
-                return "xx/xx/xxxx"
+                return fallback
             img = Image.open(photo_source)
         elif hasattr(photo_source, "read"):
             if hasattr(photo_source, "seek"):
@@ -221,7 +221,7 @@ def extrair_data_original_foto(photo_source) -> str:
         elif isinstance(photo_source, (bytes, bytearray)):
             img = Image.open(io.BytesIO(photo_source))
         else:
-            return "xx/xx/xxxx"
+            return fallback
 
         try:
             exif = img.getexif()
@@ -257,7 +257,7 @@ def extrair_data_original_foto(photo_source) -> str:
     except Exception:
         pass
 
-    return "xx/xx/xxxx"
+    return fallback
 
 def verificar_foto_elegivel_relacionar(current_photo, temp_nc: list) -> tuple[bool, str]:
     """

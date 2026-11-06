@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Plus, Trash2, Save, Tag } from "lucide-react";
+import { X, Plus, Trash2, Save, Tag, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../../store/useReportStore";
 import { saveContratosApi } from "../../services/api";

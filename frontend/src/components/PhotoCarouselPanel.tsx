@@ -12,6 +12,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { useReportStore } from "../store/useReportStore";
+import { MonitoramentoAnteriorItem } from "../types/report.types";
 import { getConcessionTheme, isPerformanceModeActive } from "../utils/concessionTheme";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
 
@@ -278,7 +279,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
       ? fotosEmNc.has(currentNewPhoto.name.trim().toLowerCase())
       : false;
 
-    const getOldImgSrc = (it: typeof oldItem) => {
+    const getOldImgSrc = (it: MonitoramentoAnteriorItem | null | undefined) => {
       if (!it?.old_photo_b64) return null;
       return it.old_photo_b64.startsWith("data:")
         ? it.old_photo_b64

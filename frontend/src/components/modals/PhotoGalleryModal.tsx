@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { X, Images, Search, CheckCircle2 } from "lucide-react";
 import { useReportStore } from "../../store/useReportStore";
+import { UploadedPhotoItem } from "../../types/report.types";
 import { modalInputCls } from "./modalHelpers";
 
 export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
@@ -21,7 +22,7 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
   const filtradas = useMemo(() => {
     const q = filtro.trim().toLowerCase();
     return ws.photos
-      .map((photo, index) => ({ photo, index }))
+      .map((photo: UploadedPhotoItem, index: number) => ({ photo, index }))
       .filter(({ photo }) => !q || photo.name.toLowerCase().includes(q));
   }, [ws.photos, filtro]);
 

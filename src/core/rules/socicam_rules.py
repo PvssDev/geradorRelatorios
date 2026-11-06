@@ -102,6 +102,42 @@ def extrair_sigla_terminal(local_val: Any) -> str:
     return l_upper
 
 
+def obter_abreviatura_terminal(local_val: Any) -> Tuple[str, str]:
+    """
+    Retorna a tupla (SIGLA, DEFINIÇÃO) do terminal rodoviário selecionado
+    para a tabela de Lista de Abreviaturas e Siglas da SOCICAM.
+    Exemplos:
+    - 'TIP' / 'Recife' -> ('TIP', 'Terminal Rodoviário de Passageiros do Recife')
+    - 'Arcoverde' -> ('ARC', 'Terminal Rodoviário de Arcoverde')
+    - 'Caruaru' -> ('CAR', 'Terminal Rodoviário de Caruaru')
+    - 'Garanhuns' -> ('GAR', 'Terminal Rodoviário de Garanhuns')
+    - 'Petrolina' -> ('PET', 'Terminal Rodoviário de Petrolina')
+    """
+    if not local_val or pd.isna(local_val):
+        return ("TIP", "Terminal Rodoviário de Passageiros do Recife")
+
+    l_str = str(local_val).strip()
+    if not l_str or l_str.lower() in ("nan", "none", "=local="):
+        return ("TIP", "Terminal Rodoviário de Passageiros do Recife")
+
+    l_upper = l_str.upper()
+    if "TIP" in l_upper or "RECIFE" in l_upper:
+        return ("TIP", "Terminal Rodoviário de Passageiros do Recife")
+    elif "ARCOVERDE" in l_upper or "ARC" in l_upper:
+        return ("ARC", "Terminal Rodoviário de Arcoverde")
+    elif "CARUARU" in l_upper:
+        return ("CAR", "Terminal Rodoviário de Caruaru")
+    elif "GARANHUNS" in l_upper:
+        return ("GAR", "Terminal Rodoviário de Garanhuns")
+    elif "PETROLINA" in l_upper:
+        return ("PET", "Terminal Rodoviário de Petrolina")
+
+    # Fallback genérico para outros terminais intermunicipais
+    sigla = extrair_sigla_terminal(local_val)[:3].upper()
+    definicao = normalizar_nome_terminal_rodoviario(local_val)
+    return (sigla, definicao)
+
+
 def formatar_extenso_achados_socicam(total_ncs: int) -> str:
     """
     Formata o número de Não Conformidades no gênero feminino exigido pelas determinações

@@ -66,6 +66,63 @@ function brToIso(br: string): string {
   return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : getTodayIso();
 }
 
+function formatarPeriodoVistoria(inicioIso: string, fimIso: string): string {
+  if (!inicioIso) return "";
+  if (!fimIso || fimIso === inicioIso) {
+    return isoToBr(inicioIso);
+  }
+  const [y1, m1, d1] = inicioIso.split("-");
+  const [y2, m2, d2] = fimIso.split("-");
+  if (!y1 || !y2) return isoToBr(inicioIso);
+
+  if (y1 !== y2) {
+    return `${d1}/${m1}/${y1} a ${d2}/${m2}/${y2}`;
+  }
+  if (m1 !== m2) {
+    return `${d1}/${m1} a ${d2}/${m2}/${y2}`;
+  }
+  return `${d1} a ${d2}/${m2}/${y2}`;
+}
+
+function desmembrarPeriodoEmDatas(periodoStr: string, fallbackDataIso: string): { inicioIso: string; fimIso: string } {
+  if (!periodoStr || periodoStr.trim() === "" || periodoStr.startsWith("=")) {
+    return { inicioIso: fallbackDataIso, fimIso: fallbackDataIso };
+  }
+  const s = periodoStr.trim();
+  // 1. "DD a DD/MM/AAAA"
+  const m1 = s.match(/^(\d{1,2})\s*(?:a|à|-|e)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m1) {
+    const [, d1, d2, m, y] = m1;
+    const iso1 = `${y}-${m.padStart(2, "0")}-${d1.padStart(2, "0")}`;
+    const iso2 = `${y}-${m.padStart(2, "0")}-${d2.padStart(2, "0")}`;
+    return { inicioIso: iso1, fimIso: iso2 };
+  }
+  // 2. "DD/MM a DD/MM/AAAA"
+  const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\s*(?:a|à|-|e)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m2) {
+    const [, d1, m1Val, d2, m2Val, y] = m2;
+    const iso1 = `${y}-${m1Val.padStart(2, "0")}-${d1.padStart(2, "0")}`;
+    const iso2 = `${y}-${m2Val.padStart(2, "0")}-${d2.padStart(2, "0")}`;
+    return { inicioIso: iso1, fimIso: iso2 };
+  }
+  // 3. "DD/MM/AAAA a DD/MM/AAAA"
+  const m3 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(?:a|à|-|e)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m3) {
+    const [, d1, m1Val, y1, d2, m2Val, y2] = m3;
+    const iso1 = `${y1}-${m1Val.padStart(2, "0")}-${d1.padStart(2, "0")}`;
+    const iso2 = `${y2}-${m2Val.padStart(2, "0")}-${d2.padStart(2, "0")}`;
+    return { inicioIso: iso1, fimIso: iso2 };
+  }
+  // 4. "DD/MM/AAAA"
+  const m4 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m4) {
+    const [, d, m, y] = m4;
+    const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    return { inicioIso: iso, fimIso: iso };
+  }
+  return { inicioIso: fallbackDataIso, fimIso: fallbackDataIso };
+}
+
 export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
   onOpenResponsaveisModal,
   onOpenCoordenadoresModal,
@@ -107,6 +164,10 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
   const [dataIso, setDataIso] = useState(
     activeFisc?.Data ? brToIso(activeFisc.Data) : getTodayIso()
   );
+  const [dataFimIso, setDataFimIso] = useState(() => {
+    const fallbackIso = activeFisc?.Data ? brToIso(activeFisc.Data) : getTodayIso();
+    return desmembrarPeriodoEmDatas(activeFisc?.Período || "", fallbackIso).fimIso;
+  });
   const [periodo, setPeriodo] = useState(
     activeFisc?.Período || isoToBr(getTodayIso())
   );
@@ -147,10 +208,14 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
     const f = ws.fiscalizacoes[idx];
     if (f) {
       const fDataIso = f.Data ? brToIso(f.Data) : getTodayIso();
+      const { inicioIso, fimIso } = desmembrarPeriodoEmDatas(f.Período || "", fDataIso);
       setIdFisc(f["ID da Fiscalização"] || "");
-      setDataIso(fDataIso);
+      setDataIso(inicioIso);
+      setDataFimIso(fimIso);
       setPeriodo(
-        f.Período && !f.Período.startsWith("=") ? f.Período : isoToBr(fDataIso)
+        f.Período && !f.Período.startsWith("=")
+          ? f.Período
+          : formatarPeriodoVistoria(inicioIso, fimIso)
       );
       setHora(f.Hora && !f.Hora.startsWith("=") ? f.Hora : "");
       setMun(f.Cidade && !f.Cidade.startsWith("=") ? f.Cidade : "");
@@ -173,6 +238,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
       const today = getTodayIso();
       setIdFisc("");
       setDataIso(today);
+      setDataFimIso(today);
       setPeriodo(isoToBr(today));
       setHora("");
       setMun("");
@@ -400,7 +466,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
       </div>
 
       <div className="grid gap-8">
-        {/* Linha 1: ID + Data + (Hora na CRA | Período em CRC/SOCICAM) */}
+        {/* Linha 1: ID + Data de Início + Data de Término (com visualização do Período) */}
         <div className="grid gap-6 sm:grid-cols-3">
           <Field
             label={isMonitoring ? "ID do Monitoramento" : "ID da Fiscalização"}
@@ -418,53 +484,52 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
             />
           </Field>
 
-          <Field label="Data da Vistoria">
+          <Field label="Data de Início da Vistoria">
             <input
               type="date"
               className={inputCls}
               value={dataIso}
               onChange={(e) => {
-                const nextIso = e.target.value;
-                const oldBr = isoToBr(dataIso);
-                const nextBr = isoToBr(nextIso);
-                const shouldSyncPeriodo = !periodo.trim() || periodo === oldBr;
-                setDataIso(nextIso);
-                if (shouldSyncPeriodo) {
-                  setPeriodo(nextBr);
-                }
+                const nextIni = e.target.value;
+                setDataIso(nextIni);
+                const nextFim = dataFimIso < nextIni ? nextIni : dataFimIso;
+                setDataFimIso(nextFim);
+                const nextPer = formatarPeriodoVistoria(nextIni, nextFim);
+                setPeriodo(nextPer);
                 syncToStore({
-                  data: nextIso,
-                  periodo: shouldSyncPeriodo ? nextBr : periodo,
+                  data: nextIni,
+                  periodo: nextPer,
                 });
               }}
             />
           </Field>
 
-          {tipoRelatorio === "CRA" ? (
-            <Field label="Hora">
+          <Field label="Data de Término da Vistoria">
+            <div className="space-y-1.5">
               <input
-                type="time"
+                type="date"
                 className={inputCls}
-                value={hora}
+                min={dataIso}
+                value={dataFimIso}
                 onChange={(e) => {
-                  setHora(e.target.value);
-                  syncToStore({ hora: e.target.value });
+                  const nextFim = e.target.value;
+                  setDataFimIso(nextFim);
+                  const nextPer = formatarPeriodoVistoria(dataIso, nextFim);
+                  setPeriodo(nextPer);
+                  syncToStore({
+                    data: dataIso,
+                    periodo: nextPer,
+                  });
                 }}
               />
-            </Field>
-          ) : (
-            <Field label="Período da Vistoria">
-              <input
-                className={inputCls}
-                placeholder="Ex: 15 a 16/06/2026"
-                value={periodo}
-                onChange={(e) => {
-                  setPeriodo(e.target.value);
-                  syncToStore({ periodo: e.target.value });
-                }}
-              />
-            </Field>
-          )}
+              <div className="flex items-center gap-1.5 px-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Período:</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  {periodo || isoToBr(dataIso)}
+                </span>
+              </div>
+            </div>
+          </Field>
         </div>
 
         {/* Linha 2: Campos específicos da Concessão (CRA vs CRC vs SOCICAM) */}
@@ -494,14 +559,14 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
               />
             </Field>
 
-            <Field label="Período da Vistoria">
+            <Field label="Hora">
               <input
+                type="time"
                 className={inputCls}
-                placeholder="Ex: 15 a 16/06/2026"
-                value={periodo}
+                value={hora}
                 onChange={(e) => {
-                  setPeriodo(e.target.value);
-                  syncToStore({ periodo: e.target.value });
+                  setHora(e.target.value);
+                  syncToStore({ hora: e.target.value });
                 }}
               />
             </Field>

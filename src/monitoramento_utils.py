@@ -86,7 +86,7 @@ def extrair_metadados_anterior(documento_anterior):
                 meta["data_vistoria_prev"] = m.group(1)
                 break
 
-        pattern_oficio = re.compile(r'Of(?:í|i)cio\s+Arpe\s+DTO\s+(?:n|N)(?:º|o)?\s*([\w/.-]+),\s*de\s*(\d{2}/\d{2}/\d{4})', re.IGNORECASE)
+        pattern_oficio = re.compile(r'Of(?:í|i)cio\s+ARPE\s+DTO\s+(?:n|N)(?:º|o)?\s*([\w/.-]+),\s*de\s*(\d{2}/\d{2}/\d{4})', re.IGNORECASE)
         for p in doc.paragraphs:
             m = pattern_oficio.search(p.text)
             if m:

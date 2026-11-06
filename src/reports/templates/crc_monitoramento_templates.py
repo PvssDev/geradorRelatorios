@@ -69,7 +69,7 @@ def get_crc_monitoramento_intro_paragraphs(
             f"Técnico-Operacional CTR {ctr_num}, realizada na Rodovia Rota dos "
             f"Coqueiros em {data_vist_prev}, verificou-se que {nc_phrase}. "
             f"Assim, o referido Relatório de Fiscalização (Doc. SEI nº {processo_sei_prev}) foi encaminhado à Concessionária "
-            f"Rota dos Coqueiros (CRC) pelo Ofício Arpe DTO nº {oficio_num_prev}, de {oficio_data_prev}, com a recomendação "
+            f"Rota dos Coqueiros (CRC) pelo Ofício ARPE DTO nº {oficio_num_prev}, de {oficio_data_prev}, com a recomendação "
             f"para que a Concessionária mantenha a ARPE informada sobre as tratativas referentes às não conformidades apontadas."
         )
     else:
@@ -78,7 +78,7 @@ def get_crc_monitoramento_intro_paragraphs(
             f"apontadas no Relatório de Fiscalização Técnico-Operacional CTR {ctr_num}, realizada na Rodovia Rota dos "
             f"Coqueiros em {data_vist_prev}, verificou-se que {nc_phrase}. "
             f"Assim, o Relatório do {n_prev_str} Monitoramento (Doc. SEI nº {processo_sei_prev}) foi encaminhado à Concessionária "
-            f"Rota dos Coqueiros (CRC) pelo Ofício Arpe DTO nº {oficio_num_prev}, de {oficio_data_prev}, reforçando a recomendação "
+            f"Rota dos Coqueiros (CRC) pelo Ofício ARPE DTO nº {oficio_num_prev}, de {oficio_data_prev}, reforçando a recomendação "
             f"para que a Concessionária mantenha a ARPE informada sobre as tratativas referentes às não conformidades pendentes."
         )
 

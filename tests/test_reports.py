@@ -80,8 +80,8 @@ def test_dynamic_header_and_footer_dates():
 
     reports_to_test = ["CRA", "CRA_MONITORAMENTO", "CRC", "SOCICAM", "SOCICAM_MONITORAMENTO"]
     
-    # Caso 1: Fiscalização em Julho de 2026
-    row_julho = {"Data": "15/07/2026", "ID da Fiscalização": "2026-001"}
+    # Caso 1: Fiscalização com ID específico e Data em Julho de 2026
+    row_julho = {"Data": "15/07/2026", "ID da Fiscalização": "CTR-0120-2026"}
     mes_ano = extrair_mes_ano_numerico(row_julho["Data"])
     ano = extrair_ano(row_julho["Data"])
     assert mes_ano == "07/2026"
@@ -89,23 +89,23 @@ def test_dynamic_header_and_footer_dates():
 
     for key in reports_to_test:
         rep = get_report(key)
-        top_header = rep.capa_ctr_number_template.format(ano=ano, id_fisc=row_julho["ID da Fiscalização"], mes_ano=mes_ano)
-        assert "07/2026" in top_header, f"Header de {key} não continha 07/2026: {top_header}"
-        assert "01/2026" not in top_header if key != "CRA" or "07" in mes_ano else True
+        top_header = rep.capa_ctr_number_template.format(ano=ano, id_fisc=row_julho["ID da Fiscalização"], mes_ano=mes_ano, ctr_num="CTR-0120-2026", n_curr_str="1°")
+        assert "CTR-0120-2026" in top_header, f"Header de {key} não continha CTR-0120-2026: {top_header}"
 
         process_texts = rep.get_process_sei_texts(row_julho, ano)
-        assert "07/2026" in process_texts[0], f"Processo de {key} não continha 07/2026: {process_texts[0]}"
+        assert "CTR-0120-2026" in process_texts[0], f"Processo de {key} não continha CTR-0120-2026: {process_texts[0]}"
 
-    # Caso 2: Fiscalização em Janeiro de 2026
-    row_jan = {"Data": "10/01/2026", "ID da Fiscalização": "2026-002"}
-    mes_ano_jan = extrair_mes_ano_numerico(row_jan["Data"])
-    ano_jan = extrair_ano(row_jan["Data"])
+    # Caso 2: Fiscalização sem ID da Fiscalização (fallback para mes_ano)
+    row_fallback = {"Data": "10/01/2026", "ID da Fiscalização": ""}
+    mes_ano_jan = extrair_mes_ano_numerico(row_fallback["Data"])
+    ano_jan = extrair_ano(row_fallback["Data"])
+    id_fisc_fallback = row_fallback["ID da Fiscalização"] or mes_ano_jan
     for key in reports_to_test:
         rep = get_report(key)
-        top_header = rep.capa_ctr_number_template.format(ano=ano_jan, id_fisc=row_jan["ID da Fiscalização"], mes_ano=mes_ano_jan)
-        assert "01/2026" in top_header, f"Header de {key} não continha 01/2026: {top_header}"
-        process_texts = rep.get_process_sei_texts(row_jan, ano_jan)
-        assert "01/2026" in process_texts[0], f"Processo de {key} não continha 01/2026: {process_texts[0]}"
+        top_header = rep.capa_ctr_number_template.format(ano=ano_jan, id_fisc=id_fisc_fallback, mes_ano=mes_ano_jan, ctr_num=mes_ano_jan, n_curr_str="1°")
+        assert "01/2026" in top_header, f"Header fallback de {key} não continha 01/2026: {top_header}"
+        process_texts = rep.get_process_sei_texts(row_fallback, ano_jan)
+        assert "01/2026" in process_texts[0], f"Processo fallback de {key} não continha 01/2026: {process_texts[0]}"
 
     print("[PASS] test_dynamic_header_and_footer_dates")
 

@@ -61,7 +61,7 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "RELATÓRIO DE MONITORAMENTO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
+        return "RELATÓRIO DE MONITORAMENTO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}"
 
     @property
     def sumario_before_abreviaturas(self) -> bool:
@@ -79,12 +79,15 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
         if isinstance(row, (str, int)) and ano is None:
             ano = str(row)
             mes_ano = f"01/{ano}"
+            id_fisc = mes_ano
         else:
             ano = ano or extrair_ano(row.get("Data", "") if hasattr(row, "get") else row["Data"])
             data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
             mes_ano = extrair_mes_ano_numerico(data_val)
+            raw_id = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else (str(row["ID da Fiscalização"]).strip() if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            id_fisc = raw_id or mes_ano
         return [
-            f"RELATÓRIO DE MONITORAMENTO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
+            f"RELATÓRIO DE MONITORAMENTO TÉCNICO-OPERACIONAL PROC ADM Nº {id_fisc} - CTR",
             f"SEI Nº {self.processo_sei_prev}"
         ]
 
