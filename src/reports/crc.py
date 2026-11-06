@@ -127,7 +127,7 @@ class CrcReport(BaseReport, IReportContract):
 
     @property
     def general_info_col_widths(self) -> List[Any]:
-        return [Inches(2.3), Inches(5.2)]
+        return [Inches(2.2), Inches(5.07)]
 
     @property
     def general_info_headers_indices(self) -> List[int]:
@@ -161,7 +161,7 @@ class CrcReport(BaseReport, IReportContract):
 
     @property
     def quadro_title_template(self) -> str:
-        return "QUADRO 1 – NÃO CONFORMIDADES IDENTIFICADAS CRC - {data_abreviada}"
+        return "Quadro 1 – Determinações para Não Conformidades Identificadas – {mes_ano}"
 
     @property
     def nc_table_headers(self) -> List[str]:
@@ -173,22 +173,25 @@ class CrcReport(BaseReport, IReportContract):
 
     def format_nc_table_total_row(self, table: Any, row_idx: int, total_ncs: int, col_widths: Optional[List[Any]] = None) -> None:
         r_total = table.rows[row_idx]
-        r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2])
+        r_total.cells[0].merge(r_total.cells[1]).merge(r_total.cells[2]).merge(r_total.cells[3])
         r_total.cells[0].text = "TOTAL"
-        r_total.cells[3].text = ""
         r_total.cells[4].text = str(total_ncs)
 
         widths = col_widths if col_widths is not None else self.nc_table_col_widths
-        r_total.cells[0].width = widths[0] + widths[1] + widths[2]
-        r_total.cells[3].width = widths[3]
+        r_total.cells[0].width = widths[0] + widths[1] + widths[2] + widths[3]
         r_total.cells[4].width = widths[4]
 
     def render_quadros(self, doc: Any, row: Any, nc_df: Any, criar_tabela_quadros_fn: Any) -> None:
-        from utils import formatar_data_extenso, formatar_data_curta, adicionar_titulo_secao
+        from utils import formatar_data_extenso, formatar_data_curta, formatar_mes_ano, adicionar_titulo_secao
         data_extenso = formatar_data_extenso(row["Data"])
         data_abreviada = formatar_data_curta(row.get("Data", "") if hasattr(row, "get") else row["Data"])
+        try:
+            mes_ano = formatar_mes_ano(row["Data"]).replace(", ", "/").lower()
+        except Exception:
+            mes_ano = "junho/2026"
 
-        # 1. Título da Seção
+        # 1. Título da Seção (com espaço antes e depois)
+        doc.add_paragraph()
         adicionar_titulo_secao(doc, self.quadros_section_title)
         doc.add_paragraph()
 
@@ -214,14 +217,13 @@ class CrcReport(BaseReport, IReportContract):
         p7 = doc.add_paragraph()
         p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p7.paragraph_format.space_after = Pt(6)
-        r7_1 = p7.add_run("QUADRO 1")
+        r7_1 = p7.add_run("Quadro 1")
         r7_1.bold = True
         r7_1.font.name = 'Aptos'
         r7_1.font.size = Pt(11)
 
         if resumo.tem_nc or (not resumo.tem_nc and not resumo.tem_pa):
-            r7_2 = p7.add_run(f" – NÃO CONFORMIDADES IDENTIFICADAS CRC - {data_abreviada}")
-            r7_2.bold = True
+            r7_2 = p7.add_run(f" – Determinações para Não Conformidades Identificadas – {mes_ano}")
             r7_2.font.name = 'Aptos'
             r7_2.font.size = Pt(11)
             criar_tabela_quadros_fn(doc, ncs_reais, is_pa=False, report_config=self)
@@ -231,19 +233,17 @@ class CrcReport(BaseReport, IReportContract):
                 p_q2 = doc.add_paragraph()
                 p_q2.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 p_q2.paragraph_format.space_after = Pt(6)
-                r_q2_1 = p_q2.add_run("QUADRO 2")
+                r_q2_1 = p_q2.add_run("Quadro 2")
                 r_q2_1.bold = True
                 r_q2_1.font.name = 'Aptos'
                 r_q2_1.font.size = Pt(11)
-                r_q2_2 = p_q2.add_run(f" – PONTOS DE ATENÇÃO IDENTIFICADOS CRC - {data_abreviada}")
-                r_q2_2.bold = True
+                r_q2_2 = p_q2.add_run(f" – Determinações para Pontos de Atenção Identificados – {mes_ano}")
                 r_q2_2.font.name = 'Aptos'
                 r_q2_2.font.size = Pt(11)
                 criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
                 doc.add_paragraph()
         elif resumo.tem_pa:
-            r7_2 = p7.add_run(f" – PONTOS DE ATENÇÃO IDENTIFICADOS CRC - {data_abreviada}")
-            r7_2.bold = True
+            r7_2 = p7.add_run(f" – Determinações para Pontos de Atenção Identificados – {mes_ano}")
             r7_2.font.name = 'Aptos'
             r7_2.font.size = Pt(11)
             criar_tabela_quadros_fn(doc, pas_reais, is_pa=True, report_config=self)
@@ -362,11 +362,14 @@ class CrcReport(BaseReport, IReportContract):
         if isinstance(row, (str, int)) and ano is None:
             ano = str(row)
             mes_ano = f"01/{ano}"
+            id_fisc = mes_ano
         else:
             data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
             ano = ano or extrair_ano(data_val)
             mes_ano = extrair_mes_ano_numerico(data_val)
+            raw_id = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else (str(row["ID da Fiscalização"]).strip() if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            id_fisc = raw_id or mes_ano
         return [
-            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
+            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {id_fisc} - CTR",
             "SEI Nº xxxxxxxx-xxx"
         ]

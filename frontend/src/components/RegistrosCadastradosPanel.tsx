@@ -618,7 +618,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                         </td>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r.Pista || "—"}</td>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r.Trecho || "—"}</td>
-                        <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r.Direção || r.Faixa || "—"}</td>
+                        <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r["Direção (faixa)"] || "—"}</td>
                         <td className="px-3.5 py-2.5 font-mono text-xs font-bold text-indigo-700 whitespace-nowrap">
                           {r.Identificação || "—"}
                         </td>

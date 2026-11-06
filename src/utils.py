@@ -266,6 +266,72 @@ def formatar_data_curta(data_val):
         return str(data_val)
 
 
+def extrair_primeira_data_vistoria(data_val):
+    """
+    Extrai a primeira data da vistoria no formato 'DD/MM/AAAA'.
+    Se receber um período (ex: '25 a 28/08/2026', '28/07 a 02/08/2026', '25/08/2026 a 28/08/2026'),
+    extrai determinística e estritamente a data inicial (ex: '25/08/2026', '28/07/2026').
+    Se receber data simples ('25/08/2026', '2026-08-25'), formata em 'DD/MM/AAAA'.
+    """
+    if pd.isna(data_val) or not data_val:
+        return ""
+    
+    try:
+        from datetime import datetime, date
+        import re
+
+        if hasattr(data_val, "to_pydatetime"):
+            return data_val.to_pydatetime().strftime("%d/%m/%Y")
+        elif isinstance(data_val, (datetime, date)):
+            return data_val.strftime("%d/%m/%Y")
+
+        s = str(data_val).strip()
+        if not s or s.lower() in ("nan", "none", "xx/xx/xxxx"):
+            return ""
+
+        # 1. Padrão período com data completa no início: "DD/MM/AAAA a ..." ou simples "DD/MM/AAAA"
+        m_full = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})", s)
+        if m_full:
+            d, m, y = m_full.groups()
+            return f"{int(d):02d}/{int(m):02d}/{y}"
+
+        # 2. Padrão período intermensal: "DD/MM a DD/MM/AAAA" (ex: "28/07 a 02/08/2026")
+        m_inter = re.match(r"^(\d{1,2})/(\d{1,2})\s*(?:a|à|-|e)\s*\d{1,2}/\d{1,2}/(\d{4})", s)
+        if m_inter:
+            d1, m1, y = m_inter.groups()
+            return f"{int(d1):02d}/{int(m1):02d}/{y}"
+
+        # 3. Padrão período no mesmo mês: "DD a DD/MM/AAAA" (ex: "25 a 28/08/2026")
+        m_mesmo_mes = re.match(r"^(\d{1,2})\s*(?:a|à|-|e)\s*\d{1,2}/(\d{1,2})/(\d{4})", s)
+        if m_mesmo_mes:
+            d1, m, y = m_mesmo_mes.groups()
+            return f"{int(d1):02d}/{int(m):02d}/{y}"
+
+        # 4. Padrão ISO: "AAAA-MM-DD"
+        m_iso = re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
+        if m_iso:
+            y, m, d = m_iso.groups()
+            return f"{int(d):02d}/{int(m):02d}/{y}"
+
+        # 5. Fallback para datetime parse convencional
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                dt = datetime.strptime(s, fmt)
+                return dt.strftime("%d/%m/%Y")
+            except ValueError:
+                continue
+
+        # 6. Busca por qualquer ocorrência de data DD/MM/AAAA
+        m_search = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+        if m_search:
+            d, m, y = m_search.groups()
+            return f"{int(d):02d}/{int(m):02d}/{y}"
+
+        return s
+    except Exception:
+        return str(data_val)
+
+
 def adicionar_metadados_geracao(doc):
     """
     Adiciona metadados informativos de autoria e carimbo de data/hora da geração

@@ -76,7 +76,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
         return (
             "COORDENADORIA DE TRANSPORTES E RODOVIAS\n"
             f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO\n"
-            "DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
+            "DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}"
         )
 
     @property
@@ -95,14 +95,17 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
         if isinstance(row, (str, int)) and ano is None:
             ano = str(row)
             mes_ano = f"01/{ano}"
+            id_fisc = mes_ano
         else:
             ano = ano or extrair_ano(row.get("Data", "") if hasattr(row, "get") else row["Data"])
             data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
             mes_ano = extrair_mes_ano_numerico(data_val)
+            raw_id = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else (str(row["ID da Fiscalização"]).strip() if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            id_fisc = raw_id or mes_ano
 
         n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         return [
-            f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}",
+            f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}",
             f"SEI Nº {self.processo_sei_prev}"
         ]
 

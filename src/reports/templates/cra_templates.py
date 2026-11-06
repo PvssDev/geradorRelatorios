@@ -12,11 +12,11 @@ CRA_DEFAULT_CONTRATO = "CT. nº 043/2011"
 CRA_CAPA_ORGAO_CONCEDENTE = "GOVERNO DO ESTADO DE PERNAMBUCO"
 CRA_CAPA_SECRETARIA = "SECRETARIA DE MOBILIDADE E INFRAESTRUTURA - SEMOBI"
 CRA_CAPA_TITULO = "RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO"
-CRA_CAPA_CTR_NUMBER_TEMPLATE = "RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº {mes_ano}"
+CRA_CAPA_CTR_NUMBER_TEMPLATE = "RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO CTR Nº {id_fisc}"
 CRA_CAPA_PRESTADOR_LABEL = "PRESTADOR DE SERVIÇO: CONCESSIONÁRIA ROTA DO ATLÂNTICO (CRA)"
 CRA_CAPA_CONTRATO_LABEL = "CONTRATO DE CONCESSÃO"
 CRA_CAPA_REGULADOR_LABEL = "AGÊNCIA DE REGULAÇÃO DOS SERVIÇOS PÚBLICOS DELEGADOS DO ESTADO DE PERNAMBUCO - ARPE"
-CRA_ANALYST_TITLE = "Analista de Regulação"
+CRA_ANALYST_TITLE = "Especialista em Regulação"
 
 CRA_CAPA_TITULOS = [
     "FISCALIZAÇÃO DO COMPLEXO VIÁRIO E LOGÍSTICO DE SUAPE – EXPRESSWAY",
@@ -55,7 +55,7 @@ def get_cra_intro_paragraphs(ano: str, data_extenso: str) -> list:
     """Gera parágrafos formatados da seção 1. Introdução."""
     return [
         [(
-            f"A Coordenadoria de Transporte e Rodovias da Arpe implementou o cronograma de fiscalização para {ano} "
+            f"A Coordenadoria de Transporte e Rodovias da ARPE implementou o cronograma de fiscalização para {ano} "
             "do Complexo Viário e Logístico de SUAPE, sob a responsabilidade da Concessionária Rota do Atlântico (CRA), "
             "visualizando a necessidade de serem reservados dois dias consecutivos, para melhor estruturar suas ações "
             "de fiscalização técnico-operacionais da Rodovia.",
@@ -80,12 +80,12 @@ def get_cra_intro_paragraphs(ano: str, data_extenso: str) -> list:
             False, False, None
         )],
         [
-            (f"É importante observar que foram realizadas ações de fiscalização, no dia {data_extenso}, conforme comunicado enviado à SUAPE por meio do Ofício Arpe/DTO nº ", False, False, None),
+            (f"É importante observar que foram realizadas ações de fiscalização, no dia {data_extenso}, conforme comunicado enviado à SUAPE por meio do Ofício ARPE/DTO nº ", False, False, None),
             ("xxx (Doc. SEI nº xxxxxxxx-xxx)", False, False, (255, 0, 0)),
             (".", False, False, None)
         ],
         [(
-            "Destaca-se que as fiscalizações realizadas pela Arpe são tratadas com caráter educativo, preferencialmente, e contributivo "
+            "Destaca-se que as fiscalizações realizadas pela ARPE são tratadas com caráter educativo, preferencialmente, e contributivo "
             "para correção de procedimentos e solução de Não Conformidades evidenciados por defeitos e/ou problemas na infraestrutura "
             "disponibilizada e respectivos serviços concedidos pelo Estado.",
             False, False, None
@@ -99,7 +99,7 @@ CRA_OBJECTIVE_PARAGRAPHS = [
         "tem por objetivo verificar as condições de operação, manutenção, segurança viária e níveis de serviço, bem "
         "como identificar não conformidades, subsidiar medidas corretivas e assegurar a observância das disposições "
         "contratuais, regulamentares e normativas aplicáveis, preservando a segurança, a qualidade do serviço, e a "
-        "adequada prestação do serviço público aos usuários. Dessa forma a ação de fiscalização da Arpe verifica o grau "
+        "adequada prestação do serviço público aos usuários. Dessa forma a ação de fiscalização da ARPE verifica o grau "
         "de conformidade dessas instalações com o Contrato de Concessão, bem como com a legislação e normas vigentes "
         "de modo a determinar/ou recomendar medidas corretivas, com foco na qualidade dos serviços prestados.",
         False, False, None
@@ -129,7 +129,7 @@ def get_cra_general_info_rows(responsaveis_formatted: str, periodo_val: str) -> 
         ("Representantes por acompanhar:", "Vanessa Monteiro e OuvidoraXXXCRA", False, False),
 
         ("3.4 DO FISCALIZADOR (CONVÊNIO SUAPE/ARPE Nº 003/2021)", "", True, False),
-        ("Regulador:", "Agência de Regulação de Pernambuco (Arpe)", False, False),
+        ("Regulador:", "Agência de Regulação de Pernambuco (ARPE)", False, False),
         ("Diretor Presidente:", "CARLOS PORTO FILHO", False, True),
         ("Endereço:", "Avenida Conselheiro Rosa e Silva, 975, Aflitos, Recife/PE, CEP: 52.050-020.\nEstacionamento: Rua do Futuro, 150, Aflitos, Recife/PE.", False, False),
 
@@ -143,7 +143,7 @@ def get_cra_methodology_paragraphs(ano: str) -> list:
     """Gera parágrafos da Seção 4. Metodologia."""
     return [
         [(
-            f"A Coordenadoria de Transporte e Rodovias da Arpe implementou o cronograma de fiscalização para {ano} do Complexo Viário "
+            f"A Coordenadoria de Transporte e Rodovias da ARPE implementou o cronograma de fiscalização para {ano} do Complexo Viário "
             "e Logístico de SUAPE reservando dois dias consecutivos, para melhor estruturar suas ações de fiscalização técnico-operacionais "
             "no Complexo Rodoviário, após uma visita técnica prévia, realizada antes do período de fiscalização, com o objetivo de elaborar "
             "um roteiro que é encaminhado para a CRA e SUAPE contendo os trechos mapeados com possíveis Não Conformidades, tornando os "
@@ -156,7 +156,7 @@ def get_cra_methodology_paragraphs(ano: str) -> list:
             False, False, None
         )],
         [(
-            "Assim, a fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da Arpe está submetida a uma "
+            "Assim, a fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da ARPE está submetida a uma "
             "metodologia organizada em três etapas: Preparação e Planejamento, Execução da Fiscalização e Monitoramento e Avaliação.",
             False, False, None
         )],
@@ -207,7 +207,7 @@ CRA_LEVELS_DATA = {
         "Nível 5 - contendo o sequencial numérico da NC no ano, expresso em três dígitos."
     ],
     "ex_str": "CRA.ST601.2794-2834/2025.013",
-    "ex_desc": "Indica que esta Não Conformidade foi apontada para a CRA, no subtrecho 6.01, distribuída do km 27,94 ao km 28,34, sendo a 13ª NC registrada pela Arpe em 2025"
+    "ex_desc": "Indica que esta Não Conformidade foi apontada para a CRA, no subtrecho 6.01, distribuída do km 27,94 ao km 28,34, sendo a 13ª NC registrada pela ARPE em 2025"
 }
 
 CRA_QUADRO_INTRO_PARAGRAPHS = [
@@ -221,7 +221,7 @@ CRA_QUADRO_INTRO_PARAGRAPHS = [
     [],
     [(
         "A partir das vistorias de campo, e das avaliações das Não Conformidades registradas pelo Verificador Independente, "
-        "foram consolidadas as informações no Quadro 2, a seguir, as Não Conformidades e Determinações/Recomendações expedidas pela Arpe.",
+        "foram consolidadas as informações no Quadro 2, a seguir, as Não Conformidades e Determinações/Recomendações expedidas pela ARPE.",
         False, False, None
     )]
 ]
@@ -230,7 +230,7 @@ CRA_DETERMINATIONS_PARAGRAPHS = [
     [("Considerando os dispositivos contratuais pertinentes e visando garantir a qualidade dos serviços prestados, determina-se que a CRA tome as seguintes medidas através de um plano de ação:", False, False, None)],
     [
         ("Medidas de Manutenção / Conservação,", True, False, None),
-        (" detalhando cronograma com trechos a executar de forma que permita à Arpe uma programação mais efetiva do monitoramento de suas soluções a execução de cada subtrecho, conforme o modelo encaminhado para {ano_anterior} (Cronograma de Conserva Especial do Pavimento CRA {ano_anterior}).", False, False, None)
+        (" detalhando cronograma com trechos a executar de forma que permita à ARPE uma programação mais efetiva do monitoramento de suas soluções a execução de cada subtrecho, conforme o modelo encaminhado para {ano_anterior} (Cronograma de Conserva Especial do Pavimento CRA {ano_anterior}).", False, False, None)
     ],
     [
         ("Medidas imediatas", True, False, None),
@@ -248,7 +248,7 @@ def get_cra_conclusions_paragraphs(total_ncs: int, extenso_ncs: str) -> list:
     """Gera parágrafos da Seção 8. Conclusões."""
     return [
         [(
-            f"Tendo em vista as ações de fiscalização realizadas pela Arpe foram constatadas {extenso_ncs} ({total_ncs}) "
+            f"Tendo em vista as ações de fiscalização realizadas pela ARPE foram constatadas {extenso_ncs} ({total_ncs}) "
             "pontos ou trechos fiscalizados que apresentaram Não Conformidades distribuídas majoritariamente na PE 009, "
             "estas foram analisadas e caracterizadas a partir dos indicadores do Grupo Condição de Superfície definidos "
             "no Contrato de Concessão CT. nº 043/2011.",
@@ -256,7 +256,7 @@ def get_cra_conclusions_paragraphs(total_ncs: int, extenso_ncs: str) -> list:
         )],
         [(
             "Assim considerando a Programação de Conserva Especial do Pavimento - CRA {ano}, solicita-se a inclusão destas "
-            "não conformidades no cronograma detalhado de Conserva Especial do Pavimento que permita à Arpe uma realização "
+            "não conformidades no cronograma detalhado de Conserva Especial do Pavimento que permita à ARPE uma realização "
             "mais efetiva dos monitoramentos ao longo de {ano}.",
             False, False, None
         )],

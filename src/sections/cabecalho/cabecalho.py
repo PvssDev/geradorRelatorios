@@ -29,7 +29,8 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
         # 1. Texto Superior (Sem fundo cinza)
         ano = extrair_ano(row["Data"])
         mes_ano = extrair_mes_ano_numerico(row["Data"])
-        id_fisc = str(row.get("ID da Fiscalização", "")).strip()
+        raw_id = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else (str(row["ID da Fiscalização"]).strip() if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+        id_fisc = raw_id or mes_ano
         ctr_text = report_config.capa_ctr_number_template.format(ano=ano, id_fisc=id_fisc, mes_ano=mes_ano)
         
         lines_ctr = ctr_text.split("\n")
@@ -80,10 +81,10 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
         for nome in responsaveis_list:
             match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
             if match:
-                funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
+                funcao = report_config.analyst_title if hasattr(report_config, "analyst_title") else match.get("funcao", "Especialista em Regulação")
                 analistas.append((match["nome"], f"{funcao}, matrícula nº {match['matricula']}"))
             else:
-                funcao = report_config.analyst_title if report_config.key == "SOCICAM" else "Analista de Regulação"
+                funcao = report_config.analyst_title if hasattr(report_config, "analyst_title") else "Especialista em Regulação"
                 analistas.append((nome, f"{funcao}, matrícula nº xxxxxxx/xx"))
         
         for i, (nome, cargo) in enumerate(analistas):
@@ -142,11 +143,11 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
         gerar_sumario(doc, row, report_config, nc_df=nc_df)
         
         doc.add_page_break()
-        gerar_lista_abreviaturas(doc, report_config)
+        gerar_lista_abreviaturas(doc, report_config, row=row)
     else:
         # CRA: Lista de Abreviaturas na Página 2, Sumário na Página 3
         doc.add_page_break()
-        gerar_lista_abreviaturas(doc, report_config)
+        gerar_lista_abreviaturas(doc, report_config, row=row)
         
         doc.add_page_break()
         gerar_sumario(doc, row, report_config, nc_df=nc_df)
@@ -155,7 +156,7 @@ def gerar_capa_primeira_pagina(doc, logo_path, row, report_config, nc_df=None, d
     doc.add_section(WD_SECTION.NEW_PAGE)
 
 
-def gerar_lista_abreviaturas(doc, report_config):
+def gerar_lista_abreviaturas(doc, report_config, row=None):
     """Gera a segunda página do cabeçalho (Lista de Abreviaturas e Siglas)."""
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -165,7 +166,12 @@ def gerar_lista_abreviaturas(doc, report_config):
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(24)
     
-    abreviaturas = report_config.get_abbreviations()
+    import inspect
+    sig = inspect.signature(report_config.get_abbreviations)
+    if "row" in sig.parameters and row is not None:
+        abreviaturas = report_config.get_abbreviations(row=row)
+    else:
+        abreviaturas = report_config.get_abbreviations()
         
     table = doc.add_table(rows=1 + len(abreviaturas), cols=2)
     table.style = 'Table Grid'

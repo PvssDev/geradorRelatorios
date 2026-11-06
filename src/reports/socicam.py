@@ -120,8 +120,23 @@ class SocicamReport(BaseReport, IReportContract):
     def sumario_before_abreviaturas(self) -> bool:
         return True
 
-    def get_abbreviations(self) -> List[Tuple[str, str]]:
-        return list(SOCICAM_ABBREVIATIONS)
+    def get_abbreviations(self, row: Any = None) -> List[Tuple[str, str]]:
+        from core.rules.socicam_rules import obter_abreviatura_terminal
+        # Começa com a lista base de abreviaturas excluindo 'TIP' para aplicar dinamicamente
+        base_abbr = [item for item in SOCICAM_ABBREVIATIONS if item[0] != "TIP"]
+        
+        local_val = "TIP"
+        if row is not None:
+            if hasattr(row, "get"):
+                local_val = row.get("Local", "TIP")
+            elif isinstance(row, dict) or hasattr(row, "__getitem__"):
+                local_val = row["Local"]
+
+        terminal_abbr = obter_abreviatura_terminal(local_val)
+        base_abbr.append(terminal_abbr)
+        
+        # Ordena alfabeticamente pela Sigla
+        return sorted(base_abbr, key=lambda x: x[0])
 
     def get_sumario_linhas(self, row: Any, nc_df: Any = None) -> List[str]:
         local_val = row.get("Local", "TIP") if hasattr(row, "get") else row["Local"]
@@ -183,7 +198,7 @@ class SocicamReport(BaseReport, IReportContract):
     def quadros_section_title(self) -> str:
         return SOCICAM_QUADROS_SECTION_TITLE
 
-    def get_quadro_intro_paragraphs(self, row: Any, data_extenso: str, responsaveis_formatted: str) -> List[Any]:
+    def get_quadro_intro_paragraphs(self, row: Any, data_extenso: str, responsaveis_formatted: str, apendice_termo: str = "Apêndice ÚNICO") -> List[Any]:
         raw_resp = row.get("Pessoal Responsável", "") if hasattr(row, "get") else row["Pessoal Responsável"]
         if pd.isna(raw_resp) or str(raw_resp).strip().lower() in ["", "nan", "none"]:
             responsaveis_list = []
@@ -209,8 +224,9 @@ class SocicamReport(BaseReport, IReportContract):
             team_runs.append((nome_real, True, False, None))
             team_runs.append((f" (matrícula nº {matricula})", False, False, None))
 
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)")) if hasattr(row, "get") else str(row["Local"])
-        return get_socicam_quadro_intro_paragraphs(data_extenso, team_runs, local_val)
+        local_raw = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)")) if hasattr(row, "get") else str(row["Local"])
+        terminal_oficial = normalizar_nome_terminal_rodoviario(local_raw)
+        return get_socicam_quadro_intro_paragraphs(data_extenso, team_runs, terminal_oficial, apendice_termo=apendice_termo)
 
     @property
     def quadro_title_template(self) -> str:
@@ -235,16 +251,27 @@ class SocicamReport(BaseReport, IReportContract):
         r_total.cells[4].width = widths[4]
 
     def render_quadros(self, doc: Any, row: Any, nc_df: Any, criar_tabela_quadros_fn: Any) -> None:
-        from utils import formatar_data_extenso, adicionar_titulo_secao
+        from utils import formatar_data_extenso, formatar_mes_ano, adicionar_titulo_secao
 
         data_extenso = formatar_data_extenso(row["Data"])
+        try:
+            mes_ano = formatar_mes_ano(row["Data"]).replace(", ", "/").lower()
+        except Exception:
+            mes_ano = "junho/2026"
 
-        # 1. Título da Seção
+        # 1. Título da Seção (com espaço antes e depois)
+        doc.add_paragraph()
         adicionar_titulo_secao(doc, self.quadros_section_title)
         doc.add_paragraph()
 
-        # 2. Parágrafos introdutórios (todos em negrito para SOCICAM)
-        intro_paragraphs = self.get_quadro_intro_paragraphs(row, data_extenso, "")
+        # Obter dados de NC via separador otimizado em O(N)
+        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
+        ncs_reais, pas_reais, resumo = separar_achados_df_socicam(nc_df, id_fisc=id_fisc)
+
+        apendice_termo = "Apêndice A" if resumo.ambos_presentes else "Apêndice ÚNICO"
+
+        # 2. Parágrafos introdutórios
+        intro_paragraphs = self.get_quadro_intro_paragraphs(row, data_extenso, "", apendice_termo=apendice_termo)
         for paragraph_runs in intro_paragraphs:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -261,12 +288,6 @@ class SocicamReport(BaseReport, IReportContract):
 
         doc.add_paragraph()
 
-        # Obter dados de NC via separador otimizado em O(N)
-        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
-        ncs_reais, pas_reais, resumo = separar_achados_df_socicam(nc_df, id_fisc=id_fisc)
-
-        local_val = str(row.get("Local", "Terminal Rodoviário de Passageiros do Recife (TIP)")) if hasattr(row, "get") else str(row["Local"])
-
         ambos_presentes = resumo.ambos_presentes
         tem_nc = resumo.tem_nc
         tem_pa = resumo.tem_pa
@@ -280,7 +301,7 @@ class SocicamReport(BaseReport, IReportContract):
             r7_1.bold = True
             r7_1.font.name = "Aptos"
             r7_1.font.size = Pt(11)
-            r7_2 = p7.add_run(f" – Não Conformidades do {local_val}")
+            r7_2 = p7.add_run(f" – Determinações para Não Conformidades Identificadas – {mes_ano}")
             r7_2.font.name = "Aptos"
             r7_2.font.size = Pt(11)
 
@@ -295,7 +316,7 @@ class SocicamReport(BaseReport, IReportContract):
                 r_q2_1.bold = True
                 r_q2_1.font.name = "Aptos"
                 r_q2_1.font.size = Pt(11)
-                r_q2_2 = p_q2.add_run(f" – Pontos de Atenção do {local_val}")
+                r_q2_2 = p_q2.add_run(f" – Determinações para Pontos de Atenção Identificados – {mes_ano}")
                 r_q2_2.font.name = "Aptos"
                 r_q2_2.font.size = Pt(11)
 
@@ -310,7 +331,7 @@ class SocicamReport(BaseReport, IReportContract):
             r7_1.bold = True
             r7_1.font.name = "Aptos"
             r7_1.font.size = Pt(11)
-            r7_2 = p7.add_run(f" – Pontos de Atenção do {local_val}")
+            r7_2 = p7.add_run(f" – Determinações para Pontos de Atenção Identificados – {mes_ano}")
             r7_2.font.name = "Aptos"
             r7_2.font.size = Pt(11)
 
@@ -330,8 +351,8 @@ class SocicamReport(BaseReport, IReportContract):
 
     def get_conclusions_paragraphs(self, total_ncs: int, local_val: str) -> List[Any]:
         nc_frase = formatar_frase_conclusao_achados_socicam(total_ncs)
-        terminal_curto = normalizar_nome_terminal_curto(local_val)
-        return get_socicam_conclusions_paragraphs(nc_frase, terminal_curto)
+        terminal_oficial = normalizar_nome_terminal_rodoviario(local_val)
+        return get_socicam_conclusions_paragraphs(nc_frase, terminal_oficial)
 
     def render_apendices(self, doc: Any, row: Any, ncs_reais: Any, pas_reais: Any, fotos_dir: Any, data_fisc: Any, ano: Any, criar_grade_fotos_fn: Any) -> None:
         from utils import adicionar_titulo_secao
@@ -371,11 +392,14 @@ class SocicamReport(BaseReport, IReportContract):
         if isinstance(row, (str, int)) and ano is None:
             ano = str(row)
             mes_ano = f"01/{ano}"
+            id_fisc = mes_ano
         else:
             ano = ano or extrair_ano(row.get("Data", "") if hasattr(row, "get") else row["Data"])
             data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
             mes_ano = extrair_mes_ano_numerico(data_val)
+            raw_id = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else (str(row["ID da Fiscalização"]).strip() if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            id_fisc = raw_id or mes_ano
         return [
-            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {mes_ano} - CTR",
+            f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {id_fisc} - CTR",
             "SEI Nº xxxxxxxx-xxx"
         ]

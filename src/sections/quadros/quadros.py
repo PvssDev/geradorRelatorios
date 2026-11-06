@@ -318,10 +318,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         run.font.size = Pt(10)
         return
         
-    if report_config.key == "SOCICAM":
-        table = doc.add_table(rows=1 + num_rows, cols=5)
-    else:
-        table = doc.add_table(rows=2 + num_rows, cols=5)
+    table = doc.add_table(rows=2 + num_rows, cols=5)
         
     table.style = 'Table Grid'
     set_table_borders(table)
@@ -330,22 +327,13 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
     table.allow_autofit = False
     
     # 1. Mesclar células do cabeçalho
-    if report_config.key != "SOCICAM":
-        table.cell(0, 0).merge(table.cell(0, 1))
-        table.cell(0, 2).merge(table.cell(1, 2))
-        table.cell(0, 3).merge(table.cell(1, 3))
-        table.cell(0, 4).merge(table.cell(1, 4))
+    table.cell(0, 0).merge(table.cell(0, 1))
+    table.cell(0, 2).merge(table.cell(1, 2))
+    table.cell(0, 3).merge(table.cell(1, 3))
+    table.cell(0, 4).merge(table.cell(1, 4))
     
     # 2. Definir os textos do cabeçalho
-    if report_config.key == "SOCICAM":
-        table.cell(0, 0).text = "IDENTIFICAÇÃO"
-        table.cell(0, 1).text = "DESCRIÇÃO"
-        table.cell(0, 2).text = "REGISTRO\nFOTOGRÁFICO"
-        table.cell(0, 3).text = "FUNDAMENTO DA INFRAÇÃO\n(ANEXO V CONTRATO DE CONCESSÃO)"
-        table.cell(0, 4).text = "DETERMINAÇÃO"
-        header_color = "D9D9D9"
-        col_widths = report_config.nc_table_col_widths
-    elif not is_pa:
+    if not is_pa:
         if report_config.key == "CRA":
             table.cell(0, 0).text = "NÃO CONFORMIDADE (NC)"
             table.cell(1, 0).text = "CODIFICAÇÃO"
@@ -355,6 +343,15 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
             table.cell(0, 4).text = "DETERMINAÇÃO"
             header_color = "D9D9D9"  # Cinza Quadro 2
             col_widths = [Inches(1.40), Inches(1.40), Inches(1.22), Inches(1.69), Inches(1.56)]
+        elif report_config.key == "SOCICAM":
+            table.cell(0, 0).text = "NÃO CONFORMIDADE (NC)"
+            table.cell(1, 0).text = "IDENTIFICAÇÃO"
+            table.cell(1, 1).text = "DESCRIÇÃO"
+            table.cell(0, 2).text = "REGISTRO FOTOGRÁFICO"
+            table.cell(0, 3).text = "FUNDAMENTO DA INFRAÇÃO\n(ANEXO V CONTRATO DE CONCESSÃO)"
+            table.cell(0, 4).text = "DETERMINAÇÃO"
+            header_color = "D9D9D9"
+            col_widths = report_config.nc_table_col_widths
         else:
             table.cell(0, 0).text = "NÃO CONFORMIDADE (NC)"
             table.cell(1, 0).text = "IDENTIFICAÇÃO"
@@ -371,14 +368,14 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         else:
             table.cell(1, 0).text = "IDENTIFICAÇÃO"
         table.cell(1, 1).text = "DESCRIÇÃO DA EVIDÊNCIA"
-        table.cell(0, 2).text = "LOCALIZAÇÃO/\nREGISTRO FOTOGRÁFICO"
+        table.cell(0, 2).text = "LOCALIZAÇÃO/\nREGISTRO FOTOGRÁFICO" if report_config.key == "CRA" else "REGISTRO FOTOGRÁFICO"
         table.cell(0, 3).text = "JUSTIFICATIVA PARA PONTOS DE ATENÇÃO"
         table.cell(0, 4).text = "SOLICITAÇÃO"
         header_color = "E7E6E6"  # Cinza Claro Quadro 3
-        col_widths = [Inches(1.18), Inches(1.74), Inches(1.14), Inches(1.81), Inches(1.40)]
+        col_widths = [Inches(1.18), Inches(1.74), Inches(1.14), Inches(1.81), Inches(1.40)] if report_config.key == "CRA" else report_config.nc_table_col_widths
         
     # Formatar cabeçalhos
-    header_rows = [0] if report_config.key == "SOCICAM" else [0, 1]
+    header_rows = [0, 1]
     for r_idx in header_rows:
         row = table.rows[r_idx]
         for c_idx, cell in enumerate(row.cells):
@@ -400,7 +397,7 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
                     run.bold = True
                     
     # Preencher dados
-    start_r_idx = 1 if report_config.key == "SOCICAM" else 2
+    start_r_idx = 2
     for idx, rec in enumerate(grouped_records):
         r_idx = idx + start_r_idx
         row = table.rows[r_idx]
@@ -439,9 +436,9 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
             
             if cell.paragraphs:
                 p = cell.paragraphs[0]
-                if report_config.key == "CRA" and c_idx == 2:
+                if c_idx == 2:
                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                elif c_idx in [0, 2, 3, 4]:
+                elif c_idx in [0, 3, 4]:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 else:
                     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -459,8 +456,8 @@ def criar_tabela_quadros(doc, df_dados, is_pa, report_config):
         for c_idx, cell in enumerate(row.cells):
             cell.width = col_widths[c_idx]
 
-    # Mesclar verticalmente as colunas 2, 3 e 4 para grupos com mais de uma NC (relação N:1:1 no CRA)
-    if report_config.key == "CRA":
+    # Mesclar verticalmente as colunas 2, 3 e 4 para grupos com mais de uma NC (relação N:1:1)
+    if report_config.key in ["CRA", "CRC", "SOCICAM"]:
         groups = []
         curr_grp = None
         curr_start = None

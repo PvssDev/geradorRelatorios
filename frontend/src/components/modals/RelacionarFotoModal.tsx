@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { X, Link2, CheckCircle2, AlertTriangle, Images, Search } from "lucide-react";
 import { toast } from "sonner";
-import { useReportStore } from "../../store/useReportStore";
-import { obterTermosUI } from "../../types/report.types";
+import { useReportStore, derivarProximaCodificacao } from "../../store/useReportStore";
+import { obterTermosUI, SituacaoNC } from "../../types/report.types";
 import { modalInputCls, modalPill } from "./modalHelpers";
 
 export const RelacionarFotoModal: React.FC<{

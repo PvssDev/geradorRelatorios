@@ -17,22 +17,22 @@ DEFAULT_RESPONSAVEIS = [
     {
         "nome": "Alcides Vieira de Azevedo Bezerra",
         "matricula": "40672015/01",
-        "funcao": "Analista de Regulação"
+        "funcao": "Especialista em Regulação"
     },
     {
         "nome": "Enildo Manoel da Silva Júnior",
         "matricula": "1796500/02",
-        "funcao": "Analista de Regulação"
+        "funcao": "Especialista em Regulação"
     },
     {
         "nome": "Cícero Ronaldo Mendes de Andrade Júnior",
         "matricula": "3485510/02",
-        "funcao": "Analista de Regulação"
+        "funcao": "Especialista em Regulação"
     },
     {
         "nome": "Maria Fernanda da Silva Novaes",
         "matricula": "18471080/01",
-        "funcao": "Auxiliar de Regulação"
+        "funcao": "Especialista em Regulação"
     }
 ]
 
@@ -105,7 +105,7 @@ def carregar_responsaveis():
                 nova_lista.append({
                     "nome": nome,
                     "matricula": "xxxxxxx/xx",
-                    "funcao": "Analista de Regulação"
+                    "funcao": "Especialista em Regulação"
                 })
         salvar_responsaveis(nova_lista)
         return nova_lista

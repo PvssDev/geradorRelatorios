@@ -322,10 +322,10 @@ const DEFAULT_MAP_SIGLAS: Record<string, string> = {
 };
 
 const DEFAULT_RESPONSAVEIS: PessoaItem[] = [
-  { nome: "Alcides Vieira de Azevedo Bezerra", matricula: "40672015/01", funcao: "Analista de Regulação" },
-  { nome: "Enildo Manoel da Silva Júnior", matricula: "1796500/02", funcao: "Analista de Regulação" },
-  { nome: "Cícero Ronaldo Mendes de Andrade Júnior", matricula: "3485510/02", funcao: "Analista de Regulação" },
-  { nome: "Maria Fernanda da Silva Novaes", matricula: "18471080/01", funcao: "Auxiliar de Regulação" },
+  { nome: "Alcides Vieira de Azevedo Bezerra", matricula: "40672015/01", funcao: "Especialista em Regulação" },
+  { nome: "Enildo Manoel da Silva Júnior", matricula: "1796500/02", funcao: "Especialista em Regulação" },
+  { nome: "Cícero Ronaldo Mendes de Andrade Júnior", matricula: "3485510/02", funcao: "Especialista em Regulação" },
+  { nome: "Maria Fernanda da Silva Novaes", matricula: "18471080/01", funcao: "Especialista em Regulação" },
   { nome: "Eulina Menezes Maciel", matricula: "17127955/04", funcao: "Especialista em Regulação" },
   { nome: "Manuel Lucas Nascimento do Espírito Santo", matricula: "18533051/01", funcao: "Especialista em Regulação" },
 ];

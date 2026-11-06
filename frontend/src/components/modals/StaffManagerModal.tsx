@@ -19,7 +19,7 @@ export const StaffManagerModal: React.FC<{
   const [matricula, setMatricula] = useState("");
   const [funcao, setFuncao] = useState(
     isResp
-      ? "Analista de Regulação"
+      ? "Especialista em Regulação"
       : "Coordenador(a) de Transportes e Rodovias"
   );
 

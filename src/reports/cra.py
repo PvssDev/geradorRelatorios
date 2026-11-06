@@ -121,7 +121,7 @@ class CraReport(BaseReport, IReportContract):
 
     @property
     def general_info_col_widths(self) -> List[Any]:
-        return [Inches(2.3), Inches(5.2)]
+        return [Inches(2.2), Inches(5.07)]
 
     @property
     def general_info_headers_indices(self) -> List[int]:
@@ -352,11 +352,14 @@ class CraReport(BaseReport, IReportContract):
         if isinstance(row, (str, int)) and ano is None:
             ano = str(row)
             mes_ano = f"01/{ano}"
+            id_fisc = mes_ano
         else:
             data_val = row.get("Data", "") if hasattr(row, "get") else (row["Data"] if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
             ano = ano or extrair_ano(data_val)
             mes_ano = extrair_mes_ano_numerico(data_val)
+            raw_id = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else (str(row["ID da Fiscalização"]).strip() if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
+            id_fisc = raw_id or mes_ano
         return [
-            f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº {mes_ano} - CTR",
+            f"RELATÓRIO DE FISCALIZAÇÃO PROCESSO ADMINISTRATIVO Nº {id_fisc} - CTR",
             "SEI Nº xxxxxxxx-xxx"
         ]

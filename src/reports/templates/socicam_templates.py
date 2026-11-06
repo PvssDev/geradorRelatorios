@@ -14,7 +14,7 @@ SOCICAM_DEFAULT_CONTRATO = "CT. nº 1.041.080/08"
 SOCICAM_CAPA_ORGAO_CONCEDENTE = "GOVERNO DO ESTADO DE PERNAMBUCO"
 SOCICAM_CAPA_SECRETARIA = "SECRETARIA DE MOBILIDADE E INFRAESTRUTURA - SEMOBI"
 SOCICAM_CAPA_TITULO = "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL"
-SOCICAM_CAPA_CTR_NUMBER_TEMPLATE = "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {mes_ano}"
+SOCICAM_CAPA_CTR_NUMBER_TEMPLATE = "RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}"
 SOCICAM_CAPA_PRESTADOR_LABEL = "PRESTADOR DE SERVIÇO: SOCICAM - ADMINISTRAÇÃO, PROJETOS E REPRESENTAÇÕES LTDA"
 SOCICAM_CAPA_CONTRATO_LABEL = "CONTRATO DE CONCESSÃO DE SERVIÇO PÚBLICO"
 SOCICAM_CAPA_REGULADOR_LABEL = "AGÊNCIA DE REGULAÇÃO DOS SERVIÇOS PÚBLICOS DELEGADOS DO ESTADO DE PERNAMBUCO - ARPE"
@@ -45,17 +45,19 @@ SOCICAM_ABBREVIATIONS = [
     ("EPTI", "Empresa Pernambucana de Transporte Coletivo Intermunicipal"),
     ("NC", "Não Conformidade"),
     ("PCD", "Pessoa com Deficiência"),
+    ("SOCICAM", "SOCICAM - Administração, Projetos e Representações Ltda"),
     ("TIP", "Terminal Rodoviário de Passageiros do Recife")
 ]
 
 SOCICAM_BASE_SUMARIO_LINHAS = [
     "1.\tINTRODUÇÃO\t4",
     "2.\tOBJETIVO\t4",
-    "3.\tMETODOLOGIA\t5",
-    "4.\tFISCALIZAÇÃO\t5",
-    "5.\tDETERMINAÇÕES GERAIS\t6",
-    "6.\tRECOMENDAÇÕES\t6",
-    "7.\tCONCLUSÕES\t7"
+    "3.\tINFORMAÇÕES GERAIS\t4",
+    "4.\tMETODOLOGIA\t5",
+    "5.\tFISCALIZAÇÃO\t5",
+    "6.\tDETERMINAÇÕES GERAIS\t6",
+    "7.\tRECOMENDAÇÕES\t6",
+    "8.\tCONCLUSÕES\t7"
 ]
 
 
@@ -63,7 +65,7 @@ def get_socicam_intro_paragraphs(terminal_nome: str) -> list:
     """Gera parágrafos formatados da seção 1. Introdução para o SOCICAM."""
     return [
         [
-            ("A Coordenadoria de Transportes e Rodovias da Arpe realizou vistorias no ", False, False, None),
+            ("A Coordenadoria de Transportes e Rodovias da ARPE realizou vistorias no ", False, False, None),
             (terminal_nome, True, False, None),
             (
                 " com o objetivo de verificar as condições operacionais, de conservação, de manutenção e de segurança e da qualidade "
@@ -115,7 +117,7 @@ def get_socicam_general_info_rows(responsaveis_formatted: str, periodo_val: str)
         ("Representantes para acompanhar:", "Recife (TIP): Monalisa Pereira", False, False),
 
         ("3.3 DO REGULADOR", "", True, False),
-        ("Regulador:", "Agência de Regulação de Pernambuco (Arpe)", False, False),
+        ("Regulador:", "Agência de Regulação de Pernambuco (ARPE)", False, False),
         ("Diretor Presidente:", "CARLOS PORTO FILHO", False, True),
         ("Endereço:", "Av. Cons. Rosa e Silva, 975, Aflitos, Recife/PE, CEP: 52.050-020", False, False),
         ("Estacionamento:", "Rua do Futuro, 150, Aflitos, Recife/PE", False, False),
@@ -125,13 +127,13 @@ def get_socicam_general_info_rows(responsaveis_formatted: str, periodo_val: str)
     ]
 
 
-SOCICAM_GENERAL_INFO_COL_WIDTHS = [Inches(3.0), Inches(4.57)]
+SOCICAM_GENERAL_INFO_COL_WIDTHS = [Inches(2.2), Inches(5.07)]
 SOCICAM_GENERAL_INFO_HEADERS_INDICES = [0, 4, 9]
 
 
 SOCICAM_METHODOLOGY_PARAGRAPHS = [
     [(
-        "A fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da Arpe está submetida a uma "
+        "A fiscalização direta e periódica realizada pela Coordenadoria de Transportes e Rodovias da ARPE está submetida a uma "
         "metodologia organizada em três etapas: Preparação e Planejamento, Execução da Fiscalização e Monitoramento e Avaliação.",
         False, False, None
     )],
@@ -156,11 +158,8 @@ SOCICAM_METHODOLOGY_PARAGRAPHS = [
 
 SOCICAM_REFERENCES_BULLETS = [
     ("Lei nº 13.254, de 21 de junho de 2007, alterada pela Lei nº 15.200, de 17 de dezembro de 2013, e regulamentada pelo Decreto nº 40.559, de 31 de março de 2014.", False, True),
-    ("", False, False),
-    ("Resoluções Arpe nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), alterada pela Resolução ARPE nº 53, de 26 de janeiro de 2009 (Antiga 003/2009); e nº 083, de 30 de julho de 2013.", False, True),
-    ("", False, False),
+    ("Resoluções ARPE nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), alterada pela Resolução ARPE nº 53, de 26 de janeiro de 2009 (Antiga 003/2009); e nº 083, de 30 de julho de 2013.", False, True),
     ("Contrato de Concessão de Serviço Público Nº 1.041.080/08, de 19 de setembro de 2008 e aditivos, em especial, o Segundo Termo Aditivo ao Contrato de Concessão, de 29 de setembro de 2017.", False, True),
-    ("", False, False),
     ("Normas Técnicas da ABNT.", False, True)
 ]
 
@@ -179,8 +178,8 @@ SOCICAM_POST_METHODOLOGY_PARAGRAPHS = [
     ]
 ]
 
-SOCICAM_QUADROS_SECTION_TITLE = "4. FISCALIZAÇÃO"
-SOCICAM_QUADRO_TITLE_TEMPLATE = "Quadro 1 – Não Conformidades do {local_val}"
+SOCICAM_QUADROS_SECTION_TITLE = "5. FISCALIZAÇÃO"
+SOCICAM_QUADRO_TITLE_TEMPLATE = "Quadro 1 – Determinações para Não Conformidades Identificadas – {mes_ano}"
 
 SOCICAM_NC_TABLE_HEADERS = [
     "IDENTIFICAÇÃO",
@@ -191,8 +190,8 @@ SOCICAM_NC_TABLE_HEADERS = [
 ]
 
 
-def get_socicam_quadro_intro_paragraphs(data_extenso: str, team_runs: list, local_val: str) -> list:
-    """Gera parágrafos introdutórios da Seção 4. Fiscalização para o SOCICAM."""
+def get_socicam_quadro_intro_paragraphs(data_extenso: str, team_runs: list, local_val: str, apendice_termo: str = "Apêndice ÚNICO") -> list:
+    """Gera parágrafos introdutórios da Seção 5. Fiscalização para o SOCICAM."""
     p1 = [
         ("As ações de fiscalização foram realizadas, em ", False, False, None),
         (f"{data_extenso}, ", False, False, None),
@@ -205,18 +204,18 @@ def get_socicam_quadro_intro_paragraphs(data_extenso: str, team_runs: list, loca
         ("As Não Conformidades constatadas estão relacionadas ao ", False, False, None),
         ("Programa de Manutenção dos Terminais Rodoviários", True, False, None),
         (", Anexo V do Contrato de Concessão, conforme descritas no ", False, False, None),
-        ("Quadro 1", True, False, None),
+        ("Quadro 1", False, False, None),
         (", a seguir, com indicação dos respectivos registros fotográficos no ", False, False, None),
-        ("Apêndice A", True, False, None),
+        (apendice_termo, True, False, None),
         (".", False, False, None)
     ]
     return [p1, p2]
 
 
 SOCICAM_FINALIZACAO_SECTIONS_CONFIG = {
-    "5": "determinações",
-    "6": "recomendações",
-    "7": "conclusões"
+    "6": "determinações",
+    "7": "recomendações",
+    "8": "conclusões"
 }
 
 
@@ -249,7 +248,7 @@ def get_socicam_determinations_paragraphs(total_ncs: int, extenso_ncs: str) -> l
 SOCICAM_RECOMMENDATIONS_PARAGRAPHS = [
     [(
         "Considerando as disposições do Contrato de Concessão, em especial, o Anexo III – Regulamento Interno dos Terminais "
-        "Rodoviários, aprovado pela Resolução Arpe nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), bem como a legislação "
+        "Rodoviários, aprovado pela Resolução ARPE nº 46, de 07 de abril de 2008 (Antiga nº 06/2008), bem como a legislação "
         "aplicável, devem ser observadas pela SOCICAM as seguintes recomendações:",
         False, False, None
     )],
@@ -283,7 +282,7 @@ def get_socicam_conclusions_paragraphs(nc_frase: str, terminal_curto: str) -> li
             (", que devem ser solucionadas pela SOCICAM de acordo com as Determinações desta Agência de Regulação (v. Quadro 1).", False, False, None)
         ],
         [(
-            "Por fim, solicita-se o encaminhamento deste Processo de Fiscalização para conhecimento e acompanhamento da EPTI, "
+            "Por fim, solicita-se o encaminhamento deste Processo de Fiscalização também para conhecimento e acompanhamento da EPTI, "
             "na qualidade de Poder Concedente do Contrato de Concessão e gestora do Sistema de Transporte Coletivo Intermunicipal "
             "de Passageiros (STCIP-PE).",
             False, False, None

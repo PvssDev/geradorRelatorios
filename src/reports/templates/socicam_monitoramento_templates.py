@@ -18,6 +18,7 @@ SOCICAM_MONITORAMENTO_ABBREVIATIONS = [
     ("EPTI", "Empresa Pernambucana de Transporte Coletivo Intermunicipal"),
     ("NC", "Não Conformidade"),
     ("PCD", "Pessoa com Deficiência"),
+    ("SOCICAM", "SOCICAM - Administração, Projetos e Representações Ltda"),
     ("TIP", "Terminal Rodoviário de Passageiros do Recife")
 ]
 

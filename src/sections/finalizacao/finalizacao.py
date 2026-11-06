@@ -13,7 +13,8 @@ from utils import (
     fotos_tem_mesmas_ncs,
     formatar_legenda_foto,
     converter_faixa_para_sigla,
-    combinar_faixas_relacionadas
+    combinar_faixas_relacionadas,
+    extrair_primeira_data_vistoria
 )
 from database.manager import carregar_responsaveis, carregar_coordenadores
 from services.image_service import extrair_data_original_foto
@@ -101,6 +102,8 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
     if df_fotos is None or df_fotos.empty:
         return
     
+    data_fallback = extrair_primeira_data_vistoria(data_fisc)
+
     # Compatibilidade com planilhas antigas
     df_fotos = df_fotos.copy()
     for col in ["Pista", "Trecho", "Codificação", "Foto", "Fotos", "Foto Anterior", "Legenda Anterior", "Observações", "Legenda da Foto", "Não Conformidade", "Identificação", "Data da Foto"]:
@@ -236,7 +239,9 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 obs_text = str(rec.get("Observações") or rec.get("Legenda da Foto") or "").strip().rstrip(".")
                 data_foto_r = rec.get("Data da Foto")
                 if not data_foto_r or data_foto_r == "xx/xx/xxxx":
-                    data_foto_r = extrair_data_original_foto(foto_path_right or foto_new)
+                    data_foto_r = extrair_data_original_foto(foto_path_right or foto_new, fallback=data_fallback or "xx/xx/xxxx")
+                if (not data_foto_r or data_foto_r == "xx/xx/xxxx") and data_fallback:
+                    data_foto_r = data_fallback
                 caption_right_text = f"Foto {num_right} – {obs_text}, em {data_foto_r}." if obs_text else f"Foto {num_right}, em {data_foto_r}."
                 run_caption_right = p_caption_right.add_run(caption_right_text)
                 run_caption_right.font.name = 'Aptos'
@@ -404,7 +409,9 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     num = str(num_val).zfill(2)
                 data_foto = rec.get("Data da Foto")
                 if not data_foto or data_foto == "xx/xx/xxxx":
-                    data_foto = extrair_data_original_foto(foto_path or rec.get("Foto"))
+                    data_foto = extrair_data_original_foto(foto_path or rec.get("Foto"), fallback=data_fallback or "xx/xx/xxxx")
+                if (not data_foto or data_foto == "xx/xx/xxxx") and data_fallback:
+                    data_foto = data_fallback
                 data_str = f", em {data_foto}"
                 
                 obs_text_clean = str(obs_text).strip()
@@ -501,7 +508,9 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                     obs_l = str(rec_left.get("Observações") or rec_left.get("Legenda da Foto") or "").strip()
                     data_foto_l = rec_left.get("Data da Foto")
                     if not data_foto_l or data_foto_l == "xx/xx/xxxx":
-                        data_foto_l = extrair_data_original_foto(f_path_left or rec_left.get("Foto"))
+                        data_foto_l = extrair_data_original_foto(f_path_left or rec_left.get("Foto"), fallback=data_fallback or "xx/xx/xxxx")
+                    if (not data_foto_l or data_foto_l == "xx/xx/xxxx") and data_fallback:
+                        data_foto_l = data_fallback
                     if str(tipo_relatorio).upper() == "CRA":
                         cod_l = cod_custom_rel or _obter_texto_localizacao_cra(rec_left)
                         faixa_l = faixa_custom_rel or rec_left.get("Direção (faixa)", "")
@@ -539,7 +548,9 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         obs_r = str(rec_right.get("Observações") or rec_right.get("Legenda da Foto") or "").strip()
                         data_foto_r = rec_right.get("Data da Foto")
                         if not data_foto_r or data_foto_r == "xx/xx/xxxx":
-                            data_foto_r = extrair_data_original_foto(f_path_right or rec_right.get("Foto"))
+                            data_foto_r = extrair_data_original_foto(f_path_right or rec_right.get("Foto"), fallback=data_fallback or "xx/xx/xxxx")
+                        if (not data_foto_r or data_foto_r == "xx/xx/xxxx") and data_fallback:
+                            data_foto_r = data_fallback
                         if str(tipo_relatorio).upper() == "CRA":
                             cod_r = cod_custom_rel or _obter_texto_localizacao_cra(rec_right)
                             faixa_r = faixa_custom_rel or rec_right.get("Direção (faixa)", "")
@@ -764,11 +775,11 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
             match = next((d for d in db_resp if d["nome"].strip().lower() == nome.lower()), None)
             if match:
                 r_nome = match["nome"]
-                r_funcao = report_config.analyst_title if report_config.key == "SOCICAM" else match["funcao"]
+                r_funcao = report_config.analyst_title if hasattr(report_config, "analyst_title") else match.get("funcao", "Especialista em Regulação")
                 r_matr = match["matricula"]
             else:
                 r_nome = nome
-                r_funcao = report_config.analyst_title
+                r_funcao = report_config.analyst_title if hasattr(report_config, "analyst_title") else "Especialista em Regulação"
                 r_matr = "xxxxxxx/xx"
                 
             p_ass = doc.add_paragraph()

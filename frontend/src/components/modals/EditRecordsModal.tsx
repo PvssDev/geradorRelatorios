@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { X, Edit3, Trash2, Save, AlertTriangle, Search, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore, derivarProximaCodificacao } from "../../store/useReportStore";
-import { SituacaoNC } from "../../types/report.types";
+import { SituacaoNC, obterTermosUI } from "../../types/report.types";
 import { modalInputCls, modalPill } from "./modalHelpers";
 
 export const EditRecordsModal: React.FC<{
