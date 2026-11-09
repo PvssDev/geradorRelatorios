@@ -127,10 +127,19 @@ class SocicamReport(BaseReport, IReportContract):
         
         local_val = "TIP"
         if row is not None:
+            raw_local = None
             if hasattr(row, "get"):
-                local_val = row.get("Local", "TIP")
+                raw_local = row.get("Local") or row.get("Terminal")
             elif isinstance(row, dict) or hasattr(row, "__getitem__"):
-                local_val = row["Local"]
+                try:
+                    raw_local = row["Local"]
+                except (KeyError, IndexError):
+                    try:
+                        raw_local = row["Terminal"]
+                    except (KeyError, IndexError):
+                        pass
+            if raw_local is not None and not (isinstance(raw_local, float) and pd.isna(raw_local)) and str(raw_local).strip():
+                local_val = str(raw_local).strip()
 
         terminal_abbr = obter_abreviatura_terminal(local_val)
         base_abbr.append(terminal_abbr)

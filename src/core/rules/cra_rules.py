@@ -759,9 +759,8 @@ def normalizar_registros_cra_para_relatorio(
             r["Trecho"] = cod_final
         normalizados.append(r)
 
-    # 4. Sincronizar legendas e faixa combinada ('Esquerda e Direita' / 'FED') em cada grupo (se for CRA)
-    if any("CRA" in str(r.get("ID da Fiscalização", "")).upper() or r.get("Direção (faixa)") for r in normalizados):
-        for grp_id in grupos_vistos:
-            sincronizar_legendas_grupo_cra(normalizados, grp_id, mapa_siglas=mapa_siglas)
+    # 4. Sincronizar legendas e faixa combinada em cada grupo
+    for grp_id in grupos_vistos:
+        sincronizar_legendas_grupo_cra(normalizados, grp_id, mapa_siglas=mapa_siglas)
 
     return normalizados

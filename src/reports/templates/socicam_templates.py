@@ -66,7 +66,7 @@ def get_socicam_intro_paragraphs(terminal_nome: str) -> list:
     return [
         [
             ("A Coordenadoria de Transportes e Rodovias da ARPE realizou vistorias no ", False, False, None),
-            (terminal_nome, True, False, None),
+            (terminal_nome, False, False, None),
             (
                 " com o objetivo de verificar as condições operacionais, de conservação, de manutenção e de segurança e da qualidade "
                 "do serviço prestado no referido terminal, conforme Contrato de Concessão de Serviço Público No 1.041.080/08, firmado "
@@ -91,7 +91,7 @@ def get_socicam_objective_paragraphs(terminal_nome: str) -> list:
                 "usuário, bem como toda estrutura para funcionamento desses terminais. Dessa forma, a ação de fiscalização no ",
                 False, False, None
             ),
-            (terminal_nome, True, False, None),
+            (terminal_nome, False, False, None),
             (
                 ", realizada pela ARPE verificou o grau de conformidade dessas instalações com o Contrato de Concessão, bem como com a "
                 "legislação e normas vigentes de modo a determinar e/ou recomendar medidas corretivas, com foco na qualidade dos "

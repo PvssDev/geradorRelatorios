@@ -29,7 +29,8 @@ def normalizar_nome_terminal_rodoviario(local_val: Any) -> str:
     if not l_str or l_str.lower() in ("nan", "none", "=local="):
         return "Terminal Rodoviário de Passageiros do Recife (TIP)"
 
-    if l_str.upper() == "TIP":
+    l_upper = l_str.upper()
+    if l_upper in ("TIP", "RECIFE", "TIP RECIFE"):
         return "Terminal Rodoviário de Passageiros do Recife (TIP)"
 
     l_lower = l_str.lower()
@@ -59,7 +60,8 @@ def normalizar_nome_terminal_curto(local_val: Any) -> str:
     if not l_str or l_str.lower() in ("nan", "none", "=local="):
         return "Terminal de Passageiros do Recife (TIP)"
 
-    if l_str.upper() == "TIP":
+    l_upper = l_str.upper()
+    if l_upper in ("TIP", "RECIFE", "TIP RECIFE"):
         return "Terminal de Passageiros do Recife (TIP)"
 
     l_lower = l_str.lower()
@@ -131,6 +133,8 @@ def obter_abreviatura_terminal(local_val: Any) -> Tuple[str, str]:
         return ("GAR", "Terminal Rodoviário de Garanhuns")
     elif "PETROLINA" in l_upper:
         return ("PET", "Terminal Rodoviário de Petrolina")
+    elif "SERRA TALHADA" in l_upper or "SERRA" in l_upper:
+        return ("SET", "Terminal Rodoviário de Serra Talhada")
 
     # Fallback genérico para outros terminais intermunicipais
     sigla = extrair_sigla_terminal(local_val)[:3].upper()

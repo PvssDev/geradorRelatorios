@@ -341,7 +341,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
             nc_txt = str(rec_main.get("Não Conformidade", "")).strip()
 
             cod_grupo_cra, siglas_grupo_cra, faixa_grupo_cra = ("", [], "")
-            if str(tipo_relatorio).upper() == "CRA":
+            if str(tipo_relatorio).upper() in ["CRA", "SOCICAM"]:
                 cod_grupo_cra, siglas_grupo_cra, faixa_grupo_cra = consolidar_dados_legenda_grupo_cra(related)
             
             if str(tipo_relatorio).upper() == "CRC":
@@ -415,7 +415,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 data_str = f", em {data_foto}"
                 
                 obs_text_clean = str(obs_text).strip()
-                if str(tipo_relatorio).upper() == "CRA":
+                if str(tipo_relatorio).upper() in ["CRA", "SOCICAM"]:
                     cod_val = cod_grupo_cra or _obter_texto_localizacao_cra(rec)
                     faixa_val = faixa_grupo_cra or rec.get("Direção (faixa)", "")
                     siglas_target = (
@@ -453,10 +453,10 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                 table.columns[0].width = Inches(3.635)
                 table.columns[1].width = Inches(3.635)
                 
-                # No CRA, todas as fotos relacionadas no mesmo grupo compartilham a mesma codificação contraída,
+                # No CRA e SOCICAM, todas as fotos relacionadas no mesmo grupo compartilham a mesma codificação contraída,
                 # as mesmas Não Conformidades / Pontos de Atenção consolidados e a mesma faixa combinada.
-                cod_custom_rel = cod_grupo_cra if str(tipo_relatorio).upper() == "CRA" and cod_grupo_cra else None
-                faixa_custom_rel = faixa_grupo_cra if str(tipo_relatorio).upper() == "CRA" and faixa_grupo_cra else None
+                cod_custom_rel = cod_grupo_cra if str(tipo_relatorio).upper() in ["CRA", "SOCICAM"] and cod_grupo_cra else None
+                faixa_custom_rel = faixa_grupo_cra if str(tipo_relatorio).upper() in ["CRA", "SOCICAM"] and faixa_grupo_cra else None
 
                 for i in range(0, len(distinct_related), 2):
                     rec_left = distinct_related[i]
@@ -511,7 +511,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                         data_foto_l = extrair_data_original_foto(f_path_left or rec_left.get("Foto"), fallback=data_fallback or "xx/xx/xxxx")
                     if (not data_foto_l or data_foto_l == "xx/xx/xxxx") and data_fallback:
                         data_foto_l = data_fallback
-                    if str(tipo_relatorio).upper() == "CRA":
+                    if str(tipo_relatorio).upper() in ["CRA", "SOCICAM"]:
                         cod_l = cod_custom_rel or _obter_texto_localizacao_cra(rec_left)
                         faixa_l = faixa_custom_rel or rec_left.get("Direção (faixa)", "")
                         siglas_target_l = (
@@ -551,7 +551,7 @@ def criar_grade_fotos(doc, df_fotos, terminal_nc, fotos_dir, data_fisc, tipo_rel
                             data_foto_r = extrair_data_original_foto(f_path_right or rec_right.get("Foto"), fallback=data_fallback or "xx/xx/xxxx")
                         if (not data_foto_r or data_foto_r == "xx/xx/xxxx") and data_fallback:
                             data_foto_r = data_fallback
-                        if str(tipo_relatorio).upper() == "CRA":
+                        if str(tipo_relatorio).upper() in ["CRA", "SOCICAM"]:
                             cod_r = cod_custom_rel or _obter_texto_localizacao_cra(rec_right)
                             faixa_r = faixa_custom_rel or rec_right.get("Direção (faixa)", "")
                             siglas_target_r = (
