@@ -25,6 +25,16 @@ const AppContent: React.FC = () => {
   const { hydrateBootstrapConfig, tipoRelatorio, categoriaRelatorio } =
     useReportStore();
 
+  const activeWorkspace = useReportStore((state) => {
+    const key = `${state.tipoRelatorio}_${state.categoriaRelatorio}` as const;
+    return state.workspaces[key];
+  });
+  const hasFiscalizacao = Boolean(
+    activeWorkspace?.fiscalizacoes?.length &&
+      activeWorkspace.fiscalizacoes.some((f) => Boolean(f["ID da Fiscalização"]?.trim()))
+  );
+  const hasRegistros = Boolean(activeWorkspace?.registrosNc?.length);
+
   const [performanceMode, setPerformanceMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem("arpe_perf_mode") === "true";
@@ -217,29 +227,37 @@ const AppContent: React.FC = () => {
           />
 
           {/* 03 · Registro de Não Conformidade ou Ponto de Atenção */}
-          <RegistroNcForm
-            onOpenCustomNcModal={(cb) => {
-              setCustomNcCallback(() => cb);
-              setShowCustomNcModal(true);
-            }}
-            onOpenRelacionarModal={(photoName) => {
-              setRelacionarPhotoName(photoName);
-              setShowRelacionarModal(true);
-            }}
-            onOpenGalleryModal={() => setShowGalleryModal(true)}
-            onOpenEditModal={(tab = "nc") => {
-              setEditModalTab(tab);
-              setShowEditModal(true);
-            }}
-          />
+          {hasFiscalizacao && (
+            <div className="animate-reveal">
+              <RegistroNcForm
+                onOpenCustomNcModal={(cb) => {
+                  setCustomNcCallback(() => cb);
+                  setShowCustomNcModal(true);
+                }}
+                onOpenRelacionarModal={(photoName) => {
+                  setRelacionarPhotoName(photoName);
+                  setShowRelacionarModal(true);
+                }}
+                onOpenGalleryModal={() => setShowGalleryModal(true)}
+                onOpenEditModal={(tab = "nc") => {
+                  setEditModalTab(tab);
+                  setShowEditModal(true);
+                }}
+              />
+            </div>
+          )}
 
           {/* 04 · Emissão e Exportação do Relatório */}
-          <SummaryAndActionsPanel
-            onOpenEditModal={(tab = "nc") => {
-              setEditModalTab(tab);
-              setShowEditModal(true);
-            }}
-          />
+          {hasFiscalizacao && hasRegistros && (
+            <div className="animate-reveal">
+              <SummaryAndActionsPanel
+                onOpenEditModal={(tab = "nc") => {
+                  setEditModalTab(tab);
+                  setShowEditModal(true);
+                }}
+              />
+            </div>
+          )}
         </div>
       </main>
 

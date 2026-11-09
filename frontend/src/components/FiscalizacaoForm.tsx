@@ -7,6 +7,7 @@ import {
   UserCheck,
   ChevronDown,
   Users,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
@@ -874,6 +875,38 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Banner de Confirmação e Desbloqueio Progressivo do Próximo Bloco */}
+        {ws.fiscalizacoes.length === 0 && (
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-all duration-300">
+            <div className="flex items-center gap-2.5 text-xs text-foreground font-medium">
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-full text-white text-[11px] font-bold shrink-0"
+                style={{ backgroundColor: theme.primary }}
+              >
+                ✓
+              </span>
+              <span>
+                {isMonitoring
+                  ? "Confirme as informações do monitoramento para habilitar o registro de ocorrências."
+                  : "Confirme as informações da fiscalização para habilitar o registro de não conformidades."}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddNewHeader}
+              className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-md hover:brightness-110 active:scale-[0.98] transition-all shrink-0 cursor-pointer"
+              style={{ backgroundColor: theme.primary }}
+            >
+              <Check className="h-4 w-4 stroke-[2.5]" />
+              <span>
+                {isMonitoring
+                  ? "Salvar Monitoramento e Prosseguir"
+                  : "Salvar Fiscalização e Prosseguir"}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </Card>
   );

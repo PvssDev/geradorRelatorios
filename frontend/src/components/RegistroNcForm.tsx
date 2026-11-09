@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronDown,
   Table2,
+  Sparkles,
 } from "lucide-react";
 import { RegistrosCadastradosPanel } from "./RegistrosCadastradosPanel";
 import { toast } from "sonner";
@@ -993,6 +994,13 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
         </p>
       )}
 
+      {ws.registrosNc.length === 0 && (
+        <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300/80 bg-amber-50/50 p-3 text-xs text-amber-900">
+          <Sparkles className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+          <span>Cadastre a primeira ocorrência para desbloquear o painel de emissão e exportação.</span>
+        </div>
+      )}
+
       {/* Trigger do Sumário Retrátil que Abre para Baixo (Accordion) */}
       {(() => {
         const baseRegs = ws.registrosNc.filter((r) => !r.is_relacionado);
@@ -1086,10 +1094,18 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
               </div>
             </button>
 
-              {/* Painel acoplado diretamente como extensão do botão */}
-              {isRegistrosExpanded && (
-                <RegistrosCadastradosPanel onOpenEditModal={onOpenEditModal || (() => {})} />
-              )}
+              {/* Painel acoplado diretamente com animação fluida de abertura (CSS Grid) */}
+              <div
+                className={`grid transition-all duration-300 ease-in-out ${
+                  isRegistrosExpanded
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <RegistrosCadastradosPanel onOpenEditModal={onOpenEditModal || (() => {})} />
+                </div>
+              </div>
             </div>
           </div>
         );
