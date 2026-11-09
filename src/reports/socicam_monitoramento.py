@@ -71,8 +71,27 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
     def signatures_before_apendices(self) -> bool:
         return True
 
-    def get_abbreviations(self) -> List[Tuple[str, str]]:
-        return list(SOCICAM_MONITORAMENTO_ABBREVIATIONS)
+    def get_abbreviations(self, row: Any = None) -> List[Tuple[str, str]]:
+        from core.rules.socicam_rules import obter_abreviatura_terminal
+        base_abbr = [item for item in SOCICAM_MONITORAMENTO_ABBREVIATIONS if item[0] != "TIP"]
+        local_val = "TIP"
+        if row is not None:
+            raw_local = None
+            if hasattr(row, "get"):
+                raw_local = row.get("Local") or row.get("Terminal")
+            elif isinstance(row, dict) or hasattr(row, "__getitem__"):
+                try:
+                    raw_local = row["Local"]
+                except (KeyError, IndexError):
+                    try:
+                        raw_local = row["Terminal"]
+                    except (KeyError, IndexError):
+                        pass
+            if raw_local is not None and not (isinstance(raw_local, float) and pd.isna(raw_local)) and str(raw_local).strip():
+                local_val = str(raw_local).strip()
+        terminal_abbr = obter_abreviatura_terminal(local_val)
+        base_abbr.append(terminal_abbr)
+        return sorted(base_abbr, key=lambda x: x[0])
 
     def get_process_sei_texts(self, row: Any, ano: Optional[Any] = None) -> List[str]:
         from utils import extrair_mes_ano_numerico, extrair_ano

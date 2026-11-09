@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronDown,
   Table2,
+  Sparkles,
 } from "lucide-react";
 import { RegistrosCadastradosPanel } from "./RegistrosCadastradosPanel";
 import { toast } from "sonner";
@@ -219,7 +220,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     } else if (tipoRelatorio === "CRC") {
       setCodificacao(`CRC.SH015.0646+0648/${ano}.${seqStr}`);
     } else {
-      setCodificacao(`SOCICAM.${ano}.${seqStr}`);
+      setCodificacao(`SOCICAM/${ano}.${seqStr}`);
     }
   };
 
@@ -358,11 +359,12 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     const { id: idVinculo, local: localVinculo } = ensureFiscalizacaoHeader();
     const isPa = tipoRelatorio === "CRA" && tipo === "PA";
 
-    if (tipoRelatorio === "CRA") {
+    if (tipoRelatorio === "CRA" || tipoRelatorio === "SOCICAM") {
       const tipoRegistroStr = isPa ? "Ponto de Atenção" : "Não Conformidade";
       const fotoNum = fotoIdx + 1;
       const grpId = `grp_${idVinculo}_${fotoNum}_${Date.now()}`;
-      const baseRaw = codificacao.trim() || "CRA.ST601.2794-2834";
+      const defaultBase = tipoRelatorio === "SOCICAM" ? "SOCICAM" : "CRA.ST601.2794-2834";
+      const baseRaw = codificacao.trim() || defaultBase;
       const baseLimpa = baseRaw.split("/")[0].trim() || baseRaw;
 
       const siglasParaCadastrar = siglas.length > 0 ? siglas : [baseRaw];
@@ -379,8 +381,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           "ID da Fiscalização": idVinculo,
           "Nº": fotoNum,
           Terminal: localVinculo,
-          Pista: ws.pistaPersistida.trim(),
-          Trecho: codFormatado,
+          Pista: tipoRelatorio === "CRA" ? ws.pistaPersistida.trim() : "",
+          Trecho: tipoRelatorio === "CRA" ? codFormatado : "",
           "Não Conformidade": isPa ? "" : descSigla,
           "Ponto de Atenção": isPa ? descSigla : "",
           Foto: targetPhotoName,
@@ -389,7 +391,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           Observações: obsSigla,
           Identificação: codFormatado,
           Codificação: codFormatado,
-          "Direção (faixa)": direcaoFaixa,
+          "Direção (faixa)": tipoRelatorio === "CRA" ? direcaoFaixa : "",
           "Fundamento da infração": fund.trim(),
           Determinação: det.trim(),
           Situação: "Pendente",
@@ -992,6 +994,13 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
         </p>
       )}
 
+      {ws.registrosNc.length === 0 && (
+        <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300/80 bg-amber-50/50 p-3 text-xs text-amber-900">
+          <Sparkles className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+          <span>Cadastre a primeira ocorrência para desbloquear o painel de emissão e exportação.</span>
+        </div>
+      )}
+
       {/* Trigger do Sumário Retrátil que Abre para Baixo (Accordion) */}
       {(() => {
         const baseRegs = ws.registrosNc.filter((r) => !r.is_relacionado);
@@ -1085,10 +1094,18 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
               </div>
             </button>
 
-              {/* Painel acoplado diretamente como extensão do botão */}
-              {isRegistrosExpanded && (
-                <RegistrosCadastradosPanel onOpenEditModal={onOpenEditModal || (() => {})} />
-              )}
+              {/* Painel acoplado diretamente com animação fluida de abertura (CSS Grid) */}
+              <div
+                className={`grid transition-all duration-300 ease-in-out ${
+                  isRegistrosExpanded
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <RegistrosCadastradosPanel onOpenEditModal={onOpenEditModal || (() => {})} />
+                </div>
+              </div>
             </div>
           </div>
         );

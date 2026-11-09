@@ -1040,6 +1040,9 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     const baseCod = (baseNc.Codificação || baseNc.Identificação || "").trim();
 
     const isCraFisc = state.tipoRelatorio === "CRA" && state.categoriaRelatorio === "Fiscalização";
+    const isCraOrSocicamFisc =
+      (state.tipoRelatorio === "CRA" || state.tipoRelatorio === "SOCICAM") &&
+      state.categoriaRelatorio === "Fiscalização";
     const activeFisc = ws.fiscalizacoes.find(
       (f) => f["ID da Fiscalização"] === targetIdFiscalizacao
     );
@@ -1081,8 +1084,9 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     }
 
     let codFinal = "";
-    if (isCraFisc) {
-      const baseRaw = codificacao?.trim() || baseCod;
+    if (isCraOrSocicamFisc) {
+      const defaultBase = state.tipoRelatorio === "SOCICAM" ? "SOCICAM" : "CRA.ST601.2794-2834";
+      const baseRaw = codificacao?.trim() || baseCod || defaultBase;
       const baseLimpa = baseRaw.split("/")[0].trim() || baseRaw;
       const baseSiglas = (baseNc["Não Conformidade"] || baseNc["Ponto de Atenção"] || "")
         .split(",")
