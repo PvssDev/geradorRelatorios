@@ -182,8 +182,8 @@ async def parse_monitoramento_anterior(arquivo: UploadFile = File(...)):
 def baixar_planilha_excel(req: PlanilhaRequestSchema):
     fisc_list = [f.model_dump(by_alias=True) for f in req.fiscalizacoes]
     nc_list = [nc.model_dump(by_alias=True) for nc in req.registros_nc]
-    is_cra = any("CRA" in str(f.get("ID da Fiscalização", "")).upper() for f in fisc_list)
-    if is_cra:
+    should_normalize = any(any(k in str(f.get("ID da Fiscalização", "")).upper() for k in ["CRA", "SOCICAM"]) for f in fisc_list)
+    if should_normalize:
         nc_list = normalizar_registros_cra_para_relatorio(nc_list, fisc_list=fisc_list, mapa_siglas=MAP_SIGLAS)
     excel_buffer = gerar_planilha_excel_buffer(fisc_list, nc_list)
     return Response(
@@ -321,7 +321,7 @@ async def gerar_relatorios_endpoint(
                     f"Diagnóstico de Fotos: {len(faltando)} foto(s) referenciada(s) nas NCs não foram encontradas: {amostra}"
                 )
 
-        if payload.tipo_relatorio == "CRA" and not is_monitoring:
+        if payload.tipo_relatorio in ["CRA", "SOCICAM"] and not is_monitoring:
             nc_list = normalizar_registros_cra_para_relatorio(nc_list, fisc_list=fisc_list, mapa_siglas=MAP_SIGLAS)
 
         excel_buffer = gerar_planilha_excel_buffer(fisc_list, nc_list)

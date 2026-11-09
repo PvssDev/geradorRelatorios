@@ -298,7 +298,7 @@ class SocicamReport(BaseReport, IReportContract):
             p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p7.paragraph_format.space_after = Pt(6)
             r7_1 = p7.add_run("Quadro 1")
-            r7_1.bold = True
+            r7_1.bold = False
             r7_1.font.name = "Aptos"
             r7_1.font.size = Pt(11)
             r7_2 = p7.add_run(f" – Determinações para Não Conformidades Identificadas – {mes_ano}")
@@ -313,7 +313,7 @@ class SocicamReport(BaseReport, IReportContract):
                 p_q2.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 p_q2.paragraph_format.space_after = Pt(6)
                 r_q2_1 = p_q2.add_run("Quadro 2")
-                r_q2_1.bold = True
+                r_q2_1.bold = False
                 r_q2_1.font.name = "Aptos"
                 r_q2_1.font.size = Pt(11)
                 r_q2_2 = p_q2.add_run(f" – Determinações para Pontos de Atenção Identificados – {mes_ano}")
@@ -328,7 +328,7 @@ class SocicamReport(BaseReport, IReportContract):
             p7.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p7.paragraph_format.space_after = Pt(6)
             r7_1 = p7.add_run("Quadro 1")
-            r7_1.bold = True
+            r7_1.bold = False
             r7_1.font.name = "Aptos"
             r7_1.font.size = Pt(11)
             r7_2 = p7.add_run(f" – Determinações para Pontos de Atenção Identificados – {mes_ano}")

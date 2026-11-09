@@ -219,7 +219,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     } else if (tipoRelatorio === "CRC") {
       setCodificacao(`CRC.SH015.0646+0648/${ano}.${seqStr}`);
     } else {
-      setCodificacao(`SOCICAM.${ano}.${seqStr}`);
+      setCodificacao(`SOCICAM/${ano}.${seqStr}`);
     }
   };
 
@@ -358,11 +358,12 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     const { id: idVinculo, local: localVinculo } = ensureFiscalizacaoHeader();
     const isPa = tipoRelatorio === "CRA" && tipo === "PA";
 
-    if (tipoRelatorio === "CRA") {
+    if (tipoRelatorio === "CRA" || tipoRelatorio === "SOCICAM") {
       const tipoRegistroStr = isPa ? "Ponto de Atenção" : "Não Conformidade";
       const fotoNum = fotoIdx + 1;
       const grpId = `grp_${idVinculo}_${fotoNum}_${Date.now()}`;
-      const baseRaw = codificacao.trim() || "CRA.ST601.2794-2834";
+      const defaultBase = tipoRelatorio === "SOCICAM" ? "SOCICAM" : "CRA.ST601.2794-2834";
+      const baseRaw = codificacao.trim() || defaultBase;
       const baseLimpa = baseRaw.split("/")[0].trim() || baseRaw;
 
       const siglasParaCadastrar = siglas.length > 0 ? siglas : [baseRaw];
@@ -379,8 +380,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           "ID da Fiscalização": idVinculo,
           "Nº": fotoNum,
           Terminal: localVinculo,
-          Pista: ws.pistaPersistida.trim(),
-          Trecho: codFormatado,
+          Pista: tipoRelatorio === "CRA" ? ws.pistaPersistida.trim() : "",
+          Trecho: tipoRelatorio === "CRA" ? codFormatado : "",
           "Não Conformidade": isPa ? "" : descSigla,
           "Ponto de Atenção": isPa ? descSigla : "",
           Foto: targetPhotoName,
@@ -389,7 +390,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           Observações: obsSigla,
           Identificação: codFormatado,
           Codificação: codFormatado,
-          "Direção (faixa)": direcaoFaixa,
+          "Direção (faixa)": tipoRelatorio === "CRA" ? direcaoFaixa : "",
           "Fundamento da infração": fund.trim(),
           Determinação: det.trim(),
           Situação: "Pendente",

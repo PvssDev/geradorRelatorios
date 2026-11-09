@@ -728,7 +728,8 @@ def normalizar_registros_cra_para_relatorio(
                         cod_raw = str(other.get("Codificação") or other.get("Trecho")).strip()
                         break
         if not cod_raw:
-            cod_raw = "CRA.ST601.2794-2834"
+            is_socicam = "SOCICAM" in fid.upper() or bool(r.get("Terminal"))
+            cod_raw = "SOCICAM" if is_socicam else "CRA.ST601.2794-2834"
 
         tem_sufixo = bool(re.search(r"/(\d{4})\.(\d+)$", cod_raw))
         precisa_gerar = not tem_sufixo
@@ -758,8 +759,9 @@ def normalizar_registros_cra_para_relatorio(
             r["Trecho"] = cod_final
         normalizados.append(r)
 
-    # 4. Sincronizar legendas e faixa combinada ('Esquerda e Direita' / 'FED') em cada grupo
-    for grp_id in grupos_vistos:
-        sincronizar_legendas_grupo_cra(normalizados, grp_id, mapa_siglas=mapa_siglas)
+    # 4. Sincronizar legendas e faixa combinada ('Esquerda e Direita' / 'FED') em cada grupo (se for CRA)
+    if any("CRA" in str(r.get("ID da Fiscalização", "")).upper() or r.get("Direção (faixa)") for r in normalizados):
+        for grp_id in grupos_vistos:
+            sincronizar_legendas_grupo_cra(normalizados, grp_id, mapa_siglas=mapa_siglas)
 
     return normalizados
