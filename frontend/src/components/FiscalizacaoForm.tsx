@@ -7,10 +7,10 @@ import {
   UserCheck,
   ChevronDown,
   Users,
-  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
+import { ConfirmDeleteModal } from "./Modals";
 import { useReportStore } from "../store/useReportStore";
 import { FiscalizacaoItem } from "../types/report.types";
 import { getConcessionTheme } from "../utils/concessionTheme";
@@ -22,13 +22,13 @@ interface FiscalizacaoFormProps {
 }
 
 const inputCls =
-  "w-full rounded-xl border border-[#d0e1f3] bg-[#f0f6fc] px-3.5 py-2.5 text-sm text-[#0f172a] font-medium outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20";
+  "w-full h-[42px] rounded-xl border border-[#d0e1f3] bg-[#f0f6fc] px-3.5 py-2 text-sm text-[#0f172a] font-medium outline-none transition-all duration-200 hover:border-primary/50 hover:bg-[#eaf3fc] hover:shadow-xs focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20";
 
 const pillFisc = (on: boolean) =>
   `rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 ${
     on
       ? "text-white font-bold border-0 shadow-sm"
-      : "border-2 bg-white hover:bg-slate-50 font-semibold"
+      : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400 font-semibold shadow-xs"
   }`;
 
 function formatNomeAbreviado(nomeCompleto: string, compactar: boolean): string {
@@ -40,14 +40,25 @@ function formatNomeAbreviado(nomeCompleto: string, compactar: boolean): string {
   return `${primeiro} ${ultimo.charAt(0)}.`;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  rightElement,
+  children,
+}: {
+  label: string;
+  rightElement?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <label className="block space-y-1.5">
-      <span className="text-[11px] font-bold uppercase tracking-wider text-[#1e3a5a]">
-        {label}
-      </span>
+    <div className="space-y-1.5">
+      <div className="flex h-5 items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[#1e3a5a] truncate">
+          {label}
+        </span>
+        {rightElement}
+      </div>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -141,7 +152,10 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
     setActiveFiscalizacaoIndex,
     addFiscalizacao,
     upsertActiveFiscalizacao,
+    deleteFiscalizacoesBulk,
   } = useReportStore();
+
+  const [fiscIndexToDelete, setFiscIndexToDelete] = useState<number | null>(null);
 
   const ws = getActiveWorkspace();
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
@@ -179,14 +193,14 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
     activeFisc?.Contrato || contratosPadrao[tipoRelatorio] || "CT. nº 043/2011"
   );
   const [equipe, setEquipe] = useState<string[]>(
-    activeFisc?.["Pessoal Responsável"] !== undefined
+    activeFisc?.["Pessoal Responsável"]
       ? activeFisc["Pessoal Responsável"].startsWith("=")
-        ? allRespNames
+        ? []
         : activeFisc["Pessoal Responsável"]
             .split(/[,;]/)
             .map((s) => s.trim())
             .filter(Boolean)
-      : allRespNames
+      : []
   );
   const [coord, setCoord] = useState(
     activeFisc?.Coordenador || coordenadores[0]?.nome || ""
@@ -225,14 +239,14 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
         f.Contrato || contratosPadrao[tipoRelatorio] || "CT. nº 043/2011"
       );
       setEquipe(
-        f["Pessoal Responsável"] !== undefined
+        f["Pessoal Responsável"]
           ? f["Pessoal Responsável"].startsWith("=")
-            ? responsaveis.map((r) => r.nome)
+            ? []
             : f["Pessoal Responsável"]
                 .split(/[,;]/)
                 .map((s) => s.trim())
                 .filter(Boolean)
-          : responsaveis.map((r) => r.nome)
+          : []
       );
       setCoord(f.Coordenador || coordenadores[0]?.nome || "");
     } else {
@@ -245,7 +259,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
       setMun("");
       setLocal(defaultLocal);
       setContrato(contratosPadrao[tipoRelatorio] || "CT. nº 043/2011");
-      setEquipe(responsaveis.map((r) => r.nome));
+      setEquipe([]);
       setCoord(coordenadores[0]?.nome || "");
     }
   }, [
@@ -380,7 +394,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
           ? defaultLocal
           : "",
       Local: defaultLocal,
-      "Pessoal Responsável": responsaveis.map((r) => r.nome).join(", "),
+      "Pessoal Responsável": "",
       Coordenador: coordenadores[0]?.nome || "",
       Contrato: contratosPadrao[tipoRelatorio] || "CT. nº 043/2011",
       Período: isoToBr(today),
@@ -397,6 +411,39 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
     }
   };
 
+  const handleRequestDeleteFisc = (idx: number) => {
+    const targetFisc = ws.fiscalizacoes[idx];
+    if (!targetFisc) return;
+    const targetId = (targetFisc["ID da Fiscalização"] || "").trim();
+
+    // Verifica se esta fiscalização possui ocorrências vinculadas
+    const regsVinculados = targetId
+      ? ws.registrosNc.filter((r) => (r["ID da Fiscalização"] || "").trim() === targetId)
+      : [];
+
+    if (regsVinculados.length > 0) {
+      // Possui ocorrências: abre pop-up de confirmação
+      setFiscIndexToDelete(idx);
+    } else {
+      // Sem ocorrências: apaga diretamente
+      deleteFiscalizacoesBulk([targetId]);
+      toast.success(
+        `Fiscalização '${targetId || `#${idx + 1}`}' apagada com sucesso.`
+      );
+    }
+  };
+
+  const handleConfirmDeleteFisc = () => {
+    if (fiscIndexToDelete === null) return;
+    const targetFisc = ws.fiscalizacoes[fiscIndexToDelete];
+    const targetId = (targetFisc?.["ID da Fiscalização"] || "").trim();
+    deleteFiscalizacoesBulk([targetId]);
+    setFiscIndexToDelete(null);
+    toast.success(
+      `Fiscalização '${targetId || `#${fiscIndexToDelete + 1}`}' e seus registros foram apagados.`
+    );
+  };
+
   // Garante que o contrato atual apareça no select mesmo que customizado
   const contratosDisponiveis = Array.from(
     new Set([
@@ -408,7 +455,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
 
   return (
     <Card
-      n={2}
+      n={1}
       icon={<Building2 className="h-5 w-5" />}
       title={
         isMonitoring
@@ -417,7 +464,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
       }
     >
       {/* Barra de Múltiplos IDs de Fiscalização / Monitoramento */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#d6e5f5] bg-[#edf4fb] px-4 py-3 transition-all duration-300 hover:shadow-md hover:border-primary/40">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#d6e5f5] bg-[#edf4fb] px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#1e3a5a]">
             {isMonitoring ? "Monitoramentos ativos:" : "Fiscalizações ativas:"}
@@ -432,39 +479,60 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
                 f["ID da Fiscalização"]?.trim() || `#${idx + 1} (Sem ID)`;
               const isAct = idx === activeIdx;
               return (
-                <button
+                <div
                   key={`${label}_${idx}`}
-                  type="button"
-                  onClick={() => setActiveFiscalizacaoIndex(idx)}
-                  className={pillFisc(isAct)}
-                  style={
-                    isAct
-                      ? { backgroundColor: theme.primary }
-                      : { borderColor: theme.primary + "60", color: theme.primary }
-                  }
+                  className="group relative inline-flex items-center"
                 >
-                  {label}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFiscalizacaoIndex(idx)}
+                    className={`${pillFisc(isAct)} inline-flex items-center gap-1.5 pr-2`}
+                    style={
+                      isAct
+                        ? { backgroundColor: theme.primary }
+                        : { borderColor: theme.primary + "60", color: theme.primary }
+                    }
+                  >
+                    <span>{label}</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestDeleteFisc(idx);
+                      }}
+                      className={`inline-flex h-4 w-4 items-center justify-center rounded-full transition-all ${
+                        isAct
+                          ? "hover:bg-white/30 text-white"
+                          : "hover:bg-rose-100 hover:text-rose-600 text-slate-400 group-hover:text-slate-600"
+                      }`}
+                      title={`Apagar fiscalização ${label}`}
+                    >
+                      <X className="h-3 w-3 stroke-[2.5]" />
+                    </span>
+                  </button>
+                </div>
               );
             })
           )}
         </div>
+
         <button
           type="button"
           onClick={handleAddNewHeader}
-          className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:border-primary hover:text-primary transition"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] transition-all"
           title="Cadastrar mais um ID para gerar múltiplos relatórios no mesmo lote"
         >
           <Plus className="h-3.5 w-3.5" />
-          {ws.fiscalizacoes.length === 0
-            ? isMonitoring
-              ? "Fixar ID Inicial"
-              : "Fixar ID Inicial"
-            : isMonitoring
-            ? "Novo Monitoramento"
-            : "Nova Fiscalização"}
-        </button>
-      </div>
+            {ws.fiscalizacoes.length === 0
+              ? isMonitoring
+                ? "Fixar ID Inicial"
+                : "Fixar ID Inicial"
+              : isMonitoring
+              ? "Novo Monitoramento"
+              : "Nova Fiscalização"}
+          </button>
+        </div>
 
       <div className="grid gap-8">
         {/* Linha 1: ID + Data de Início + Data de Término (com visualização do Período) */}
@@ -505,31 +573,30 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
             />
           </Field>
 
-          <Field label="Data de Término da Vistoria">
-            <div className="space-y-1.5">
-              <input
-                type="date"
-                className={inputCls}
-                min={dataIso}
-                value={dataFimIso}
-                onChange={(e) => {
-                  const nextFim = e.target.value;
-                  setDataFimIso(nextFim);
-                  const nextPer = formatarPeriodoVistoria(dataIso, nextFim);
-                  setPeriodo(nextPer);
-                  syncToStore({
-                    data: dataIso,
-                    periodo: nextPer,
-                  });
-                }}
-              />
-              <div className="flex items-center gap-1.5 px-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Período:</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  {periodo || isoToBr(dataIso)}
-                </span>
-              </div>
-            </div>
+          <Field
+            label="Data de Término da Vistoria"
+            rightElement={
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                Período: {periodo || isoToBr(dataIso)}
+              </span>
+            }
+          >
+            <input
+              type="date"
+              className={inputCls}
+              min={dataIso}
+              value={dataFimIso}
+              onChange={(e) => {
+                const nextFim = e.target.value;
+                setDataFimIso(nextFim);
+                const nextPer = formatarPeriodoVistoria(dataIso, nextFim);
+                setPeriodo(nextPer);
+                syncToStore({
+                  data: dataIso,
+                  periodo: nextPer,
+                });
+              }}
+            />
           </Field>
         </div>
 
@@ -572,11 +639,9 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
               />
             </Field>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-blue">
-                  Contrato
-                </span>
+            <Field
+              label="Contrato"
+              rightElement={
                 <button
                   type="button"
                   onClick={() =>
@@ -585,49 +650,56 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
                       syncToStore({ contrato: c });
                     })
                   }
-                  className="text-[11px] font-medium text-muted-foreground hover:text-accent transition"
+                  className="text-[11px] font-medium text-muted-foreground hover:text-accent transition shrink-0"
                 >
                   + Gerenciar
                 </button>
+              }
+            >
+              <div className="relative">
+                <select
+                  className={`${inputCls} appearance-none pr-9 cursor-pointer`}
+                  value={contrato}
+                  onChange={(e) => {
+                    setContrato(e.target.value);
+                    syncToStore({ contrato: e.target.value });
+                  }}
+                >
+                  {contratosDisponiveis.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#45556c]" />
               </div>
-              <select
-                className={inputCls}
-                value={contrato}
-                onChange={(e) => {
-                  setContrato(e.target.value);
-                  syncToStore({ contrato: e.target.value });
-                }}
-              >
-                {contratosDisponiveis.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
+            </Field>
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2">
             {tipoRelatorio === "SOCICAM" ? (
               <Field label="Terminal Rodoviário (Local)">
-                <select
-                  className={inputCls}
-                  value={local}
-                  onChange={(e) => {
-                    setLocal(e.target.value);
-                    setMun(e.target.value);
-                    syncToStore({
-                      local: e.target.value,
-                      mun: e.target.value,
-                    });
-                  }}
-                >
-                  {locaisSocicam.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    className={`${inputCls} appearance-none pr-9 cursor-pointer`}
+                    value={local}
+                    onChange={(e) => {
+                      setLocal(e.target.value);
+                      setMun(e.target.value);
+                      syncToStore({
+                        local: e.target.value,
+                        mun: e.target.value,
+                      });
+                    }}
+                  >
+                    {locaisSocicam.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#45556c]" />
+                </div>
               </Field>
             ) : (
               <Field label="Local / Sistema Viário">
@@ -643,11 +715,9 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
               </Field>
             )}
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-blue">
-                  Contrato de Concessão
-                </span>
+            <Field
+              label="Contrato de Concessão"
+              rightElement={
                 <button
                   type="button"
                   onClick={() =>
@@ -656,26 +726,30 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
                       syncToStore({ contrato: c });
                     })
                   }
-                  className="text-[11px] font-medium text-muted-foreground hover:text-accent transition"
+                  className="text-[11px] font-medium text-muted-foreground hover:text-accent transition shrink-0"
                 >
                   + Gerenciar
                 </button>
+              }
+            >
+              <div className="relative">
+                <select
+                  className={`${inputCls} appearance-none pr-9 cursor-pointer`}
+                  value={contrato}
+                  onChange={(e) => {
+                    setContrato(e.target.value);
+                    syncToStore({ contrato: e.target.value });
+                  }}
+                >
+                  {contratosDisponiveis.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#45556c]" />
               </div>
-              <select
-                className={inputCls}
-                value={contrato}
-                onChange={(e) => {
-                  setContrato(e.target.value);
-                  syncToStore({ contrato: e.target.value });
-                }}
-              >
-                {contratosDisponiveis.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
+            </Field>
           </div>
         )}
 
@@ -718,7 +792,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
             </div>
 
             {/* Card Executivo de Responsáveis (Simétrico ao Coordenador) */}
-            <div className="relative flex h-[68px] items-center justify-between gap-2.5 overflow-hidden rounded-2xl border-2 border-border bg-card p-3 shadow-sm hover:border-primary/40 transition-all">
+            <div className="relative flex h-[68px] items-center justify-between gap-2.5 overflow-hidden rounded-2xl border-2 border-border bg-card p-3 shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md">
               <div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
                 style={{ backgroundColor: theme.primary }}
@@ -817,7 +891,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
             </div>
 
             {/* Card Executivo Perfeitamente Simétrico */}
-            <div className="relative flex h-[68px] items-center justify-between gap-2.5 overflow-hidden rounded-2xl border-2 border-border bg-card p-3 shadow-sm hover:border-primary/40 transition-all">
+            <div className="relative flex h-[68px] items-center justify-between gap-2.5 overflow-hidden rounded-2xl border-2 border-border bg-card p-3 shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md">
               <div className="flex flex-1 min-w-0 items-center gap-3 overflow-hidden">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#071d36] text-white shadow-sm">
                   <UserCheck className="h-5 w-5" />
@@ -875,39 +949,32 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Banner de Confirmação e Desbloqueio Progressivo do Próximo Bloco */}
-        {ws.fiscalizacoes.length === 0 && (
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-all duration-300">
-            <div className="flex items-center gap-2.5 text-xs text-foreground font-medium">
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full text-white text-[11px] font-bold shrink-0"
-                style={{ backgroundColor: theme.primary }}
-              >
-                ✓
-              </span>
-              <span>
-                {isMonitoring
-                  ? "Confirme as informações do monitoramento para habilitar o registro de ocorrências."
-                  : "Confirme as informações da fiscalização para habilitar o registro de não conformidades."}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddNewHeader}
-              className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-md hover:brightness-110 active:scale-[0.98] transition-all shrink-0 cursor-pointer"
-              style={{ backgroundColor: theme.primary }}
-            >
-              <Check className="h-4 w-4 stroke-[2.5]" />
-              <span>
-                {isMonitoring
-                  ? "Salvar Monitoramento e Prosseguir"
-                  : "Salvar Fiscalização e Prosseguir"}
-              </span>
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Modal de Confirmação para Apagar Fiscalização com Registros */}
+      {fiscIndexToDelete !== null && (() => {
+        const targetFisc = ws.fiscalizacoes[fiscIndexToDelete];
+        const targetId =
+          targetFisc?.["ID da Fiscalização"]?.trim() || `#${fiscIndexToDelete + 1}`;
+        const regsVinculados = ws.registrosNc.filter(
+          (r) => (r["ID da Fiscalização"] || "").trim() === targetId
+        );
+
+        return (
+          <ConfirmDeleteModal
+            title={isMonitoring ? "Excluir Monitoramento" : "Excluir Fiscalização"}
+            description={`A fiscalização "${targetId}" possui ${regsVinculados.length} ocorrência(s) cadastrada(s). Tem certeza de que deseja apagá-la? Todas as ocorrências vinculadas e fotos serão removidas permanentemente.`}
+            itemsPreview={[
+              `Identificação: ${targetId}`,
+              `Total de ocorrências vinculadas: ${regsVinculados.length}`,
+              ...(targetFisc?.Data ? [`Data da vistoria: ${targetFisc.Data}`] : []),
+              ...(targetFisc?.Local ? [`Local: ${targetFisc.Local}`] : []),
+            ]}
+            onConfirm={handleConfirmDeleteFisc}
+            onClose={() => setFiscIndexToDelete(null)}
+          />
+        );
+      })()}
     </Card>
   );
 };

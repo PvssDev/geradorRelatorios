@@ -8,6 +8,7 @@ import {
   Images,
   CheckCircle2,
   X,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
@@ -96,7 +97,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
 
   return (
     <Card
-      n={1}
+      n={2}
       icon={<CloudUpload className="h-5 w-5" />}
       title="Fotos da Vistoria em Campo"
     >
@@ -236,18 +237,23 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
           role="switch"
           aria-checked={compressImages}
           onClick={() => setCompressImages(!compressImages)}
-          className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-            compressImages ? "bg-accent" : "bg-border"
-          }`}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition ${compressImages ? "bg-accent" : "bg-border"
+            }`}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-all ${
-              compressImages ? "left-5" : "left-0.5"
-            }`}
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-all ${compressImages ? "left-5" : "left-0.5"
+              }`}
           />
         </button>
         Otimizar e comprimir imagens automaticamente para o Word (limite de 500 KB)
       </label>
+
+      {ws.photos.length === 0 && (
+        <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3.5 text-xs text-foreground font-medium">
+          <Sparkles className="h-4 w-4 text-primary shrink-0" />
+          <span>Envie as fotos desta vistoria acima para liberar o registro de ocorrências.</span>
+        </div>
+      )}
 
       {ws.photos.length > 0 && (
         <>
@@ -307,11 +313,10 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                 <div
                   key={f.id}
                   onClick={() => setCarouselIndex(i)}
-                  className={`group relative w-36 shrink-0 cursor-pointer overflow-hidden rounded-xl border bg-card transition ${
-                    isSelected
-                      ? "border-accent ring-2 ring-accent/25"
-                      : "border-border hover:border-accent/50"
-                  }`}
+                  className={`group relative w-36 shrink-0 cursor-pointer overflow-hidden rounded-xl border bg-card transition ${isSelected
+                    ? "border-accent ring-2 ring-accent/25"
+                    : "border-border hover:border-accent/50"
+                    }`}
                 >
                   <img
                     src={f.previewUrl}

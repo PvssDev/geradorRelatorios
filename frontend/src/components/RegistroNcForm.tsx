@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Table2,
   Sparkles,
+  Edit3,
 } from "lucide-react";
 import { RegistrosCadastradosPanel } from "./RegistrosCadastradosPanel";
 import { toast } from "sonner";
@@ -40,13 +41,13 @@ const PISTAS_SUGESTOES = [
 ];
 
 const inputCls =
-  "w-full rounded-lg border border-input bg-secondary/60 px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20";
+  "w-full rounded-lg border border-input bg-secondary/60 px-3 py-2 text-sm text-foreground outline-none transition-all duration-200 hover:border-primary/50 hover:bg-secondary/90 hover:shadow-xs focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20";
 
 const btn = {
   primary:
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-stone-950 shadow-[0_3px_0_0_#b45309] transition-all duration-150 hover:bg-amber-400 active:translate-y-[2px] active:shadow-[0_1px_0_0_#b45309] disabled:opacity-40 disabled:pointer-events-none",
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-amber-500/20 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/30 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none",
   secondary:
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:border-accent hover:text-accent transition-all duration-200 active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none",
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-all duration-150 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none",
 };
 
 const pill = (on: boolean) =>
@@ -195,22 +196,28 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     activeFisc?.Data || new Date().toLocaleDateString("pt-BR");
   const ano = dataBr.split("/")[2] || String(new Date().getFullYear());
 
+  const currentFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+  const currentFiscRegs = useMemo(
+    () =>
+      ws.registrosNc.filter(
+        (r) => !currentFiscId || (r["ID da Fiscalização"] || "").trim() === currentFiscId
+      ),
+    [ws.registrosNc, currentFiscId]
+  );
+
   // Sequencial baseado no maior sufixo numérico da fiscalização atual
   const maxSeqInFiscalizacao = useMemo(() => {
     let max = 0;
-    const currentId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
-    for (const r of ws.registrosNc) {
-      if (!currentId || r["ID da Fiscalização"] === currentId) {
-        const cod = (r.Codificação || r.Identificação || "").trim();
-        const m = cod.match(/[\/.](\d{4})\.(\d+)$/) || cod.match(/[\/.](\d+)$/);
-        if (m) {
-          const num = parseInt(m[2] || m[1], 10);
-          if (!isNaN(num) && num > max) max = num;
-        }
+    for (const r of currentFiscRegs) {
+      const cod = (r.Codificação || r.Identificação || "").trim();
+      const m = cod.match(/[\/.](\d{4})\.(\d+)$/) || cod.match(/[\/.](\d+)$/);
+      if (m) {
+        const num = parseInt(m[2] || m[1], 10);
+        if (!isNaN(num) && num > max) max = num;
       }
     }
-    return max > 0 ? max + 1 : ws.registrosNc.length + 1;
-  }, [ws.registrosNc, activeFisc]);
+    return max > 0 ? max + 1 : currentFiscRegs.length + 1;
+  }, [currentFiscRegs]);
 
   const seqStr = String(maxSeqInFiscalizacao).padStart(3, "0");
 
@@ -269,13 +276,33 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     return { id: generatedId, local: defaultLocal };
   };
 
-  const addReg = () => {
-    const targetPhotoName = isMonitoring
-      ? selectedNewPhotoMon || activePhoto?.name || ""
-      : activePhoto?.name || "";
+  const targetPhotoName = isMonitoring
+    ? selectedNewPhotoMon || activePhoto?.name || ""
+    : activePhoto?.name || "";
 
+  // Trava de Unicidade Fotográfica: verifica se a foto já foi cadastrada em qualquer ocorrência
+  const registroExistenteComFoto = useMemo(() => {
+    if (!targetPhotoName) return null;
+    const nameLower = targetPhotoName.trim().toLowerCase();
+    return (
+      ws.registrosNc.find(
+        (r) => (r.Foto || "").trim().toLowerCase() === nameLower
+      ) || null
+    );
+  }, [ws.registrosNc, targetPhotoName]);
+
+  const isFotoBloqueada = Boolean(registroExistenteComFoto);
+
+  const addReg = () => {
     if (!targetPhotoName) {
-      toast.error("Envie e selecione ao menos uma foto no bloco 01.");
+      toast.error("Envie e selecione ao menos uma foto no bloco 02.");
+      return;
+    }
+
+    if (isFotoBloqueada) {
+      toast.error(
+        `Esta foto já está cadastrada no Item #${registroExistenteComFoto?.["Nº"]} (${registroExistenteComFoto?.Identificação || "Ocorrência"}). Selecione outra foto no bloco 2 para novo cadastro.`
+      );
       return;
     }
 
@@ -306,7 +333,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
 
       addOrUpdateRegistroNc({
         "ID da Fiscalização": idVinculo,
-        "Nº": ws.registrosNc.length + 1,
+        "Nº": currentFiscRegs.length + 1,
         Terminal: localVinculo,
         Pista:
           tipoRelatorio === "SOCICAM"
@@ -427,7 +454,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     const obsFinal = siglas.length
       ? siglas.map((s) => (mapSiglas[s] || s).toLowerCase()).join(", ")
       : descStr;
-    const nextNum = ws.registrosNc.length + 1;
+    const nextNum = currentFiscRegs.length + 1;
 
     addOrUpdateRegistroNc({
       "ID da Fiscalização": idVinculo,
@@ -461,7 +488,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     setDet("");
   };
 
-  const temOcorrenciaBase = ws.registrosNc.some((r) => !r.is_relacionado);
+  const temOcorrenciaBase = currentFiscRegs.some((r) => !r.is_relacionado);
   const podeRelacionar = Boolean(temOcorrenciaBase && fotos.length > 0);
 
   return (
@@ -552,7 +579,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
               onChange={(e) =>
                 setActiveFiscalizacaoIndex(Number(e.target.value))
               }
-              className="rounded-lg border border-input bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground outline-none focus:border-ring"
+              className="rounded-lg border border-input bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground outline-none transition-all duration-200 hover:border-primary/50 hover:bg-secondary/90 hover:shadow-xs focus:border-ring"
             >
               {ws.fiscalizacoes.map((f, idx) => (
                 <option key={`${f["ID da Fiscalização"]}_${idx}`} value={idx}>
@@ -951,14 +978,16 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       <div className="mt-8 flex flex-wrap gap-3">
         <button
           type="button"
-          className="group relative inline-flex items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:brightness-105 hover:shadow-xl hover:shadow-amber-500/35 active:translate-y-[2px] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none flex-1"
-          disabled={!activePhoto}
+          className="group relative inline-flex items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-amber-500/20 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/30 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none flex-1"
+          disabled={!activePhoto || isFotoBloqueada}
           onClick={addReg}
         >
           <div className="flex items-center gap-2.5">
             <Plus className="h-4 w-4 stroke-[2.5]" />
             <span>
-              {isMonitoring
+              {isFotoBloqueada
+                ? `Foto já cadastrada no Item #${registroExistenteComFoto?.["Nº"]}`
+                : isMonitoring
                 ? "Salvar Auditoria no Relatório"
                 : "Adicionar Registro ao Relatório"}
             </span>
@@ -971,9 +1000,11 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
         <button
           type="button"
           className={`${btn.secondary} py-3.5 px-5`}
-          disabled={!podeRelacionar}
+          disabled={!podeRelacionar || isFotoBloqueada}
           title={
-            podeRelacionar
+            isFotoBloqueada
+              ? `Esta foto já possui cadastro próprio (Item #${registroExistenteComFoto?.["Nº"]}) e não pode ser relacionada como 2ª foto`
+              : podeRelacionar
               ? "Abrir janela para vincular uma 2ª foto a uma ocorrência já registrada (máx. 2 fotos por NC)"
               : "Cadastre ao menos uma ocorrência e envie fotos para habilitar o relacionamento"
           }
@@ -988,13 +1019,32 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
         </button>
       </div>
 
+      {isFotoBloqueada && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-xs text-amber-950 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white font-bold text-xs shadow-xs">
+              ✓
+            </div>
+            <div className="min-w-0">
+              <span className="font-bold">Foto bloqueada para novo cadastro: </span>
+              <span>
+                Esta imagem já está vinculada ao <b>Item #{registroExistenteComFoto?.["Nº"]}</b> ({registroExistenteComFoto?.Identificação || "—"}).
+              </span>
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                Avance para outra foto no bloco 2 ou gerencie a ocorrência no Sumário abaixo se desejar alterá-la.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!activePhoto && (
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          Envie ao menos uma foto no bloco 01 para habilitar o registro.
+          Envie ao menos uma foto no bloco 02 para habilitar o registro.
         </p>
       )}
 
-      {ws.registrosNc.length === 0 && (
+      {currentFiscRegs.length === 0 && (
         <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300/80 bg-amber-50/50 p-3 text-xs text-amber-900">
           <Sparkles className="h-3.5 w-3.5 text-amber-600 shrink-0" />
           <span>Cadastre a primeira ocorrência para desbloquear o painel de emissão e exportação.</span>
@@ -1003,96 +1053,100 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
 
       {/* Trigger do Sumário Retrátil que Abre para Baixo (Accordion) */}
       {(() => {
-        const baseRegs = ws.registrosNc.filter((r) => !r.is_relacionado);
+        const baseRegs = currentFiscRegs.filter((r) => !r.is_relacionado);
         const sanadasCount = baseRegs.filter((r) => r.Situação === "Sanada").length;
         const pendentesCount = baseRegs.filter((r) => !r.Situação || r.Situação === "Pendente").length;
 
         return (
           <div className="mt-5 border-t border-slate-200/90 pt-4">
-            <div className={`transition-all duration-200 ${isRegistrosExpanded ? "shadow-lg shadow-indigo-950/5" : ""}`}>
+            <div className="overflow-hidden rounded-2xl border border-slate-300/90 bg-white shadow-md shadow-slate-900/5 transition-all duration-200">
               <button
                 type="button"
                 onClick={() => setIsRegistrosExpanded((prev) => !prev)}
-                className={`group relative flex w-full items-center justify-between gap-4 p-4 text-left transition-all duration-200 active:translate-y-[1px] ${
+                className={`group relative flex w-full items-center justify-between gap-4 p-4 text-left transition-colors duration-150 hover:bg-slate-50/80 ${
                   isRegistrosExpanded
-                    ? "rounded-t-2xl rounded-b-none border-t border-x border-b border-slate-300"
-                    : "rounded-2xl border border-slate-300 bg-slate-50/80 hover:bg-[#fafbff] hover:shadow-md shadow-sm"
+                    ? "border-b border-slate-200 bg-white"
+                    : "bg-white"
                 }`}
-                style={{
-                  backgroundColor: isRegistrosExpanded ? theme.lightBg : undefined,
-                  borderBottomColor: isRegistrosExpanded ? theme.lightBorder : undefined,
-                }}
-            >
-              <div className="flex items-center gap-3.5">
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-xs transition-transform duration-200 group-hover:scale-105"
-                  style={{
-                    backgroundColor: theme.lightBg,
-                    borderColor: theme.lightBorder,
-                    color: theme.primary,
-                  }}
-                >
-                  <Table2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900">
+              >
+                <div className="flex items-center gap-3.5">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-xs transition-transform duration-200 group-hover:scale-105"
+                    style={{
+                      backgroundColor: theme.lightBg,
+                      borderColor: theme.lightBorder,
+                      color: theme.primary,
+                    }}
+                  >
+                    <Table2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        {isMonitoring
+                          ? "Sumário de Auditoria e Ocorrências"
+                          : "Sumário de Registros Cadastrados"}
+                      </span>
+                      <span
+                        className="rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold shadow-xs"
+                        style={{
+                          backgroundColor: theme.lightBg,
+                          borderColor: theme.lightBorder,
+                          color: theme.primary,
+                        }}
+                      >
+                        {baseRegs.length} {baseRegs.length === 1 ? "achado" : "achados"}
+                      </span>
+                      {isMonitoring && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 font-semibold text-[#008763] bg-[#e6fbf4] border border-[#a7f3d0] px-2 py-0.5 rounded-full text-[10px]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#008763]" />
+                            {sanadasCount} saneada(s)
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-[#b45309] bg-[#fffbeb] border border-[#fde68a] px-2 py-0.5 rounded-full text-[10px]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#b45309]" />
+                            {pendentesCount} pendente(s)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500">
                       {isMonitoring
-                        ? "Sumário de Auditoria e Ocorrências"
-                        : "Sumário de Registros Cadastrados"}
+                        ? `Clique para ${isRegistrosExpanded ? "recolher" : "abrir e gerenciar"} a tabela completa de ocorrências`
+                        : `Total de ${currentFiscRegs.length} foto(s) e ocorrências consolidadas neste relatório`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  {currentFiscRegs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenEditModal?.("nc");
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] transition-all"
+                      title="Editar todas as ocorrências em lote"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" style={{ color: theme.primary }} />
+                      <span className="hidden sm:inline">Editar em Lote</span>
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 group-hover:text-slate-900 transition-colors">
+                    <span className="hidden md:inline">
+                      {isRegistrosExpanded ? "Recolher Sumário" : "Expandir Sumário"}
                     </span>
                     <span
-                      className="rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold shadow-xs"
-                      style={{
-                        backgroundColor: theme.lightBg,
-                        borderColor: theme.lightBorder,
-                        color: theme.primary,
-                      }}
+                      className={`flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-transform duration-300 ${
+                        isRegistrosExpanded ? "rotate-180" : "rotate-0"
+                      }`}
                     >
-                      {baseRegs.length} {baseRegs.length === 1 ? "achado" : "achados"}
+                      <ChevronDown className="h-4 w-4 stroke-[2.5]" />
                     </span>
-                    {isMonitoring && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 font-semibold text-[#008763] bg-[#e6fbf4] border border-[#a7f3d0] px-2 py-0.5 rounded-full text-[10px]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#008763]" />
-                          {sanadasCount} saneada(s)
-                        </span>
-                        <span className="inline-flex items-center gap-1 font-semibold text-[#b45309] bg-[#fffbeb] border border-[#fde68a] px-2 py-0.5 rounded-full text-[10px]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#b45309]" />
-                          {pendentesCount} pendente(s)
-                        </span>
-                      </div>
-                    )}
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {isMonitoring
-                      ? `Clique para ${isRegistrosExpanded ? "recolher" : "abrir e gerenciar"} a tabela completa de ocorrências`
-                      : `Total de ${ws.registrosNc.length} foto(s) e ocorrências consolidadas no relatório`}
-                  </p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 group-hover:text-slate-900 transition-colors shrink-0">
-                <span className="hidden sm:inline">
-                  {isRegistrosExpanded ? "Recolher Sumário" : "Expandir Sumário"}
-                </span>
-                <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full transition-transform duration-300 ${
-                    isRegistrosExpanded ? "rotate-180" : "rotate-0 bg-slate-100 text-slate-600"
-                  }`}
-                  style={
-                    isRegistrosExpanded
-                      ? {
-                          backgroundColor: theme.lightBg,
-                          color: theme.primary,
-                        }
-                      : undefined
-                  }
-                >
-                  <ChevronDown className="h-4 w-4 stroke-[2.5]" />
-                </span>
-              </div>
-            </button>
+              </button>
 
               {/* Painel acoplado diretamente com animação fluida de abertura (CSS Grid) */}
               <div

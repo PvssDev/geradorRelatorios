@@ -28,7 +28,7 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
     >
