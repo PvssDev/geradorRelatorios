@@ -33,7 +33,17 @@ const AppContent: React.FC = () => {
     activeWorkspace?.fiscalizacoes?.length &&
       activeWorkspace.fiscalizacoes.some((f) => Boolean(f["ID da Fiscalização"]?.trim()))
   );
-  const hasRegistros = Boolean(activeWorkspace?.registrosNc?.length);
+  const activeFiscId =
+    activeWorkspace?.fiscalizacoes[activeWorkspace.activeFiscalizacaoIndex]?.["ID da Fiscalização"]?.trim() || "";
+  const hasFotos = Boolean(
+    activeWorkspace?.photos?.length ||
+      (activeWorkspace?.documentoAnteriorFile && categoriaRelatorio === "Monitoramento")
+  );
+  const hasRegistros = Boolean(
+    activeWorkspace?.registrosNc?.some(
+      (r) => !activeFiscId || (r["ID da Fiscalização"] || "").trim() === activeFiscId
+    )
+  );
 
   const [performanceMode, setPerformanceMode] = useState<boolean>(() => {
     try {
@@ -213,10 +223,7 @@ const AppContent: React.FC = () => {
             dense ? "space-y-6" : "space-y-10"
           }`}
         >
-          {/* 01 · Fotos da Vistoria em Campo */}
-          <UploadPanel onOpenGalleryModal={() => setShowGalleryModal(true)} />
-
-          {/* 02 · Informações da Fiscalização / Monitoramento */}
+          {/* 01 · Informações da Fiscalização / Monitoramento */}
           <FiscalizacaoForm
             onOpenResponsaveisModal={() => setStaffModalMode("responsaveis")}
             onOpenCoordenadoresModal={() => setStaffModalMode("coordenadores")}
@@ -226,8 +233,15 @@ const AppContent: React.FC = () => {
             }}
           />
 
-          {/* 03 · Registro de Não Conformidade ou Ponto de Atenção */}
+          {/* 02 · Fotos da Vistoria em Campo */}
           {hasFiscalizacao && (
+            <div className="animate-reveal">
+              <UploadPanel onOpenGalleryModal={() => setShowGalleryModal(true)} />
+            </div>
+          )}
+
+          {/* 03 · Registro de Não Conformidade ou Ponto de Atenção */}
+          {hasFiscalizacao && hasFotos && (
             <div className="animate-reveal">
               <RegistroNcForm
                 onOpenCustomNcModal={(cb) => {
@@ -248,7 +262,7 @@ const AppContent: React.FC = () => {
           )}
 
           {/* 04 · Emissão e Exportação do Relatório */}
-          {hasFiscalizacao && hasRegistros && (
+          {hasFiscalizacao && hasFotos && hasRegistros && (
             <div className="animate-reveal">
               <SummaryAndActionsPanel
                 onOpenEditModal={(tab = "nc") => {

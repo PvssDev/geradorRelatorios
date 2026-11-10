@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { X, Link2, CheckCircle2, AlertTriangle, Images, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore, derivarProximaCodificacao } from "../../store/useReportStore";
 import { obterTermosUI, SituacaoNC } from "../../types/report.types";
 import { modalInputCls, modalPill } from "./modalHelpers";
+import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
 
 export const RelacionarFotoModal: React.FC<{
   initialPhotoName?: string;
   onClose: () => void;
 }> = ({ initialPhotoName, onClose }) => {
+  useLockBodyScroll(true);
   const {
     tipoRelatorio,
     categoriaRelatorio,
@@ -59,18 +62,45 @@ export const RelacionarFotoModal: React.FC<{
     );
   }, [ocorrenciasBase, selectedTargetKey]);
 
+  const fotosUsadasSet = useMemo(() => {
+    const set = new Set<string>();
+    ws.registrosNc.forEach((nc) => {
+      if (nc.Foto) set.add(nc.Foto.trim().toLowerCase());
+    });
+    return set;
+  }, [ws.registrosNc]);
+
+  // Lista estrita de fotos disponíveis para relacionamento (não pode ser a foto da NC alvo nem foto já cadastrada em outra NC)
+  const fotosDisponiveis = useMemo(() => {
+    return ws.photos.filter((p) => {
+      const nameLower = p.name.trim().toLowerCase();
+      if (targetNc && nameLower === targetNc.Foto.trim().toLowerCase()) return false;
+      return !fotosUsadasSet.has(nameLower);
+    });
+  }, [ws.photos, targetNc, fotosUsadasSet]);
+
   const defaultSecondPhoto = useMemo(() => {
     if (
       initialPhotoName &&
+      !fotosUsadasSet.has(initialPhotoName.trim().toLowerCase()) &&
       (!targetNc || initialPhotoName !== targetNc.Foto)
     ) {
       return initialPhotoName;
     }
-    const other = ws.photos.find((p) => p.name !== targetNc?.Foto);
-    return other?.name || initialPhotoName || ws.photos[0]?.name || "";
-  }, [initialPhotoName, targetNc, ws.photos]);
+    return fotosDisponiveis[0]?.name || "";
+  }, [initialPhotoName, targetNc, fotosDisponiveis, fotosUsadasSet]);
 
   const [foto2Name, setFoto2Name] = useState<string>(defaultSecondPhoto);
+
+  useEffect(() => {
+    if (fotosDisponiveis.length > 0) {
+      if (!foto2Name || !fotosDisponiveis.some((p) => p.name === foto2Name)) {
+        setFoto2Name(fotosDisponiveis[0].name);
+      }
+    } else {
+      setFoto2Name("");
+    }
+  }, [fotosDisponiveis]);
   const [trecho2, setTrecho2] = useState<string>(targetNc?.Trecho || "");
   const [obs2, setObs2] = useState<string>(
     isMonitoring
@@ -143,6 +173,12 @@ export const RelacionarFotoModal: React.FC<{
       toast.error("Selecione a 2ª foto para relacionar.");
       return;
     }
+    if (fotosUsadasSet.has(foto2Name.trim().toLowerCase())) {
+      toast.error(
+        "Esta foto já está cadastrada em uma ocorrência e não pode ser relacionada como 2ª foto."
+      );
+      return;
+    }
     if (jaTemDuas) {
       toast.error(
         "Esta ocorrência já atingiu o limite máximo de 2 fotos relacionadas."
@@ -175,28 +211,32 @@ export const RelacionarFotoModal: React.FC<{
     onClose();
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
     >
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card-lg">
-        <div className="flex items-center justify-between border-b border-border bg-navy-gradient px-6 py-4 text-primary-foreground">
-          <div>
-            <h3 className="flex items-center gap-2 text-base font-bold">
-              <Link2 className="h-5 w-5 text-accent" />
-              Relacionar Nova Foto à Ocorrência
-            </h3>
-            <p className="text-xs text-primary-foreground/75">
-              Posiciona 2 fotos lado a lado no mesmo quadro do Memorial
-              Fotográfico e agrupa a numeração na tabela do relatório.
-            </p>
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-slate-700/30 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        {/* Topo Dark Executivo com Badge de Ícone */}
+        <div className="flex items-center justify-between border-b border-slate-800 bg-[#0b1728] px-6 py-4 text-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+              <Link2 className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="truncate text-sm font-bold tracking-wide">
+                Relacionar 2ª Foto a uma Ocorrência
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Posiciona 2 fotos lado a lado no mesmo quadro do Memorial Fotográfico
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-primary-foreground/80 hover:bg-white/10 hover:text-primary-foreground"
+            className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
           >
             <X className="h-5 w-5" />
           </button>
@@ -334,20 +374,29 @@ export const RelacionarFotoModal: React.FC<{
 
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-blue">
-                      Escolher 2ª Foto
+                      Escolher 2ª Foto (Disponíveis: {fotosDisponiveis.length})
                     </label>
-                    <select
-                      value={foto2Name}
-                      onChange={(e) => setFoto2Name(e.target.value)}
-                      className={modalInputCls}
-                    >
-                      {ws.photos.map((p, idx) => (
-                        <option key={p.id} value={p.name}>
-                          Foto {String(idx + 1).padStart(2, "0")} — {p.name}
-                          {p.name === targetNc?.Foto ? " (mesma da 1ª)" : ""}
-                        </option>
-                      ))}
-                    </select>
+                    {fotosDisponiveis.length === 0 ? (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-2.5 text-xs text-amber-950">
+                        <AlertTriangle className="h-4 w-4 inline mr-1 text-amber-600" />
+                        Todas as fotos do lote já foram cadastradas em ocorrências. Não há fotos órfãs disponíveis para relacionamento.
+                      </div>
+                    ) : (
+                      <select
+                        value={foto2Name}
+                        onChange={(e) => setFoto2Name(e.target.value)}
+                        className={modalInputCls}
+                      >
+                        {fotosDisponiveis.map((p) => {
+                          const origIdx = ws.photos.findIndex((ph) => ph.name === p.name);
+                          return (
+                            <option key={p.id} value={p.name}>
+                              Foto {String(origIdx >= 0 ? origIdx + 1 : 1).padStart(2, "0")} — {p.name}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    )}
                   </div>
 
                   {/* Tipo de Registro (NC vs PA para CRA Fiscalização) */}
@@ -478,24 +527,24 @@ export const RelacionarFotoModal: React.FC<{
               {/* Banner Informativo sobre a Relação das Fotos no Relatório Word */}
               {isCraFisc && (
                 <div
-                  className={`rounded-xl border p-3.5 text-xs flex items-center gap-3 ${
+                  className={`rounded-xl border p-3.5 text-xs flex items-center gap-3 shadow-xs ${
                     !siglasMudaram
-                      ? "border-accent/40 bg-accent/10 text-accent-foreground"
-                      : "border-pa/40 bg-pa-soft text-pa"
+                      ? "border-amber-300 bg-amber-50/90 text-amber-950"
+                      : "border-orange-300 bg-orange-50/90 text-orange-950"
                   }`}
                 >
                   {!siglasMudaram ? (
                     <>
-                      <Link2 className="h-4 w-4 shrink-0 text-accent" />
+                      <Link2 className="h-4 w-4 shrink-0 text-amber-600" />
                       <div>
-                        <span className="font-bold">Mesmas Siglas Mantidas:</span> A 2ª foto será agrupada sob a mesma linha e codificação ({codificacao2.trim() || targetNc?.Identificação || "—"}) no Quadro de Não Conformidades (relação 1:1).
+                        <span className="font-bold text-amber-950">Mesmas Siglas Mantidas:</span> A 2ª foto será agrupada sob a mesma linha e codificação ({codificacao2.trim() || targetNc?.Identificação || "—"}) no Quadro de Não Conformidades (relação 1:1).
                       </div>
                     </>
                   ) : (
                     <>
-                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-orange-600" />
                       <div>
-                        <span className="font-bold">Siglas Diferentes Detectadas:</span> No Quadro será gerada uma codificação para cada sigla (Linha 1: {targetNc?.Identificação || "—"} | Linha 2: {codificacao2.trim() || proximaSugerida}) e as fotos ficarão relacionadas com colunas de registro fotográfico mescladas no Word.
+                        <span className="font-bold text-orange-950">Siglas Diferentes Detectadas:</span> No Quadro será gerada uma codificação para cada sigla (Linha 1: {targetNc?.Identificação || "—"} | Linha 2: {codificacao2.trim() || proximaSugerida}) e as fotos ficarão relacionadas com colunas de registro fotográfico mescladas no Word.
                       </div>
                     </>
                   )}
@@ -568,14 +617,14 @@ export const RelacionarFotoModal: React.FC<{
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition"
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] transition-all"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={!targetNc || !foto2Name || jaTemDuas}
-                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-stone-950 shadow-[0_2px_0_0_#b45309] hover:bg-amber-400 active:translate-y-[1px] transition disabled:opacity-40"
+                  disabled={!targetNc || !foto2Name || jaTemDuas || fotosDisponiveis.length === 0}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2 text-xs font-bold text-stone-950 shadow-md shadow-amber-500/20 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
                 >
                   <Link2 className="h-4 w-4" />
                   Confirmar Relação de Fotos
@@ -585,7 +634,8 @@ export const RelacionarFotoModal: React.FC<{
           )}
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

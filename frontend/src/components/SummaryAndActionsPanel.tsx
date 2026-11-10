@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Rocket,
   Trash2,
@@ -6,10 +6,11 @@ import {
   Wand2,
   Download,
   CheckCircle2,
-  FileSpreadsheet,
+  Files,
   Loader2,
   AlertTriangle,
   ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
@@ -27,11 +28,11 @@ interface SummaryAndActionsPanelProps {
 
 const btn = {
   primary:
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-amber-500/25 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/35 active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none",
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-amber-500/20 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/30 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none",
   secondary:
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted hover:border-primary/40 transition-all duration-200 active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none",
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-all duration-150 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none",
   danger:
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-nc/30 bg-nc-soft px-4 py-2.5 text-sm font-semibold text-nc transition-all duration-200 hover:bg-nc hover:text-white active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none",
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 shadow-xs transition-all duration-150 hover:bg-rose-100 hover:border-rose-400 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none",
 };
 
 function downloadBase64Docx(item: RelatorioGeradoItem) {
@@ -62,30 +63,50 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
     coordenadores,
     mapSiglas,
     getActiveWorkspace,
+    getAllPhotosForBatch,
     executarAutoPreenchimento,
-    limparRegistrosAtuais,
+    reiniciarModalidadeAtual,
     setRelatoriosGerados,
   } = useReportStore();
 
   const ws = getActiveWorkspace();
-  const regs = ws.registrosNc;
-  const fotos = ws.photos;
   const isMonitoring = categoriaRelatorio === "Monitoramento";
 
-  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const activeFiscIdx = Math.max(
+    0,
+    Math.min(ws.activeFiscalizacaoIndex, Math.max(0, ws.fiscalizacoes.length - 1))
+  );
+  const activeFisc = ws.fiscalizacoes[activeFiscIdx];
+  const activeFiscId = (activeFisc?.["ID da Fiscalização"] || "").trim();
+
+  // Ocorrências vinculadas estritamente à fiscalização ativa atual
+  const activeRegs = useMemo(() => {
+    if (!activeFiscId) return [];
+    return ws.registrosNc.filter(
+      (r) => (r["ID da Fiscalização"] || "").trim() === activeFiscId
+    );
+  }, [ws.registrosNc, activeFiscId]);
+
+  // Fiscalizações que possuem ao menos 1 registro de ocorrência cadastrado
+  const fiscalizacoesValidas = useMemo(() => {
+    return ws.fiscalizacoes.filter((f) => {
+      const id = (f["ID da Fiscalização"] || "").trim();
+      if (!id) return false;
+      return ws.registrosNc.some(
+        (r) => (r["ID da Fiscalização"] || "").trim() === id
+      );
+    });
+  }, [ws.fiscalizacoes, ws.registrosNc]);
+
+  const countRelatoriosValidos = fiscalizacoesValidas.length;
+
+  const [confirmReset, setConfirmReset] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [generatingBatch, setGeneratingBatch] = useState(false);
   const [avisos, setAvisos] = useState<string[]>([]);
 
-  const executeConfirmedDelete = () => {
-    limparRegistrosAtuais(false);
-    setAvisos([]);
-    toast.success("Todos os registros de ocorrências foram limpos.");
-    setConfirmClearAll(false);
-  };
-
-  const handleGerar = async () => {
-    if (!regs.length) return;
+  const handleGerarIndividual = async () => {
+    if (!activeRegs.length || !activeFisc) return;
 
     if (
       tipoRelatorio === "CRC" &&
@@ -93,20 +114,21 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
       !ws.documentoAnteriorFile
     ) {
       toast.error(
-        "Para CRC Monitoramento, envie primeiro o Relatório Anterior (.docx) no Bloco 01."
+        "Para CRC Monitoramento, envie primeiro o Relatório Anterior (.docx) no Bloco 02."
       );
       return;
     }
 
     setGenerating(true);
+    setGeneratingBatch(false);
     setAvisos([]);
     try {
       const res = await gerarRelatoriosApi({
         tipo_relatorio: tipoRelatorio,
         categoria_relatorio: categoriaRelatorio,
-        fiscalizacoes: ws.fiscalizacoes,
-        registros_nc: regs,
-        photos: fotos,
+        fiscalizacoes: [activeFisc],
+        registros_nc: activeRegs,
+        photos: ws.photos,
         oldItems: ws.oldPhotosToMatch,
         documentoAnteriorFile: ws.documentoAnteriorFile,
         planilhaElegibilidadeFile: ws.planilhaElegibilidadeFile,
@@ -117,7 +139,7 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
       });
       setRelatoriosGerados(res.relatorios || []);
       setAvisos(res.avisos || []);
-      toast.success("Relatório (.docx) compilado com sucesso!");
+      toast.success(`Relatório (${activeFisc["ID da Fiscalização"]}) gerado com sucesso!`);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Falha ao gerar o relatório.";
@@ -127,26 +149,58 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
     }
   };
 
-  const handleExcel = async () => {
-    if (!regs.length) return;
-    setDownloadingExcel(true);
+  const handleGerarLote = async () => {
+    if (countRelatoriosValidos === 0) return;
+
+    if (
+      tipoRelatorio === "CRC" &&
+      isMonitoring &&
+      !ws.documentoAnteriorFile
+    ) {
+      toast.error(
+        "Para CRC Monitoramento, envie primeiro o Relatório Anterior (.docx) no Bloco 02."
+      );
+      return;
+    }
+
+    setGenerating(true);
+    setGeneratingBatch(true);
+    setAvisos([]);
     try {
-      const blob = await downloadPlanilhaExcelApi(ws.fiscalizacoes, regs);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Planilha_${tipoRelatorio}_${categoriaRelatorio}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      toast.success("Planilha (.xlsx) exportada!");
+      const validIds = new Set(
+        fiscalizacoesValidas.map((f) => (f["ID da Fiscalização"] || "").trim())
+      );
+      const loteRegs = ws.registrosNc.filter((r) =>
+        validIds.has((r["ID da Fiscalização"] || "").trim())
+      );
+      const allBatchPhotos = getAllPhotosForBatch();
+
+      const res = await gerarRelatoriosApi({
+        tipo_relatorio: tipoRelatorio,
+        categoria_relatorio: categoriaRelatorio,
+        fiscalizacoes: fiscalizacoesValidas,
+        registros_nc: loteRegs,
+        photos: allBatchPhotos,
+        oldItems: ws.oldPhotosToMatch,
+        documentoAnteriorFile: ws.documentoAnteriorFile,
+        planilhaElegibilidadeFile: ws.planilhaElegibilidadeFile,
+        customSiglasMap: mapSiglas,
+        responsaveis,
+        coordenadores,
+        compressImages,
+      });
+      setRelatoriosGerados(res.relatorios || []);
+      setAvisos(res.avisos || []);
+      toast.success(
+        `${res.relatorios?.length || countRelatoriosValidos} relatório(s) gerado(s) em lote com sucesso!`
+      );
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Erro ao exportar planilha.";
+        err instanceof Error ? err.message : "Falha ao gerar relatórios em lote.";
       toast.error(msg);
     } finally {
-      setDownloadingExcel(false);
+      setGenerating(false);
+      setGeneratingBatch(false);
     }
   };
 
@@ -165,30 +219,48 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-amber-500/25 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/35 active:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none"
-            disabled={!regs.length || generating}
-            onClick={handleGerar}
+            className={btn.primary}
+            disabled={!activeRegs.length || generating}
+            onClick={handleGerarIndividual}
+            title={
+              !activeRegs.length
+                ? "Adicione ocorrências nesta fiscalização para habilitar a emissão"
+                : `Gerar apenas o relatório ${activeFiscId}`
+            }
           >
-            {generating ? (
+            {generating && !generatingBatch ? (
               <Loader2 className="h-4 w-4 animate-spin text-white" />
             ) : (
               <Sparkles className="h-4 w-4 text-amber-100" />
             )}
-            <span>{generating ? "Gerando..." : "Gerar Relatório (.docx)"}</span>
+            <span>
+              {generating && !generatingBatch
+                ? "Gerando..."
+                : `Gerar Relatório (${activeFiscId || "1"})`}
+            </span>
           </button>
 
           <button
             type="button"
             className={btn.secondary}
-            disabled={!regs.length || downloadingExcel}
-            onClick={handleExcel}
+            disabled={countRelatoriosValidos === 0 || generating}
+            onClick={handleGerarLote}
+            title={
+              countRelatoriosValidos === 0
+                ? "Nenhum relatório possui registros de ocorrências para emissão em lote"
+                : `Gerar todos os ${countRelatoriosValidos} relatórios que possuem registros cadastrados`
+            }
           >
-            {downloadingExcel ? (
+            {generating && generatingBatch ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <FileSpreadsheet className="h-4 w-4" />
+              <Files className="h-4 w-4" />
             )}
-            Planilha (.xlsx)
+            <span>
+              {generating && generatingBatch
+                ? "Gerando Lote..."
+                : `Gerar Relatórios (${countRelatoriosValidos})`}
+            </span>
           </button>
 
           <button
@@ -205,17 +277,17 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
           <button
             type="button"
             className={btn.danger}
-            disabled={!regs.length}
-            onClick={() => setConfirmClearAll(true)}
+            disabled={!ws.fiscalizacoes.length && !ws.registrosNc.length && !ws.photos.length}
+            onClick={() => setConfirmReset(true)}
+            title={`Reiniciar completamente este relatório (${tipoRelatorio} · ${categoriaRelatorio})`}
           >
-            <Trash2 className="h-4 w-4" /> Limpar Todos os Registros
+            <RotateCcw className="h-4 w-4" /> Reiniciar Relatório
           </button>
         </div>
 
-        {!regs.length && (
+        {!activeRegs.length && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Adicione ao menos um registro no bloco 3 (ou use Auto Preenchimento)
-            para gerar o relatório.
+            Adicione ao menos uma ocorrência nesta fiscalização no bloco 3 para liberar a geração do documento.
           </p>
         )}
 
@@ -240,7 +312,7 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
 
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-md shadow-amber-500/25 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/35 active:translate-y-[1px]"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-md shadow-amber-500/25 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/35 active:scale-[0.98]"
                   onClick={() => downloadBase64Docx(rel)}
                 >
                   <Download className="h-4 w-4 stroke-[2.5]" />
@@ -265,15 +337,38 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
         )}
       </Card>
 
-      {confirmClearAll && (
-        <ConfirmDeleteModal
-          title="Limpar Todos os Registros"
-          description="Deseja realmente remover todas as ocorrências registradas nesta modalidade? (As fotos enviadas e o cabeçalho serão mantidos)."
-          itemsPreview={[`${regs.length} registro(s) de ocorrências em ${tipoRelatorio} · ${categoriaRelatorio}`]}
-          onConfirm={executeConfirmedDelete}
-          onClose={() => setConfirmClearAll(false)}
-        />
-      )}
+      {confirmReset && (() => {
+        const totalRelatorios = ws.fiscalizacoes.length;
+        const totalRegistros = ws.registrosNc.length;
+        const totalFotos =
+          ws.photos.length +
+          Object.values(ws.photosByFiscalizacao || {}).reduce(
+            (acc, list) => acc + (list?.length || 0),
+            0
+          );
+
+        return (
+          <ConfirmDeleteModal
+            title={`Reiniciar Relatório (${tipoRelatorio} · ${categoriaRelatorio})`}
+            description={`Atenção: Esta ação reiniciará completamente o estado deste tipo de relatório (${tipoRelatorio} · ${categoriaRelatorio}). Todos os dados serão apagados: ${totalRelatorios} relatório(s)/cabeçalho(s), ${totalRegistros} ocorrência(s) e fotos vinculadas. Deseja continuar?`}
+            itemsPreview={[
+              `Modalidade: ${tipoRelatorio} · ${categoriaRelatorio}`,
+              `Relatórios / Cabeçalhos cadastrados: ${totalRelatorios}${ws.fiscalizacoes.length > 0 ? ` (${ws.fiscalizacoes.map((f) => f["ID da Fiscalização"] || "Sem ID").join(", ")})` : ""}`,
+              `Total de ocorrências feitas: ${totalRegistros} registro(s)`,
+              `Total de fotos vinculadas: ${totalFotos} foto(s)`,
+            ]}
+            onConfirm={() => {
+              reiniciarModalidadeAtual();
+              setAvisos([]);
+              setConfirmReset(false);
+              toast.success(
+                `Relatório de ${tipoRelatorio} · ${categoriaRelatorio} foi reiniciado com sucesso.`
+              );
+            }}
+            onClose={() => setConfirmReset(false)}
+          />
+        );
+      })()}
     </>
   );
 };

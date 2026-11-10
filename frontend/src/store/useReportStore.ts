@@ -21,6 +21,7 @@ export interface ModalityWorkspaceState {
   activeFiscalizacaoIndex: number;
   registrosNc: RegistroNcItem[];
   photos: UploadedPhotoItem[];
+  photosByFiscalizacao: Record<string, UploadedPhotoItem[]>;
   sortOption: SortOption;
   carouselIndex: number;
   pistaPersistida: string;
@@ -37,6 +38,7 @@ function createEmptyWorkspace(): ModalityWorkspaceState {
     activeFiscalizacaoIndex: 0,
     registrosNc: [],
     photos: [],
+    photosByFiscalizacao: {},
     sortOption: "Nome (A-Z / 0-9)",
     carouselIndex: 0,
     pistaPersistida: "",
@@ -249,6 +251,7 @@ interface ReportStore {
   removePhoto: (id: string) => void;
   setSortOption: (option: SortOption) => void;
   clearPhotos: () => void;
+  getAllPhotosForBatch: () => UploadedPhotoItem[];
   setCarouselIndex: (idx: number) => void;
   setMonitoramentoAnteriorData: (file: File | null, items: MonitoramentoAnteriorItem[]) => void;
   setPlanilhaElegibilidadeFile: (file: File | null) => void;
@@ -268,6 +271,7 @@ interface ReportStore {
   deleteRegistrosNcBulk: (keys: Array<{ idFiscalizacao: string; numero: number }>) => void;
   executarAutoPreenchimento: () => void;
   limparRegistrosAtuais: (alsoClearPhotos?: boolean) => void;
+  reiniciarModalidadeAtual: () => void;
   setRelatoriosGerados: (items: RelatorioGeradoItem[]) => void;
   importarEstadoModalidade: (
     tipo: TipoRelatorio,
@@ -574,12 +578,20 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       }
       newIdx = Math.max(0, Math.min(newIdx, Math.max(0, sorted.length - 1)));
 
+      const activeFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+      const activeFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+      if (activeFiscId) {
+        updatedCache[activeFiscId] = sorted;
+      }
+
       return {
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             photos: sorted,
+            photosByFiscalizacao: updatedCache,
             carouselIndex: newIdx,
           },
         },
@@ -597,6 +609,13 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         const foundIdx = sorted.findIndex((p) => p.name === activePhotoName);
         if (foundIdx >= 0) newIdx = foundIdx;
       }
+      const activeFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+      const activeFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+      if (activeFiscId) {
+        updatedCache[activeFiscId] = sorted;
+      }
+
       return {
         workspaces: {
           ...state.workspaces,
@@ -604,6 +623,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
             ...ws,
             sortOption: option,
             photos: sorted,
+            photosByFiscalizacao: updatedCache,
             carouselIndex: newIdx,
           },
         },
@@ -620,12 +640,21 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       }
       const nextPhotos = ws.photos.filter((p) => p.id !== id);
       const nextIdx = Math.max(0, Math.min(ws.carouselIndex, Math.max(0, nextPhotos.length - 1)));
+
+      const activeFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+      const activeFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+      if (activeFiscId) {
+        updatedCache[activeFiscId] = nextPhotos;
+      }
+
       return {
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             photos: nextPhotos,
+            photosByFiscalizacao: updatedCache,
             carouselIndex: nextIdx,
           },
         },
@@ -637,17 +666,43 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
       ws.photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+
+      const activeFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+      const activeFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+      if (activeFiscId) {
+        updatedCache[activeFiscId] = [];
+      }
+
       return {
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             photos: [],
+            photosByFiscalizacao: updatedCache,
             carouselIndex: 0,
           },
         },
       };
     }),
+
+  getAllPhotosForBatch: () => {
+    const state = get();
+    const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
+    const ws = state.workspaces[key];
+    const photoMap = new Map<string, UploadedPhotoItem>();
+
+    (ws.photos || []).forEach((p) => photoMap.set(p.name, p));
+
+    if (ws.photosByFiscalizacao) {
+      Object.values(ws.photosByFiscalizacao).forEach((list) => {
+        (list || []).forEach((p) => photoMap.set(p.name, p));
+      });
+    }
+
+    return Array.from(photoMap.values());
+  },
 
   setCarouselIndex: (idx) =>
     set((state) => {
@@ -706,12 +761,32 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
       const safeIdx = Math.max(0, Math.min(idx, Math.max(0, ws.fiscalizacoes.length - 1)));
+      if (safeIdx === ws.activeFiscalizacaoIndex && ws.photos.length > 0) {
+        return state;
+      }
+
+      // Salva as fotos da fiscalização atual no cache
+      const currentOldFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+      const currentOldId = currentOldFisc?.["ID da Fiscalização"]?.trim() || "";
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+      if (currentOldId) {
+        updatedCache[currentOldId] = ws.photos;
+      }
+
+      // Restaura as fotos da nova fiscalização
+      const newFisc = ws.fiscalizacoes[safeIdx];
+      const newId = newFisc?.["ID da Fiscalização"]?.trim() || "";
+      const restoredPhotos = newId && updatedCache[newId] ? updatedCache[newId] : [];
+
       return {
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             activeFiscalizacaoIndex: safeIdx,
+            photosByFiscalizacao: updatedCache,
+            photos: restoredPhotos,
+            carouselIndex: 0,
           },
         },
       };
@@ -735,6 +810,16 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       };
     }
 
+    // Salva fotos da fiscalização anterior no cache
+    const currentOldFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+    const currentOldId = currentOldFisc?.["ID da Fiscalização"]?.trim() || "";
+    const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+    if (currentOldId) {
+      updatedCache[currentOldId] = ws.photos;
+    }
+    // A nova fiscalização inicia com fotos vazias []
+    updatedCache[cleanId] = [];
+
     const nextFisc = [...ws.fiscalizacoes, { ...item, "ID da Fiscalização": cleanId }];
     set({
       workspaces: {
@@ -743,6 +828,9 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           ...ws,
           fiscalizacoes: nextFisc,
           activeFiscalizacaoIndex: nextFisc.length - 1,
+          photosByFiscalizacao: updatedCache,
+          photos: [],
+          carouselIndex: 0,
           relatoriosGerados: [],
         },
       },
@@ -755,12 +843,16 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
       if (ws.fiscalizacoes.length === 0) {
+        const id = item["ID da Fiscalização"]?.trim() || "";
+        const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+        if (id) updatedCache[id] = ws.photos;
         return {
           workspaces: {
             ...state.workspaces,
             [key]: {
               ...ws,
               fiscalizacoes: [item],
+              photosByFiscalizacao: updatedCache,
               activeFiscalizacaoIndex: 0,
             },
           },
@@ -784,6 +876,14 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         return state;
       }
 
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+      if (oldId && oldId !== newId && updatedCache[oldId]) {
+        updatedCache[newId] = updatedCache[oldId];
+        delete updatedCache[oldId];
+      } else if (newId && !updatedCache[newId]) {
+        updatedCache[newId] = ws.photos;
+      }
+
       const nextFisc = ws.fiscalizacoes.map((f, idx) => (idx === targetIdx ? item : f));
       const nextNc = ws.registrosNc.map((nc) =>
         nc["ID da Fiscalização"] === oldId
@@ -797,6 +897,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
             ...ws,
             fiscalizacoes: nextFisc,
             registrosNc: nextNc,
+            photosByFiscalizacao: updatedCache,
           },
         },
       };
@@ -822,6 +923,12 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       };
     }
 
+    const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+    if (oldId && oldId !== newId && updatedCache[oldId]) {
+      updatedCache[newId] = updatedCache[oldId];
+      delete updatedCache[oldId];
+    }
+
     const cleanUpdated = { ...updated, "ID da Fiscalização": newId };
     const nextFisc = ws.fiscalizacoes.map((f) =>
       f["ID da Fiscalização"] === oldId ? cleanUpdated : f
@@ -839,6 +946,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           ...ws,
           fiscalizacoes: nextFisc,
           registrosNc: nextNc,
+          photosByFiscalizacao: updatedCache,
           relatoriosGerados: [],
         },
       },
@@ -851,17 +959,39 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
       const idSet = new Set(ids);
+
+      const activeFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+      const activeFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+      if (activeFiscId && idSet.has(activeFiscId)) {
+        ws.photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+      }
+
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
+      ids.forEach((id) => {
+        if (updatedCache[id]) {
+          updatedCache[id].forEach((p) => URL.revokeObjectURL(p.previewUrl));
+          delete updatedCache[id];
+        }
+      });
+
       const nextFisc = ws.fiscalizacoes.filter((f) => !idSet.has(f["ID da Fiscalização"]));
+      const safeIdx = Math.max(
+        0,
+        Math.min(ws.activeFiscalizacaoIndex, Math.max(0, nextFisc.length - 1))
+      );
+      const nextActiveId = nextFisc[safeIdx]?.["ID da Fiscalização"]?.trim() || "";
+      const restoredPhotos = nextActiveId && updatedCache[nextActiveId] ? updatedCache[nextActiveId] : [];
+
       return {
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             fiscalizacoes: nextFisc,
-            activeFiscalizacaoIndex: Math.max(
-              0,
-              Math.min(ws.activeFiscalizacaoIndex, Math.max(0, nextFisc.length - 1))
-            ),
+            activeFiscalizacaoIndex: safeIdx,
+            photosByFiscalizacao: updatedCache,
+            photos: restoredPhotos,
+            carouselIndex: 0,
             registrosNc: ws.registrosNc.filter((nc) => !idSet.has(nc["ID da Fiscalização"])),
             relatoriosGerados: [],
           },
@@ -1032,6 +1162,17 @@ export const useReportStore = create<ReportStore>((set, get) => ({
             "Esta ocorrência já possui o limite máximo de 2 fotos relacionadas lado a lado.",
         };
       }
+    }
+
+    const isFotoJaCadastrada = ws.registrosNc.some(
+      (nc) => (nc.Foto || "").trim().toLowerCase() === fotoName.trim().toLowerCase()
+    );
+    if (isFotoJaCadastrada) {
+      return {
+        ok: false,
+        error:
+          "Esta foto já está cadastrada em uma ocorrência e não pode ser relacionada como 2ª foto.",
+      };
     }
 
     const grpId =
@@ -1439,21 +1580,54 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     set((state) => {
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
+      const activeFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+      const activeFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
       if (alsoClearPhotos) {
         ws.photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+        if (activeFiscId) updatedCache[activeFiscId] = [];
       }
+      const remainingNcs = activeFiscId
+        ? ws.registrosNc.filter((r) => (r["ID da Fiscalização"] || "").trim() !== activeFiscId)
+        : [];
       return {
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
-            registrosNc: [],
+            registrosNc: remainingNcs,
             photos: alsoClearPhotos ? [] : ws.photos,
+            photosByFiscalizacao: updatedCache,
             carouselIndex: 0,
             pistaPersistida: "",
             trechoPersistido: "",
             relatoriosGerados: [],
           },
+        },
+      };
+    }),
+
+  reiniciarModalidadeAtual: () =>
+    set((state) => {
+      const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
+      const ws = state.workspaces[key];
+
+      // Revoga todas as fotos em tela e em cache desta modalidade
+      ws.photos.forEach((p) => {
+        if (p.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(p.previewUrl);
+      });
+      if (ws.photosByFiscalizacao) {
+        Object.values(ws.photosByFiscalizacao).forEach((list) => {
+          list.forEach((p) => {
+            if (p.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(p.previewUrl);
+          });
+        });
+      }
+
+      return {
+        workspaces: {
+          ...state.workspaces,
+          [key]: createEmptyWorkspace(),
         },
       };
     }),

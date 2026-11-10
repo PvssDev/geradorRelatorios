@@ -227,7 +227,7 @@ export const EditRecordsModal: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
     >
@@ -454,7 +454,7 @@ export const EditRecordsModal: React.FC<{
 
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-navy-2 transition"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-navy-2 active:scale-[0.98] transition-all"
                 >
                   <Save className="h-4 w-4" />
                   Salvar Alterações {terms.term_fisc_prep}
@@ -755,7 +755,7 @@ export const EditRecordsModal: React.FC<{
 
                   <button
                     type="submit"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-navy-2 transition"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-navy-2 active:scale-[0.98] transition-all"
                   >
                     <Save className="h-4 w-4" />
                     Salvar Alterações no Item #{currentNc["Nº"]}

@@ -1,5 +1,7 @@
 import React from "react";
-import { AlertTriangle, Trash2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Trash2, X } from "lucide-react";
+import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
 
 export const ConfirmDeleteModal: React.FC<{
   title: string;
@@ -8,45 +10,52 @@ export const ConfirmDeleteModal: React.FC<{
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ title, description, itemsPreview, onConfirm, onClose }) => {
-  return (
+  useLockBodyScroll(true);
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-card-lg">
-        <div className="flex items-center justify-between border-b border-border bg-nc px-5 py-4 text-destructive-foreground">
-          <h3 className="flex items-center gap-2 text-base font-bold">
-            <Trash2 className="h-5 w-5" />
-            {title}
-          </h3>
+      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-slate-700/30 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        {/* Topo Dark Executivo com Badge Rose de Alerta */}
+        <div className="flex items-center justify-between border-b border-slate-800 bg-[#0b1728] px-5 py-4 text-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-sm">
+              <Trash2 className="h-4 w-4" />
+            </div>
+            <h3 className="truncate text-sm font-bold tracking-wide">
+              {title}
+            </h3>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-white/80 hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="space-y-4 p-5">
-          <p className="text-sm text-foreground">{description}</p>
+          <p className="text-xs sm:text-sm text-slate-700 font-medium">{description}</p>
           {itemsPreview.length > 0 && (
-            <ul className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border bg-secondary/40 p-3 text-xs font-semibold text-foreground">
+            <ul className="max-h-40 space-y-1.5 overflow-y-auto rounded-2xl border border-slate-200 bg-[#f1f5f9] p-3 text-xs font-semibold text-slate-800">
               {itemsPreview.map((it, idx) => (
                 <li key={idx}>• {it}</li>
               ))}
             </ul>
           )}
-          <div className="rounded-xl border border-pa/30 bg-pa-soft p-3 text-xs font-medium text-pa">
-            Esta ação não pode ser desfeita.
+          <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-3 text-xs font-semibold text-amber-950">
+            Atenção: Esta ação não poderá ser desfeita.
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] transition-all"
             >
               Cancelar
             </button>
@@ -56,7 +65,7 @@ export const ConfirmDeleteModal: React.FC<{
                 onConfirm();
                 onClose();
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/60 bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-[0_2px_0_0_#991b1b] hover:bg-red-500 active:translate-y-[1px] transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-red-600 bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-red-700 active:scale-[0.98] transition-all"
             >
               <Trash2 className="h-4 w-4" />
               Sim, Excluir
@@ -64,7 +73,8 @@ export const ConfirmDeleteModal: React.FC<{
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

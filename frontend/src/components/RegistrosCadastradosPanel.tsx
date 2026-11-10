@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Table2,
   Trash2,
-  Edit3,
   Link2,
   ZoomIn,
   CheckCircle2,
@@ -12,11 +12,13 @@ import {
   Inbox,
   Image as ImageIcon,
   X,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../store/useReportStore";
 import { getConcessionTheme } from "../utils/concessionTheme";
 import { ConfirmDeleteModal } from "./Modals";
+import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
 
 interface RegistrosCadastradosPanelProps {
   onOpenEditModal: (tab?: "fisc" | "nc") => void;
@@ -31,11 +33,16 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
     getActiveWorkspace,
     deleteRegistrosNcBulk,
     deleteFiscalizacoesBulk,
-    limparRegistrosAtuais,
+    reiniciarModalidadeAtual,
   } = useReportStore();
 
   const ws = getActiveWorkspace();
-  const regs = ws.registrosNc;
+  const currentFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex] || ws.fiscalizacoes[0];
+  const currentFiscId = currentFisc?.["ID da Fiscalização"]?.trim() || "";
+  const regs = useMemo(
+    () => ws.registrosNc.filter((r) => !currentFiscId || (r["ID da Fiscalização"] || "").trim() === currentFiscId),
+    [ws.registrosNc, currentFiscId]
+  );
   const fiscs = ws.fiscalizacoes;
   const fotos = ws.photos;
   const isMonitoring = categoriaRelatorio === "Monitoramento";
@@ -43,8 +50,11 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
 
   const [selFisc, setSelFisc] = useState<string[]>([]);
   const [selNc, setSelNc] = useState<string[]>([]);
-  const [confirmMode, setConfirmMode] = useState<"fisc" | "nc" | "clear_all" | null>(null);
+  const [confirmMode, setConfirmMode] = useState<"fisc" | "nc" | null>(null);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+
+  // Trava scroll do body quando lightbox de zoom estiver aberto
+  useLockBodyScroll(Boolean(zoomUrl));
 
   // Fechamento de zoom/confirmação com ESC
   const handleKeyDown = useCallback(
@@ -203,10 +213,6 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
       deleteRegistrosNcBulk(keys);
       setSelNc([]);
       toast.success("Registros selecionados excluídos!");
-    } else if (confirmMode === "clear_all") {
-      limparRegistrosAtuais(false);
-      setSelNc([]);
-      toast.success("Todos os registros de ocorrências foram limpos.");
     }
     setConfirmMode(null);
   };
@@ -263,70 +269,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
   }, [isMonitoring, tipoRelatorio]);
 
   return (
-    <div className="mt-0 flex flex-col gap-4 rounded-b-2xl rounded-t-none border-x border-b border-slate-300 bg-[#f1f5f9] p-4 sm:p-6 shadow-xl shadow-slate-900/5 animate-in slide-in-from-top-1 duration-200">
-      {/* ========================================================================= */}
-      {/* BARRA DE AÇÕES DO PAINEL EXPANSÍVEL (SEM TÍTULO REDUNDANTE, COR DINÂMICA) */}
-      {/* ========================================================================= */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300/80 pb-3.5">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border shadow-xs"
-            style={{
-              backgroundColor: theme.lightBg,
-              borderColor: theme.lightBorder,
-              color: theme.primary,
-            }}
-          >
-            <Table2 className="h-4 w-4" />
-          </div>
-          <span
-            className="rounded-full border px-3 py-1 font-mono text-xs font-bold shadow-xs"
-            style={{
-              backgroundColor: theme.lightBg,
-              borderColor: theme.lightBorder,
-              color: theme.primary,
-            }}
-          >
-            {baseRegs.length} {baseRegs.length === 1 ? "achado registrado" : "achados registrados"}
-          </span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {regs.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onOpenEditModal("nc")}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all shadow-xs"
-              title="Editar todas as ocorrências em lote"
-            >
-              <Edit3 className="h-3.5 w-3.5" style={{ color: theme.primary }} /> Editar em Lote
-            </button>
-          )}
-
-          {fiscs.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onOpenEditModal("fisc")}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-all shadow-xs"
-              title="Editar cabeçalhos da fiscalização"
-            >
-              <Edit3 className="h-3.5 w-3.5" style={{ color: theme.primary }} /> Cabeçalhos ({fiscs.length})
-            </button>
-          )}
-
-          {regs.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setConfirmMode("clear_all")}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-600 hover:bg-rose-100 transition-all shadow-xs"
-              title="Limpar todos os registros cadastrados"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Limpar
-            </button>
-          )}
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-4 bg-white p-4 sm:p-6 animate-in slide-in-from-top-1 duration-200">
       {/* ========================================================================= */}
       {/* KPIS DE RESUMO (CARDS MODERNOS DA REFERÊNCIA)                             */}
       {/* ========================================================================= */}
@@ -336,19 +279,18 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
           return (
             <div
               key={idx}
-              className={`flex items-center gap-3 rounded-2xl bg-white border ${kpi.border} p-3.5 shadow-sm transition-all hover:shadow-md`}
+              className={`flex items-center gap-3 rounded-2xl bg-white border ${kpi.border} p-3.5 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300 cursor-default`}
             >
               <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                  kpi.customColor ? "border" : `${kpi.iconBg} ${kpi.color}`
-                }`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${kpi.customColor ? "border" : `${kpi.iconBg} ${kpi.color}`
+                  }`}
                 style={
                   kpi.customColor
                     ? {
-                        color: kpi.customColor,
-                        backgroundColor: kpi.customBg,
-                        borderColor: kpi.customBorder,
-                      }
+                      color: kpi.customColor,
+                      backgroundColor: kpi.customBg,
+                      borderColor: kpi.customBorder,
+                    }
                     : undefined
                 }
               >
@@ -463,13 +405,12 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                 return (
                   <tr
                     key={rowKey}
-                    className={`group transition-colors duration-150 ${
-                      isChecked
+                    className={`group transition-colors duration-150 ${isChecked
                         ? "bg-[#eff2fe]/70 hover:bg-[#eff2fe]"
                         : r.is_relacionado
-                        ? "bg-slate-50/60 hover:bg-slate-50"
-                        : "hover:bg-slate-50/80"
-                    }`}
+                          ? "bg-slate-50/60 hover:bg-slate-50"
+                          : "hover:bg-slate-50/80"
+                      }`}
                   >
                     {/* Checkbox */}
                     <td className="px-3.5 py-2.5">
@@ -542,22 +483,20 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                         </td>
                         <td className="px-3.5 py-2.5 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
-                              sit === "Sanada"
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${sit === "Sanada"
                                 ? "bg-[#e6fbf4] border-[#a7f3d0] text-[#008763]"
                                 : sit === "Parcialmente Sanada"
-                                ? "bg-[#eff2fe] border-[#c7d2fe] text-[#4338ca]"
-                                : "bg-[#fffbeb] border-[#fde68a] text-[#b45309]"
-                            }`}
+                                  ? "bg-[#eff2fe] border-[#c7d2fe] text-[#4338ca]"
+                                  : "bg-[#fffbeb] border-[#fde68a] text-[#b45309]"
+                              }`}
                           >
                             <span
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                sit === "Sanada"
+                              className={`h-1.5 w-1.5 rounded-full ${sit === "Sanada"
                                   ? "bg-[#008763]"
                                   : sit === "Parcialmente Sanada"
-                                  ? "bg-[#4338ca]"
-                                  : "bg-[#b45309]"
-                              }`}
+                                    ? "bg-[#4338ca]"
+                                    : "bg-[#b45309]"
+                                }`}
                             />
                             {sit}
                           </span>
@@ -607,11 +546,10 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                       <>
                         <td className="px-3.5 py-2.5 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
-                              isNc
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${isNc
                                 ? "bg-rose-50 border-rose-200 text-rose-700"
                                 : "bg-amber-50 border-amber-200 text-amber-700"
-                            }`}
+                              }`}
                           >
                             {isNc ? "NC" : "PA"}
                           </span>
@@ -651,28 +589,30 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
       </div>
 
       {/* Modal de Zoom Lightbox */}
-      {zoomUrl && (
-        <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
-          onClick={() => setZoomUrl(null)}
-        >
-          <div className="relative max-h-[90vh] max-w-4xl animate-in fade-in zoom-in-95 duration-200">
-            <button
-              type="button"
-              aria-label="Fechar ampliação"
-              onClick={() => setZoomUrl(null)}
-              className="absolute -right-3 -top-3 rounded-full bg-white p-2 text-slate-900 shadow-xl hover:scale-110 active:scale-95 transition-all"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <img
-              src={zoomUrl}
-              alt="Zoom"
-              className="max-h-[85vh] rounded-2xl object-contain shadow-2xl ring-1 ring-white/20"
-            />
-          </div>
-        </div>
-      )}
+      {zoomUrl &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
+            onClick={() => setZoomUrl(null)}
+          >
+            <div className="relative max-h-[90vh] max-w-4xl animate-in fade-in zoom-in-95 duration-200">
+              <button
+                type="button"
+                aria-label="Fechar ampliação"
+                onClick={() => setZoomUrl(null)}
+                className="absolute -right-3 -top-3 rounded-full bg-white p-2 text-slate-900 shadow-xl hover:scale-110 active:scale-95 transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <img
+                src={zoomUrl}
+                alt="Zoom"
+                className="max-h-[85vh] rounded-2xl object-contain shadow-2xl ring-1 ring-white/20"
+              />
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Confirmação de Exclusão */}
       {confirmMode && (
@@ -680,26 +620,20 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
           title={
             confirmMode === "fisc"
               ? "Excluir Cabeçalhos Selecionados"
-              : confirmMode === "nc"
-              ? "Excluir Ocorrências Selecionadas"
-              : "Limpar Todos os Registros"
+              : "Excluir Ocorrências Selecionadas"
           }
           description={
             confirmMode === "fisc"
               ? "Os cabeçalhos abaixo e todas as ocorrências vinculadas a eles serão removidos:"
-              : confirmMode === "nc"
-              ? "Confirma a exclusão das ocorrências selecionadas e a renumeração sequencial?"
-              : "Deseja realmente remover todas as ocorrências registradas nesta modalidade? (As fotos enviadas e o cabeçalho serão mantidos)."
+              : "Confirma a exclusão das ocorrências selecionadas e a renumeração sequencial?"
           }
           itemsPreview={
             confirmMode === "fisc"
               ? selFisc
-              : confirmMode === "nc"
-              ? selNc.map((k) => {
+              : selNc.map((k) => {
                   const [idF, n] = k.split("__");
                   return `${idF} — Registro Nº ${n}`;
                 })
-              : [`${regs.length} registro(s) de ocorrências em ${tipoRelatorio} · ${categoriaRelatorio}`]
           }
           onConfirm={executeConfirmedDelete}
           onClose={() => setConfirmMode(null)}
