@@ -3,7 +3,7 @@ import os
 import pytest
 from docx import Document
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend', 'src')))
 
 from reports.socicam import SocicamReport
 from core.rules.cra_rules import normalizar_registros_cra_para_relatorio

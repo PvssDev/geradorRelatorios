@@ -5,7 +5,7 @@ import io
 import pandas as pd
 from docx import Document
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend', 'src')))
 
 from report import gerar_relatorio
 from services.data_service import gerar_planilha_excel_buffer

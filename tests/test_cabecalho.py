@@ -2,7 +2,7 @@ import sys
 import os
 
 # Adiciona o diretório src ao path para poder importar o módulo report
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend', 'src')))
 
 from report import gerar_relatorio
 

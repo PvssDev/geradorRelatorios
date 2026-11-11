@@ -3,7 +3,7 @@ import sys
 import os
 
 # Adiciona src ao path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend', 'src')))
 
 from reports.factory import get_report, get_all_reports
 from reports.base import BaseReport, BaseMonitoramentoMixin

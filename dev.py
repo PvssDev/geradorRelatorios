@@ -15,7 +15,7 @@ from threading import Thread
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
-SRC_DIR = os.path.join(ROOT_DIR, "src")
+SRC_DIR = os.path.join(ROOT_DIR, "backend", "src")
 
 def abrir_navegador():
     time.sleep(2.0)
