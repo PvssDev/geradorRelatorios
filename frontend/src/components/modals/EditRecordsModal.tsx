@@ -77,12 +77,11 @@ export const EditRecordsModal: React.FC<{
       Hora: tipoRelatorio === "CRA" ? editHora.trim() : "",
       Cidade: tipoRelatorio === "CRA" ? editCidade.trim() : "",
       Local:
-        editLocal.trim() ||
-        (tipoRelatorio === "CRA"
+        tipoRelatorio === "CRA"
           ? "Rota do Atlântico"
           : tipoRelatorio === "CRC"
           ? "Sistema Viário do Paiva"
-          : locaisSocicam[0]),
+          : editLocal.trim() || locaisSocicam[0],
       Contrato: editContrato.trim(),
       "Pessoal Responsável": editResp.trim(),
       Coordenador: editCoord.trim(),
@@ -332,7 +331,7 @@ export const EditRecordsModal: React.FC<{
                 </div>
 
                 {tipoRelatorio === "CRA" && (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-blue">
                         Hora
@@ -355,17 +354,6 @@ export const EditRecordsModal: React.FC<{
                         className={modalInputCls}
                       />
                     </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-blue">
-                        Local
-                      </label>
-                      <input
-                        type="text"
-                        value={editLocal}
-                        onChange={(e) => setEditLocal(e.target.value)}
-                        className={modalInputCls}
-                      />
-                    </div>
                   </div>
                 )}
 
@@ -385,20 +373,6 @@ export const EditRecordsModal: React.FC<{
                         </option>
                       ))}
                     </select>
-                  </div>
-                )}
-
-                {tipoRelatorio === "CRC" && (
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-blue">
-                      Local
-                    </label>
-                    <input
-                      type="text"
-                      value={editLocal}
-                      onChange={(e) => setEditLocal(e.target.value)}
-                      className={modalInputCls}
-                    />
                   </div>
                 )}
 

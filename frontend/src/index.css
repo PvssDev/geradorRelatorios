@@ -136,3 +136,179 @@
 .perf-mode {
   scroll-behavior: auto !important;
 }
+
+/* ==========================================================================
+   HeroUI DateRangePicker - Concession Theme Integration
+   ========================================================================== */
+
+/* 1. Container do Input: 100% harmonizado com inputCls (ID, Cidade, Hora, Contrato) */
+.arpe-date-range-picker [data-slot="input-wrapper"],
+.arpe-date-range-picker div[data-slot="input-wrapper"] {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: #d0e1f3 !important;
+  background-color: #f0f6fc !important;
+  box-shadow: none !important;
+  outline: none !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.arpe-date-range-picker [data-slot="input-wrapper"]:hover,
+.arpe-date-range-picker [data-slot="input-wrapper"][data-hover="true"] {
+  background-color: #eaf3fc !important;
+  border-color: rgba(0, 22, 48, 0.5) !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.arpe-date-range-picker [data-slot="input-wrapper"][data-focus="true"],
+.arpe-date-range-picker [data-slot="input-wrapper"]:focus-within {
+  background-color: #ffffff !important;
+  border-color: #001630 !important;
+  box-shadow: 0 0 0 2px rgba(0, 22, 48, 0.2) !important;
+}
+
+/* Segmentos de data (dd, mm, aaaa) e separador */
+.arpe-date-range-picker [data-slot="segment"] {
+  color: #0f172a !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+}
+
+.arpe-date-range-picker [data-slot="segment"][data-placeholder="true"] {
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+}
+
+.arpe-date-range-picker [data-slot="separator"] {
+  color: #64748b !important;
+  font-weight: 600 !important;
+  padding: 0 0.25rem !important;
+}
+
+/* Ícone do seletor (mesmo tom discreto #45556c do ícone de Contrato) */
+.arpe-date-range-picker [data-slot="selector-button"],
+.arpe-date-range-picker [data-slot="selector-button"] svg {
+  color: #45556c !important;
+  opacity: 0.9 !important;
+  transition: all 0.2s ease !important;
+}
+
+.arpe-date-range-picker [data-slot="selector-button"]:hover,
+.arpe-date-range-picker [data-slot="selector-button"]:hover svg {
+  color: #001630 !important;
+  opacity: 1 !important;
+  background-color: transparent !important;
+  transform: scale(1.06);
+}
+
+/* 2. Popover e Calendário Flutuante */
+.arpe-date-range-popover {
+  border-radius: 1.25rem !important;
+  box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.2), 0 8px 16px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+  padding: 0.5rem !important;
+}
+
+.arpe-date-range-popover [data-slot="title"] {
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  font-size: 0.95rem !important;
+  text-transform: capitalize !important;
+}
+
+.arpe-date-range-popover [data-slot="prev-button"]:hover,
+.arpe-date-range-popover [data-slot="next-button"]:hover,
+.arpe-date-range-popover [data-slot="prevButton"]:hover,
+.arpe-date-range-popover [data-slot="nextButton"]:hover {
+  background-color: var(--concession-soft, #f0f6ff) !important;
+  color: var(--concession-primary, #2563eb) !important;
+}
+
+.arpe-date-range-popover [data-slot="grid-header-cell"],
+.arpe-date-range-popover [data-slot="gridHeaderCell"] {
+  color: #64748b !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  text-transform: capitalize !important;
+}
+
+/* 3. Células do Calendário: Hover, Extremidades e Intervalo com a cor da Concessão */
+.arpe-date-range-popover button[data-slot*="cell"]:hover:not([data-selected="true"]) {
+  background-color: var(--concession-soft, #f0f6ff) !important;
+  color: var(--concession-primary, #2563eb) !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  transform: scale(1.05);
+  transition: transform 0.15s ease-out;
+}
+
+/* Extremidades selecionadas (Início e Fim) */
+.arpe-date-range-popover button[data-slot*="cell"][data-selection-start="true"],
+.arpe-date-range-popover button[data-slot*="cell"][data-selection-end="true"],
+.arpe-date-range-popover button[data-slot*="cell"][data-selected="true"]:not([data-range-selection="true"]) {
+  background-color: var(--concession-primary, #2563eb) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 4px 10px var(--concession-glow, rgba(37, 99, 235, 0.35)) !important;
+  z-index: 20 !important;
+}
+
+/* Faixa intermediária selecionada */
+.arpe-date-range-popover button[data-slot*="cell"][data-range-selection="true"]:before {
+  background-color: var(--concession-soft, #eff6ff) !important;
+  opacity: 1 !important;
+}
+
+.arpe-date-range-popover button[data-slot*="cell"][data-range-selection="true"]:not([data-selection-start="true"]):not([data-selection-end="true"]) {
+  color: var(--concession-primary, #2563eb) !important;
+  font-weight: 600 !important;
+}
+
+/* Efeito Hover do Intervalo (enquanto o mouse passeia antes do 2º clique) */
+.arpe-date-range-popover button[data-slot*="cell"][data-range-hover="true"]:before {
+  background-color: var(--concession-soft, #eff6ff) !important;
+  opacity: 0.8 !important;
+}
+
+.arpe-date-range-popover button[data-slot*="cell"][data-range-hover="true"] {
+  color: var(--concession-primary, #2563eb) !important;
+}
+
+/* Animação do Indicativo de Correto (Seleção Múltipla de Equipe) */
+@keyframes checkCirclePop {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.4;
+  }
+  65% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes checkDraw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-check-pop {
+  animation: checkCirclePop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-check-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: checkDraw 0.24s ease-out 0.06s forwards;
+}
