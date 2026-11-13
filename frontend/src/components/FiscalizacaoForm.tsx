@@ -704,6 +704,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
   return (
     <Card
       n={1}
+      className="h-full"
       icon={<Building2 className="h-5 w-5" />}
       title={
         isMonitoring

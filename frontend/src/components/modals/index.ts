@@ -6,3 +6,4 @@ export * from "./PhotoGalleryModal";
 export * from "./RelacionarFotoModal";
 export * from "./ConfirmDeleteModal";
 export * from "./EditRecordsModal";
+export * from "./PastaGeradorBDModal";

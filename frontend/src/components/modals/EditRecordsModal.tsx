@@ -204,8 +204,10 @@ export const EditRecordsModal: React.FC<{
       updateRegistroNcAt(currentNc["ID da Fiscalização"], currentNc["Nº"], {
         Pista: tipoRelatorio === "CRC" ? editNcPista : "",
         Trecho: tipoRelatorio === "CRC" ? editNcTrecho : "",
-        "Não Conformidade": siglasJoined,
-        "Ponto de Atenção": "",
+        "Não Conformidade":
+          tipoRelatorio === "SOCICAM" && editIsPa ? "" : siglasJoined,
+        "Ponto de Atenção":
+          tipoRelatorio === "SOCICAM" && editIsPa ? siglasJoined : "",
         Identificação: editIdentificacao.trim() || siglasJoined,
         Observações: editNcObs,
         "Fundamento da infração": editNcFund,
@@ -497,7 +499,8 @@ export const EditRecordsModal: React.FC<{
 
               {currentNc && (
                 <>
-                  {tipoRelatorio === "CRA" && !isMonitoring && (
+                  {(tipoRelatorio === "CRA" || tipoRelatorio === "SOCICAM") &&
+                    !isMonitoring && (
                     <div className="inline-flex rounded-xl bg-muted p-1">
                       <button
                         type="button"

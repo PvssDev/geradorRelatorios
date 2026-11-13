@@ -292,7 +292,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
     const nextOldSrc = getOldImgSrc(nextOldItem);
 
     return (
-      <div className={`relative overflow-hidden rounded-2xl border p-4 sm:p-6 shadow-sm ${isPerf ? "bg-slate-900 border-slate-700" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
+      <div className={`relative overflow-hidden border p-4 sm:p-6 ${isPerf ? "rounded-2xl bg-slate-900 border-slate-700 shadow-sm" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
 
         {/* Keyframes de animação vertical (Desativados no modo desempenho) */}
         {!isPerf && (
@@ -382,24 +382,24 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
           {/* COLUNA 1: CARROSSEL VERTICAL DE FOTOS ANTERIORES              */}
           {/* ============================================================= */}
           <div className="flex flex-col">
-            <div className="mb-2.5 flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-300">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.primary }} />
-                Foto Anterior (Doc)
+            <div className="mb-2.5 flex min-h-[32px] items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-300">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: theme.primary }} />
+                <span className="truncate">Foto Anterior (Doc)</span>
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setShowAllOldModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-2.5 py-1 text-[11px] font-semibold normal-case text-slate-200 hover:bg-white/20 hover:text-white shadow-sm transition-all duration-200"
+                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/10 px-2.5 py-1 text-[11px] font-semibold normal-case text-slate-200 hover:bg-white/20 hover:text-white shadow-sm transition-all duration-200"
                   title="Abrir grade com todas as fotos do documento anterior"
                 >
-                  <Images className="h-3.5 w-3.5" />
-                  Ver todas as fotos anteriores
+                  <Images className="h-3.5 w-3.5 shrink-0" />
+                  Galeria anterior
                 </button>
                 <span
-                  className="rounded-lg bg-white/10 px-2 py-0.5 font-mono text-[11px] font-bold"
+                  className="shrink-0 whitespace-nowrap rounded-lg bg-white/10 px-2 py-0.5 font-mono text-[11px] font-bold"
                   style={{ color: theme.primary }}
                 >
                   {oldIdx + 1} / {totalOld}
@@ -450,7 +450,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
               {/* Card Central Ativo (Foto Anterior Ativa) */}
               <div
                 key={`curr_old_${oldIdx}_${oldAnimKey}`}
-                className={`group relative z-30 flex aspect-[4/3] ${isPerf ? "w-full max-h-[85%]" : "w-[92%] max-h-[70%]"} items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
+                className={`group relative z-30 flex aspect-[4/3] w-[92%] max-h-[70%] items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
                   isPerf ? "shadow-md" : `shadow-2xl transition-all duration-300 ${oldDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"}`
                 }`}
                 style={{
@@ -462,7 +462,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                   <img
                     src={oldSrc}
                     alt={oldItem.id_nc}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className={`h-full w-full object-cover ${isPerf ? "" : "transition-transform duration-300 group-hover:scale-105"}`}
                   />
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-900">
@@ -528,7 +528,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
             {/* Metadados: Legenda Antiga (Lado Esquerdo) */}
             {oldItem && (
-              <div className="mt-4 flex flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 backdrop-blur-md shadow-sm">
+              <div className="mt-4 flex flex-1 flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 backdrop-blur-md shadow-sm">
                 <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400" style={{ color: theme.primary }}>
                   Legenda Antiga
                 </span>
@@ -543,26 +543,26 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
           {/* COLUNA 2: CARROSSEL VERTICAL DE FOTOS NOVAS (CAMPO)           */}
           {/* ============================================================= */}
           <div className="flex flex-col">
-            <div className="mb-2.5 flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-300">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.primary }} />
-                Foto Nova (Vistoria)
+            <div className="mb-2.5 flex min-h-[32px] items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-300">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: theme.primary }} />
+                <span className="truncate">Foto Nova (Vistoria)</span>
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {totalFotos > 0 && onOpenGalleryModal && (
                   <button
                     type="button"
                     onClick={onOpenGalleryModal}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-2.5 py-1 text-[11px] font-semibold normal-case text-slate-200 hover:bg-white/20 hover:text-white shadow-sm transition-all duration-200"
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/10 px-2.5 py-1 text-[11px] font-semibold normal-case text-slate-200 hover:bg-white/20 hover:text-white shadow-sm transition-all duration-200"
                     title="Abrir galeria de fotos de campo"
                   >
-                    <Images className="h-3.5 w-3.5" />
-                    Ver todas as fotos
+                    <Images className="h-3.5 w-3.5 shrink-0" />
+                    Galeria atual
                   </button>
                 )}
                 <span
-                  className="rounded-lg bg-white/10 px-2 py-0.5 font-mono text-[11px] font-bold"
+                  className="shrink-0 whitespace-nowrap rounded-lg bg-white/10 px-2 py-0.5 font-mono text-[11px] font-bold"
                   style={{ color: theme.primary }}
                 >
                   {totalFotos > 0 ? `${newIdx + 1} / ${totalFotos}` : "0 fotos"}
@@ -607,7 +607,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
               {/* Card Central Ativo (Foto Nova Ativa) */}
               <div
                 key={`curr_new_${newIdx}_${newAnimKey}`}
-                className={`group relative z-30 flex aspect-[4/3] ${isPerf ? "w-full max-h-[85%]" : "w-[92%] max-h-[70%]"} items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
+                className={`group relative z-30 flex aspect-[4/3] w-[92%] max-h-[70%] items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
                   isPerf ? "shadow-md" : `shadow-2xl transition-all duration-300 ${newDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"}`
                 }`}
                 style={{
@@ -619,7 +619,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                   <img
                     src={currentNewPhoto.previewUrl}
                     alt={currentNewPhoto.name}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className={`h-full w-full object-cover ${isPerf ? "" : "transition-transform duration-300 group-hover:scale-105"}`}
                   />
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-900">
@@ -682,7 +682,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
             {/* Metadados: Constatação Antiga (Lado Direito) */}
             {oldItem && (
-              <div className="mt-4 flex flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 backdrop-blur-md shadow-sm">
+              <div className="mt-4 flex flex-1 flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 backdrop-blur-md shadow-sm">
                 <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400" style={{ color: theme.primary }}>
                   Constatação Antiga
                 </span>
@@ -827,7 +827,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
   const endDot = Math.min(totalFotos, startDot + maxDots);
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border p-4 sm:p-6 shadow-sm ${isPerf ? "bg-slate-900 border-slate-700" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
+    <div className={`relative overflow-hidden border p-4 sm:p-6 ${isPerf ? "rounded-2xl bg-slate-900 border-slate-700 shadow-sm" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
 
       {/* Estilos inline para animação fluida (Desativado no modo desempenho) */}
       {!isPerf && (
@@ -986,7 +986,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
               {currentPhoto && (
                 <div
                   key={`curr_${fotoIdx}_${animKey}`}
-                  className={`group relative z-30 ${isPerf ? "w-full max-w-xl rounded-2xl border-2 bg-slate-950 shadow-md" : `w-[78%] sm:w-[72%] overflow-hidden rounded-3xl border-2 bg-slate-900 ${direction === "next" ? "anim-slide-next" : "anim-slide-prev"}`}`}
+                  className={`group relative z-30 w-[78%] sm:w-[72%] overflow-hidden border-2 ${isPerf ? "rounded-2xl bg-slate-950 shadow-md" : `rounded-3xl bg-slate-900 ${direction === "next" ? "anim-slide-next" : "anim-slide-prev"}`}`}
                   style={{
                     aspectRatio: "4 / 3",
                     borderColor: theme.primary,
@@ -996,7 +996,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                   <img
                     src={currentPhoto.previewUrl}
                     alt={currentPhoto.name}
-                    className="h-full w-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-105"
+                    className={`h-full w-full object-cover cursor-pointer ${isPerf ? "" : "transition-transform duration-500 group-hover:scale-105"}`}
                     onClick={() => setZoomUrl(currentPhoto.previewUrl)}
                   />
 

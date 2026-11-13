@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { Folder, FolderPlus, AlertCircle, CheckCircle2, X } from "lucide-react";
-import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
+import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
 
 interface PastaGeradorBDModalProps {
   isOpen: boolean;

@@ -98,6 +98,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
   return (
     <Card
       n={2}
+      className="h-full"
       icon={<CloudUpload className="h-5 w-5" />}
       title="Fotos da Vistoria em Campo"
     >

@@ -32,6 +32,7 @@ python
 tests/
 .tests
 .tests/
+tmp_test_reports/
 scratch/
 scratch_*.py
 test_out.docx
