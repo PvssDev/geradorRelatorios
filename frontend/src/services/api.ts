@@ -11,8 +11,23 @@ import {
   UploadedPhotoItem,
 } from "../types/report.types";
 import { comprimirFotoParaEnvio } from "./imageCompressor";
+import { otimizarArquivoOfficeParaEnvio } from "./documentOptimizer";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
+
+async function parseApiError(res: Response, fallbackMsg: string): Promise<string> {
+  if (res.status === 413) {
+    return "O arquivo ou lote enviado excede o limite de 4,5 MB do servidor em produção. Reduza o tamanho do documento/planilha ou divida o envio.";
+  }
+  if (res.status === 504) {
+    return "O processamento excedeu o tempo limite do servidor (timeout). Tente novamente com arquivos menores.";
+  }
+  const err = await res.json().catch(() => null);
+  if (err && typeof err.detail === "string" && err.detail.trim()) {
+    return err.detail;
+  }
+  return `${fallbackMsg} (HTTP ${res.status})`;
+}
 
 export async function fetchBootstrapConfig(): Promise<BootstrapConfigResponse> {
   const res = await fetch(`${API_BASE}/api/config/bootstrap`);
@@ -76,18 +91,38 @@ export async function saveCustomNcsApi(
 export async function parseMonitoramentoAnteriorApi(
   file: File
 ): Promise<{ metadados: Record<string, unknown>; itens_pendentes: MonitoramentoAnteriorItem[] }> {
-  const formData = new FormData();
-  formData.append("arquivo", file);
-
-  const res = await fetch(`${API_BASE}/api/monitoramento/parse`, {
-    method: "POST",
-    body: formData,
+  const optimizedFile = await otimizarArquivoOfficeParaEnvio(file, {
+    maxWidth: 960,
+    maxHeight: 720,
+    quality: 0.7,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Erro ao ler arquivo .docx anterior." }));
-    throw new Error(err.detail || "Erro ao ler arquivo de monitoramento anterior.");
+
+  const formData = new FormData();
+  formData.append("arquivo", optimizedFile, optimizedFile.name);
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 55_000);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/monitoramento/parse`, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(
+        await parseApiError(res, "Erro ao ler arquivo de monitoramento anterior.")
+      );
+    }
+    return res.json();
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Tempo limite excedido ao processar o relatório anterior (.docx).");
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-  return res.json();
 }
 
 export async function downloadPlanilhaExcelApi(
@@ -162,11 +197,17 @@ export async function gerarRelatoriosApi(params: {
   formData.append("payload_json", JSON.stringify(payload));
 
   if (params.documentoAnteriorFile) {
-    formData.append("documento_anterior", params.documentoAnteriorFile, params.documentoAnteriorFile.name);
+    const docToSend = shouldCompress
+      ? await otimizarArquivoOfficeParaEnvio(params.documentoAnteriorFile)
+      : params.documentoAnteriorFile;
+    formData.append("documento_anterior", docToSend, docToSend.name);
   }
 
   if (params.planilhaElegibilidadeFile) {
-    formData.append("planilha_elegibilidade", params.planilhaElegibilidadeFile, params.planilhaElegibilidadeFile.name);
+    const sheetToSend = shouldCompress
+      ? await otimizarArquivoOfficeParaEnvio(params.planilhaElegibilidadeFile)
+      : params.planilhaElegibilidadeFile;
+    formData.append("planilha_elegibilidade", sheetToSend, sheetToSend.name);
   }
 
   const res = await fetch(`${API_BASE}/api/relatorios/gerar`, {
@@ -175,8 +216,7 @@ export async function gerarRelatoriosApi(params: {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Erro interno ao gerar relatórios." }));
-    throw new Error(err.detail || "Falha ao gerar relatórios.");
+    throw new Error(await parseApiError(res, "Falha ao gerar relatórios."));
   }
 
   return res.json();

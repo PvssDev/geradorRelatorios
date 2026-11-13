@@ -5,6 +5,7 @@ import os
 import tempfile
 from typing import Any, BinaryIO, Dict, List
 from monitoramento_utils import extrair_metadados_anterior, extrair_ncs_e_fotos_anterior
+from services.image_service import comprimir_imagem_para_word
 
 
 def _calcular_display_labels(items: List[Dict[str, Any]]) -> None:
@@ -60,11 +61,17 @@ def processar_documento_monitoramento_anterior(file_bytes: bytes, filename: str 
             photo_b64_url = ""
 
             if photo_path and os.path.exists(photo_path):
-                ext = os.path.splitext(photo_name)[1].lower()
-                mime = "image/png" if ext == ".png" else "image/jpeg"
                 with open(photo_path, "rb") as f:
-                    b64_str = base64.b64encode(f.read()).decode("utf-8")
-                    photo_b64_url = f"data:{mime};base64,{b64_str}"
+                    raw_bytes = f.read()
+                try:
+                    compressed_bytes = comprimir_imagem_para_word(raw_bytes, max_kb=120)
+                    mime = "image/jpeg"
+                except Exception:
+                    compressed_bytes = raw_bytes
+                    ext = os.path.splitext(photo_name)[1].lower()
+                    mime = "image/png" if ext == ".png" else "image/jpeg"
+                b64_str = base64.b64encode(compressed_bytes).decode("utf-8")
+                photo_b64_url = f"data:{mime};base64,{b64_str}"
 
             itens_serializados.append({
                 "id_nc": item.get("id_nc", ""),
