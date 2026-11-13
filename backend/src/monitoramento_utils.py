@@ -293,6 +293,11 @@ def extrair_ncs_e_fotos_anterior(documento_anterior, output_dir=None):
 
         doc = Document(documento_anterior)
         body = doc.element.body
+        is_monitoring_doc = any(
+            "MONITORAMENTO" in strip_accents(p.text)
+            for p in doc.paragraphs[:20]
+            if p.text.strip()
+        )
 
         # Regex para IDs de NC (evitando capturar palavras como 'FOTO')
         nc_pattern = r'\b((?:CRC|CRA|SOCICAM|CAR|GAR|TIP|NC|PET|PETRO)(?:[\s_\.-]*[A-Z0-9\+\-/]+)+)\b'
@@ -424,69 +429,79 @@ def extrair_ncs_e_fotos_anterior(documento_anterior, output_dir=None):
                             break
                 
                 if in_appendix:
-                    cell_text_all = ' '.join([c.text for r in t.rows for c in r.cells])
-                    m_foto_tbl = re.search(r'(FOTO\s*\d+)', cell_text_all, re.IGNORECASE)
-                    if m_foto_tbl and m_foto_tbl.group(1).upper() in foto_to_id_map:
-                        active_id = foto_to_id_map[m_foto_tbl.group(1).upper()]
-                    elif current_nc_id:
-                        active_id = current_nc_id
-                    else:
-                        photo_counter_global += 1
-                        active_id = f"NC_{photo_counter_global:02d}"
-                    
-                    status = status_ncs.get(active_id, "Pendente")
-                    if status.strip().lower() == "sanada":
-                        continue
+                    # Seleciona pares (célula_imagem, célula_legenda) suportando:
+                    # 1) Pares 2x2 de Monitoramento [Anterior | Atual] (extrai apenas a foto Atual à direita)
+                    # 2) Grades multi-linha/multi-coluna (ex: 20x2) e tabelas 2x1 de Fiscalização
+                    image_legend_pairs = []
+                    num_rows = len(t.rows)
+                    num_cols = len(t.columns)
 
-                    # Seleção inteligente de célula da imagem e legenda
-                    cell_img = None
-                    cell_leg = None
-                    
-                    if len(t.rows) >= 2 and len(t.columns) == 2:
+                    if num_rows == 2 and num_cols == 2:
+                        embeds_left = t.cell(0, 0)._element.xpath('.//@r:embed')
                         embeds_right = t.cell(0, 1)._element.xpath('.//@r:embed')
-                        if embeds_right:
-                            cell_img = t.cell(0, 1)
-                            cell_leg = t.cell(1, 1) if len(t.rows) > 1 else t.cell(0, 1)
+                        if is_monitoring_doc and embeds_right:
+                            image_legend_pairs.append((t.cell(0, 1), t.cell(1, 1)))
                         else:
-                            cell_img = t.cell(0, 0)
-                            cell_leg = t.cell(1, 0) if len(t.rows) > 1 else t.cell(0, 0)
-                    elif len(t.rows) >= 1 and len(t.columns) >= 1:
-                        cell_img = t.cell(0, 0)
-                        cell_leg = t.cell(1, 0) if len(t.rows) > 1 else t.cell(0, 0)
+                            if embeds_left:
+                                image_legend_pairs.append((t.cell(0, 0), t.cell(1, 0)))
+                            if embeds_right:
+                                image_legend_pairs.append((t.cell(0, 1), t.cell(1, 1)))
+                    else:
+                        for r_idx in range(num_rows):
+                            for c_idx in range(num_cols):
+                                cell_candidate = t.cell(r_idx, c_idx)
+                                if cell_candidate._element.xpath('.//@r:embed'):
+                                    leg_candidate = (
+                                        t.cell(r_idx + 1, c_idx)
+                                        if r_idx + 1 < num_rows
+                                        else cell_candidate
+                                    )
+                                    image_legend_pairs.append((cell_candidate, leg_candidate))
 
-                    if cell_img:
+                    for cell_img, cell_leg in image_legend_pairs:
+                        legend_text = cell_leg.text.strip() if cell_leg else ""
+                        m_foto_cell = re.search(r'(FOTO\s*\d+)', legend_text, re.IGNORECASE)
+                        if m_foto_cell and m_foto_cell.group(1).upper() in foto_to_id_map:
+                            active_id = foto_to_id_map[m_foto_cell.group(1).upper()]
+                        elif current_nc_id:
+                            active_id = current_nc_id
+                        else:
+                            photo_counter_global += 1
+                            active_id = f"NC_{photo_counter_global:02d}"
+
+                        status = status_ncs.get(active_id, "Pendente")
+                        if status.strip().lower() == "sanada":
+                            continue
+
                         embeds = cell_img._element.xpath('.//@r:embed')
-                        if embeds:
-                            for rId in embeds:
-                                if rId in doc.part.related_parts:
-                                    img_part = doc.part.related_parts[rId]
-                                    img_bytes = img_part.image.blob
-                                    
-                                    ext = ".jpg"
-                                    if "png" in img_part.content_type:
-                                        ext = ".png"
-                                    
-                                    idx = photo_count_per_nc.get(active_id, 0) + 1
-                                    photo_count_per_nc[active_id] = idx
-                                    
-                                    safe_id = re.sub(r'[/\\:*?"<>|]', '_', active_id)
-                                    photo_name = f"{safe_id}_{idx}{ext}"
-                                    photo_path = os.path.join(extracted_dir, photo_name)
-                                    
-                                    with open(photo_path, "wb") as f:
-                                        f.write(img_bytes)
-                                    
-                                    legend_text = cell_leg.text.strip() if cell_leg else ""
-                                    
-                                    result.append({
-                                        "id_nc": active_id,
-                                        "constatacao": nc_details.get(active_id, {}).get("constatacao", current_nc_desc),
-                                        "pista": current_pista,
-                                        "trecho": current_trecho,
-                                        "old_photo_path": photo_path,
-                                        "old_legend": legend_text
-                                    })
-                                    break
+                        for rId in embeds:
+                            if rId in doc.part.related_parts:
+                                img_part = doc.part.related_parts[rId]
+                                img_bytes = img_part.image.blob
+
+                                ext = ".jpg"
+                                if "png" in img_part.content_type:
+                                    ext = ".png"
+
+                                idx = photo_count_per_nc.get(active_id, 0) + 1
+                                photo_count_per_nc[active_id] = idx
+
+                                safe_id = re.sub(r'[/\\:*?"<>|]', '_', active_id)
+                                photo_name = f"{safe_id}_{idx}{ext}"
+                                photo_path = os.path.join(extracted_dir, photo_name)
+
+                                with open(photo_path, "wb") as f:
+                                    f.write(img_bytes)
+
+                                result.append({
+                                    "id_nc": active_id,
+                                    "constatacao": nc_details.get(active_id, {}).get("constatacao", current_nc_desc),
+                                    "pista": current_pista,
+                                    "trecho": current_trecho,
+                                    "old_photo_path": photo_path,
+                                    "old_legend": legend_text
+                                })
+                                break
                                     
     except Exception as e:
         print(f"Erro ao extrair NCs e fotos do documento anterior: {e}")
