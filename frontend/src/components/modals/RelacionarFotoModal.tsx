@@ -6,6 +6,10 @@ import { useReportStore, derivarProximaCodificacao } from "../../store/useReport
 import { obterTermosUI, SituacaoNC } from "../../types/report.types";
 import { modalInputCls, modalPill } from "./modalHelpers";
 import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
+import {
+  contrairCodificacoes,
+  resolverSiglaFaixaCombinada,
+} from "../../utils/reportFormatting";
 
 export const RelacionarFotoModal: React.FC<{
   initialPhotoName?: string;
@@ -159,6 +163,85 @@ export const RelacionarFotoModal: React.FC<{
     );
   }, [targetNc]);
 
+  const legendaApendice = useMemo(() => {
+    if (!targetNc) return "";
+
+    const idxFoto2 = ws.photos.findIndex((p) => p.name === foto2Name);
+    const numFoto = idxFoto2 >= 0 ? idxFoto2 + 1 : 2;
+    const dataFoto = (
+      targetNc["Data da Foto"] ||
+      ws.fiscalizacoes?.[0]?.Data ||
+      ""
+    )
+      .trim()
+      .replace(/^\(|\)$/g, "");
+
+    const siglasUnificadas: string[] = [];
+    [...baseSiglasList, ...siglas2].forEach((s) => {
+      const clean = s.trim();
+      if (clean && !siglasUnificadas.includes(clean)) {
+        siglasUnificadas.push(clean);
+      }
+    });
+
+    const descs = siglasUnificadas.map((s) => {
+      const d = (mapSiglas[s] || "").trim().replace(/\.$/, "");
+      return d ? `${d} (${s})` : s;
+    });
+
+    let descPart = "";
+    if (descs.length === 1) {
+      descPart = descs[0];
+    } else if (descs.length === 2) {
+      descPart = `${descs[0]} e ${descs[1]}`;
+    } else if (descs.length > 2) {
+      descPart = `${descs.slice(0, -1).join(", ")} e ${descs[descs.length - 1]}`;
+    }
+
+    if (tipoRelatorio === "CRC") {
+      const corpoCrc = descPart || (targetNc.Observações || "").trim().replace(/\.$/, "");
+      if (!corpoCrc && !dataFoto) return "";
+      const dataCrc = dataFoto ? `, em ${dataFoto}` : "";
+      return `Foto ${numFoto} – ${corpoCrc}${dataCrc}.`;
+    }
+
+    const cod1 = (targetNc.Codificação || targetNc.Identificação || "").trim();
+    const cod2 = siglasMudaram
+      ? codificacao2.trim() || proximaSugerida
+      : codificacao2.trim() || cod1;
+    const codPart = contrairCodificacoes(cod1, cod2);
+
+    const siglaFaixa =
+      tipoRelatorio === "CRA"
+        ? resolverSiglaFaixaCombinada(targetNc["Direção (faixa)"], direcaoFaixa2)
+        : "";
+    const faixaPart = siglaFaixa ? ` na ${siglaFaixa}` : "";
+    const corpo = [codPart, descPart].filter(Boolean).join(" ") + faixaPart;
+    const corpoLimpo = corpo.trim().replace(/\.$/, "");
+    const dataPart = dataFoto ? ` (${dataFoto}).` : corpoLimpo ? "." : "";
+
+    return corpoLimpo || dataPart ? `Foto ${numFoto} – ${corpoLimpo}${dataPart}` : "";
+  }, [
+    targetNc,
+    ws.photos,
+    ws.fiscalizacoes,
+    foto2Name,
+    baseSiglasList,
+    siglas2,
+    mapSiglas,
+    tipoRelatorio,
+    siglasMudaram,
+    codificacao2,
+    proximaSugerida,
+    direcaoFaixa2,
+  ]);
+
+  useEffect(() => {
+    if (legendaApendice) {
+      setObs2(legendaApendice);
+    }
+  }, [legendaApendice]);
+
   const foto1Obj = ws.photos.find((p) => p.name === targetNc?.Foto) || null;
   const foto2Obj = ws.photos.find((p) => p.name === foto2Name) || null;
   const jaTemDuas = targetNc ? countInGroup(targetNc.grupo_relacao) >= 2 : false;
@@ -194,7 +277,10 @@ export const RelacionarFotoModal: React.FC<{
       observacoes: isMonitoring ? targetNc.Observações : obs2.trim(),
       legendaDaFoto: isMonitoring ? obs2.trim() : undefined,
       situacao: isMonitoring ? situacao2 : targetNc.Situação,
-      tipoRegistro: tipoRelatorio === "CRA" && !isMonitoring ? tipo2 : "Não Conformidade",
+      tipoRegistro:
+        (tipoRelatorio === "CRA" || tipoRelatorio === "SOCICAM") && !isMonitoring
+          ? tipo2
+          : "Não Conformidade",
       siglas: siglas2,
       direcaoFaixa: tipoRelatorio === "CRA" ? direcaoFaixa2 : undefined,
       codificacao: codificacao2.trim() || undefined,
@@ -399,27 +485,25 @@ export const RelacionarFotoModal: React.FC<{
                     )}
                   </div>
 
-                  {/* Tipo de Registro (NC vs PA para CRA Fiscalização) */}
-                  {tipoRelatorio === "CRA" && !isMonitoring && (
+                  {/* Tipo de Registro travado ao mesmo tipo da 1ª Foto (NC <-> NC, PA <-> PA) */}
+                  {(tipoRelatorio === "CRA" || tipoRelatorio === "SOCICAM") &&
+                    !isMonitoring && (
                     <div>
                       <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-blue">
                         Tipo de Registro da 2ª Foto
                       </label>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setTipo2("Não Conformidade")}
-                          className={modalPill(tipo2 === "Não Conformidade")}
-                        >
-                          Não Conformidade
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTipo2("Ponto de Atenção")}
-                          className={modalPill(tipo2 === "Ponto de Atenção")}
-                        >
-                          Ponto de Atenção
-                        </button>
+                      <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground">
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${
+                            tipo2 === "Ponto de Atenção"
+                              ? "bg-amber-500"
+                              : "bg-rose-500"
+                          }`}
+                        />
+                        {tipo2}
+                        <span className="text-[10px] font-normal text-muted-foreground">
+                          (mesmo tipo da ocorrência base)
+                        </span>
                       </div>
                     </div>
                   )}
@@ -599,15 +683,13 @@ export const RelacionarFotoModal: React.FC<{
                   }
                 >
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-blue">
-                    {isMonitoring
-                      ? "Legenda da 2ª Foto Atual"
-                      : "Observações / Legenda da 2ª Foto"}
+                    Legenda da Relação
                   </label>
                   <input
                     type="text"
                     value={obs2}
                     onChange={(e) => setObs2(e.target.value)}
-                    placeholder="Descrição exibida abaixo da 2ª foto no relatório..."
+                    placeholder="Legenda da relação exibida no apêndice do relatório..."
                     className={modalInputCls}
                   />
                 </div>
@@ -624,7 +706,7 @@ export const RelacionarFotoModal: React.FC<{
                 <button
                   type="submit"
                   disabled={!targetNc || !foto2Name || jaTemDuas || fotosDisponiveis.length === 0}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2 text-xs font-bold text-stone-950 shadow-md shadow-amber-500/20 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
                 >
                   <Link2 className="h-4 w-4" />
                   Confirmar Relação de Fotos

@@ -35,10 +35,11 @@ const AppContent: React.FC = () => {
   );
   const activeFiscId =
     activeWorkspace?.fiscalizacoes[activeWorkspace.activeFiscalizacaoIndex]?.["ID da Fiscalização"]?.trim() || "";
-  const hasFotos = Boolean(
-    activeWorkspace?.photos?.length ||
-      (activeWorkspace?.documentoAnteriorFile && categoriaRelatorio === "Monitoramento")
-  );
+  const hasPhotos = Boolean(activeWorkspace?.photos?.length);
+  const canOpenRegistro =
+    categoriaRelatorio === "Monitoramento"
+      ? hasPhotos && Boolean(activeWorkspace?.documentoAnteriorFile)
+      : hasPhotos;
   const hasRegistros = Boolean(
     activeWorkspace?.registrosNc?.some(
       (r) => !activeFiscId || (r["ID da Fiscalização"] || "").trim() === activeFiscId
@@ -86,6 +87,10 @@ const AppContent: React.FC = () => {
 
   // Garante que o App re-renderize quando o modo mudar
   const [, setRerenderKey] = useState(0);
+  useEffect(() => {
+    document.documentElement.classList.toggle("perf-mode", performanceMode);
+  }, [performanceMode]);
+
   useEffect(() => {
     const handleStorage = () => setRerenderKey((k) => k + 1);
     window.addEventListener("storage", handleStorage);
@@ -219,31 +224,46 @@ const AppContent: React.FC = () => {
         />
 
         <div
-          className={`mx-auto max-w-5xl px-6 py-10 ${
-            dense ? "space-y-6" : "space-y-10"
+          className={`mx-auto px-6 py-10 transition-all duration-300 ${
+            dense
+              ? "max-w-[1480px] grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch"
+              : "max-w-5xl space-y-10"
           }`}
         >
           {/* 01 · Informações da Fiscalização / Monitoramento */}
-          <FiscalizacaoForm
-            onOpenResponsaveisModal={() => setStaffModalMode("responsaveis")}
-            onOpenCoordenadoresModal={() => setStaffModalMode("coordenadores")}
-            onOpenContratosModal={(cb) => {
-              setContratosCallback(() => cb || null);
-              setShowContratosModal(true);
-            }}
-          />
+          <div
+            className={
+              dense && !hasFiscalizacao
+                ? "xl:col-span-2 xl:max-w-3xl xl:mx-auto w-full"
+                : "w-full min-w-0 h-full"
+            }
+          >
+            <FiscalizacaoForm
+              onOpenResponsaveisModal={() => setStaffModalMode("responsaveis")}
+              onOpenCoordenadoresModal={() => setStaffModalMode("coordenadores")}
+              onOpenContratosModal={(cb) => {
+                setContratosCallback(() => cb || null);
+                setShowContratosModal(true);
+              }}
+            />
+          </div>
 
           {/* 02 · Fotos da Vistoria em Campo */}
           {hasFiscalizacao && (
-            <div className="animate-reveal">
+            <div className="animate-reveal w-full min-w-0 h-full">
               <UploadPanel onOpenGalleryModal={() => setShowGalleryModal(true)} />
             </div>
           )}
 
           {/* 03 · Registro de Não Conformidade ou Ponto de Atenção */}
-          {hasFiscalizacao && hasFotos && (
-            <div className="animate-reveal">
+          {hasFiscalizacao && canOpenRegistro && (
+            <div
+              className={`animate-reveal w-full min-w-0 ${
+                dense ? "xl:col-span-2" : ""
+              }`}
+            >
               <RegistroNcForm
+                dense={dense}
                 onOpenCustomNcModal={(cb) => {
                   setCustomNcCallback(() => cb);
                   setShowCustomNcModal(true);
@@ -262,8 +282,12 @@ const AppContent: React.FC = () => {
           )}
 
           {/* 04 · Emissão e Exportação do Relatório */}
-          {hasFiscalizacao && hasFotos && hasRegistros && (
-            <div className="animate-reveal">
+          {hasFiscalizacao && canOpenRegistro && hasRegistros && (
+            <div
+              className={`animate-reveal w-full min-w-0 ${
+                dense ? "xl:col-span-2" : ""
+              }`}
+            >
               <SummaryAndActionsPanel
                 onOpenEditModal={(tab = "nc") => {
                   setEditModalTab(tab);

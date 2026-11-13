@@ -16,7 +16,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../store/useReportStore";
+import { RegistroNC } from "../types/report.types";
 import { getConcessionTheme } from "../utils/concessionTheme";
+import {
+  contrairCodificacoes,
+  contarAchadosUnicosNoGrupo,
+} from "../utils/reportFormatting";
 import { ConfirmDeleteModal } from "./Modals";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
 
@@ -75,18 +80,60 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Contabiliza ocorrências-base (desconsidera 2ª foto relacionada como registro duplo)
-  const baseRegs = useMemo(() => regs.filter((r) => !r.is_relacionado), [regs]);
+  // Agrupa fotos relacionadas (mesmo grupo_relacao) em uma única linha no Sumário
+  const groupedRows = useMemo(() => {
+    const groups: {
+      base: RegistroNC;
+      relacionado: RegistroNC | null;
+      allRecords: RegistroNC[];
+      rowKeys: string[];
+    }[] = [];
+    const byGroup = new Map<string, number>();
+
+    regs.forEach((r) => {
+      const rKey = `${r["ID da Fiscalização"]}__${r["Nº"]}`;
+      const grp = r.grupo_relacao;
+      if (grp && byGroup.has(grp)) {
+        const idx = byGroup.get(grp)!;
+        const entry = groups[idx];
+        if (
+          !entry.relacionado &&
+          (r.is_relacionado ||
+            (r.Foto || "").trim().toLowerCase() !==
+              (entry.base.Foto || "").trim().toLowerCase())
+        ) {
+          entry.relacionado = r;
+        }
+        entry.allRecords.push(r);
+        entry.rowKeys.push(rKey);
+      } else {
+        const entry = {
+          base: r,
+          relacionado: null as RegistroNC | null,
+          allRecords: [r],
+          rowKeys: [rKey],
+        };
+        if (grp) byGroup.set(grp, groups.length);
+        groups.push(entry);
+      }
+    });
+
+    return groups;
+  }, [regs]);
 
   const kpiData = useMemo(() => {
     if (isMonitoring) {
-      const sanadas = baseRegs.filter((r) => r.Situação === "Sanada").length;
-      const parciais = baseRegs.filter((r) => r.Situação === "Parcialmente Sanada").length;
-      const pendentes = baseRegs.filter((r) => !r.Situação || r.Situação === "Pendente").length;
+      const sanadas = groupedRows.filter((g) => g.base.Situação === "Sanada").length;
+      const parciais = groupedRows.filter(
+        (g) => g.base.Situação === "Parcialmente Sanada"
+      ).length;
+      const pendentes = groupedRows.filter(
+        (g) => !g.base.Situação || g.base.Situação === "Pendente"
+      ).length;
       return [
         {
-          label: "Total Auditadas",
-          value: baseRegs.length,
+          label: "Auditadas",
+          value: groupedRows.length,
           icon: Table2,
           color: "",
           iconBg: "",
@@ -104,7 +151,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
           border: "border-[#a7f3d0]/60",
         },
         {
-          label: "Parcialmente Saneadas",
+          label: "Parciais",
           value: parciais,
           icon: Clock,
           color: "text-[#4338ca]",
@@ -122,54 +169,24 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
       ];
     }
 
-    if (tipoRelatorio === "CRA") {
-      const ncCount = baseRegs.filter((r) => (r["Não Conformidade"] || "").trim() !== "").length;
-      const paCount = baseRegs.length - ncCount;
-      const relPhotosCount = regs.filter((r) => Boolean(r.Foto)).length;
-      return [
-        {
-          label: "Total de Achados",
-          value: baseRegs.length,
-          icon: Table2,
-          color: "",
-          iconBg: "",
-          customColor: theme.primary,
-          customBg: theme.lightBg,
-          customBorder: theme.lightBorder,
-          border: "border-slate-200/80",
-        },
-        {
-          label: "Não Conformidades (NC)",
-          value: ncCount,
-          icon: AlertTriangle,
-          color: "text-rose-600",
-          iconBg: "bg-rose-50 border border-rose-200",
-          border: "border-rose-200/70",
-        },
-        {
-          label: "Pontos de Atenção (PA)",
-          value: paCount,
-          icon: Sparkles,
-          color: "text-amber-600",
-          iconBg: "bg-amber-50 border border-amber-200",
-          border: "border-amber-200/70",
-        },
-        {
-          label: "Fotos Vinculadas",
-          value: relPhotosCount,
-          icon: ImageIcon,
-          color: "text-[#008763]",
-          iconBg: "bg-[#e6fbf4] border border-[#a7f3d0]",
-          border: "border-[#a7f3d0]/70",
-        },
-      ];
-    }
+    const ncCount = groupedRows.reduce(
+      (acc, g) =>
+        acc + contarAchadosUnicosNoGrupo(g.allRecords, "Não Conformidade"),
+      0
+    );
+    const paCount = groupedRows.reduce(
+      (acc, g) =>
+        acc + contarAchadosUnicosNoGrupo(g.allRecords, "Ponto de Atenção"),
+      0
+    );
+    const relPhotosCount = new Set(
+      regs.map((r) => (r.Foto || "").trim().toLowerCase()).filter(Boolean)
+    ).size;
 
-    const relPhotosCount = regs.filter((r) => Boolean(r.Foto)).length;
     return [
       {
-        label: "Total de Ocorrências",
-        value: baseRegs.length,
+        label: "Ocorrências",
+        value: groupedRows.length,
         icon: Table2,
         color: "",
         iconBg: "",
@@ -179,15 +196,23 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
         border: "border-slate-200/80",
       },
       {
-        label: "Irregularidades (NC)",
-        value: baseRegs.length,
+        label: "Irregularidades",
+        value: ncCount,
         icon: AlertTriangle,
         color: "text-rose-600",
         iconBg: "bg-rose-50 border border-rose-200",
         border: "border-rose-200/70",
       },
       {
-        label: "Registros Fotográficos",
+        label: "Pontos de Atenção",
+        value: paCount,
+        icon: Sparkles,
+        color: "text-amber-600",
+        iconBg: "bg-amber-50 border border-amber-200",
+        border: "border-amber-200/70",
+      },
+      {
+        label: "Registros",
         value: relPhotosCount,
         icon: ImageIcon,
         color: "text-[#008763]",
@@ -195,7 +220,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
         border: "border-[#a7f3d0]/70",
       },
     ];
-  }, [isMonitoring, tipoRelatorio, baseRegs, regs]);
+  }, [isMonitoring, groupedRows, regs, theme]);
 
   const allNcKeys = regs.map((r) => `${r["ID da Fiscalização"]}__${r["Nº"]}`);
   const allNcSelected = allNcKeys.length > 0 && allNcKeys.every((k) => selNc.includes(k));
@@ -235,6 +260,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
       return [
         "Nº",
         "Foto",
+        "Tipo",
         "Terminal",
         "Irregularidade",
         "Codificação",
@@ -297,7 +323,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                 <Icon className="h-5 w-5 stroke-[2.2]" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate">
+                <div className="text-[10px] font-bold uppercase tracking-tight text-slate-500 whitespace-nowrap">
                   {kpi.label}
                 </div>
                 <div className="text-xl font-extrabold text-slate-900 tracking-tight">
@@ -378,7 +404,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-normal">
-            {regs.length === 0 ? (
+            {groupedRows.length === 0 ? (
               <tr>
                 <td colSpan={ncHeaders.length + 1} className="py-14 text-center">
                   <div className="flex flex-col items-center justify-center gap-2.5">
@@ -395,19 +421,43 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                 </td>
               </tr>
             ) : (
-              regs.map((r, i) => {
-                const rowKey = `${r["ID da Fiscalização"]}__${r["Nº"]}`;
+              groupedRows.map((group, i) => {
+                const r = group.base;
+                const rel = group.relacionado;
+                const rowKey = group.rowKeys[0];
                 const fi = fotos.findIndex((f) => f.name === r.Foto);
+                const fiRel = rel ? fotos.findIndex((f) => f.name === rel.Foto) : -1;
                 const isNc = Boolean((r["Não Conformidade"] || "").trim());
                 const sit = r.Situação || "Pendente";
-                const isChecked = selNc.includes(rowKey);
+                const isChecked = group.rowKeys.every((k) => selNc.includes(k));
+
+                const codsGrupo = group.allRecords
+                  .map((rec) => (rec.Identificação || rec.Codificação || "").trim())
+                  .filter((v, idx, arr) => v && arr.indexOf(v) === idx);
+                const codDisplay =
+                  codsGrupo.length >= 2
+                    ? contrairCodificacoes(codsGrupo[0], codsGrupo[codsGrupo.length - 1]) ||
+                      codsGrupo[0]
+                    : codsGrupo[0] || "—";
+
+                const obsDisplay = rel
+                  ? rel.Observações || r.Observações || r["Não Conformidade"] || r["Ponto de Atenção"] || "—"
+                  : r.Observações || r["Não Conformidade"] || r["Ponto de Atenção"] || "—";
+
+                const ncSiglasDisplay =
+                  group.allRecords
+                    .flatMap((rec) => [rec["Não Conformidade"], rec["Ponto de Atenção"]])
+                    .filter(Boolean)
+                    .flatMap((v) => String(v).split(",").map((s) => s.trim()))
+                    .filter((v, idx, arr) => v && arr.indexOf(v) === idx)
+                    .join(", ") || "—";
 
                 return (
                   <tr
                     key={rowKey}
                     className={`group transition-colors duration-150 ${isChecked
                         ? "bg-[#eff2fe]/70 hover:bg-[#eff2fe]"
-                        : r.is_relacionado
+                        : rel
                           ? "bg-slate-50/60 hover:bg-slate-50"
                           : "hover:bg-slate-50/80"
                       }`}
@@ -419,7 +469,9 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                         checked={isChecked}
                         onChange={() =>
                           setSelNc((s) =>
-                            s.includes(rowKey) ? s.filter((x) => x !== rowKey) : [...s, rowKey]
+                            isChecked
+                              ? s.filter((x) => !group.rowKeys.includes(x))
+                              : Array.from(new Set([...s, ...group.rowKeys]))
                           )
                         }
                         className="h-4 w-4 rounded border-slate-300 cursor-pointer" style={{ accentColor: theme.primary }}
@@ -430,7 +482,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                     <td className="px-3.5 py-2.5 font-bold text-slate-900 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs">{r["Nº"] || i + 1}</span>
-                        {r.is_relacionado && (
+                        {rel && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[9px] font-bold"
                             style={{
@@ -438,43 +490,67 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                               borderColor: theme.lightBorder,
                               color: theme.primary,
                             }}
-                            title="2ª foto relacionada à ocorrência anterior"
+                            title="Ocorrência com 2 fotos relacionadas lado a lado"
                           >
-                            <Link2 className="h-2.5 w-2.5" /> 2ª Foto
+                            <Link2 className="h-2.5 w-2.5" /> 2 Fotos
                           </span>
                         )}
                       </div>
                     </td>
 
-                    {/* Foto com Zoom Lightbox */}
+                    {/* Foto(s) com Zoom Lightbox */}
                     <td className="px-3.5 py-2 whitespace-nowrap">
-                      {fi >= 0 ? (
-                        <div
-                          className="group/img relative h-9 w-12 cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-xs transition-transform duration-200 hover:scale-110 hover:border-indigo-400"
-                          onClick={() => setZoomUrl(fotos[fi].previewUrl)}
-                          title={`Ampliar ${r.Foto}`}
-                        >
-                          <img
-                            src={fotos[fi].previewUrl}
-                            alt={r.Foto}
-                            className="h-full w-full object-cover"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                            <ZoomIn className="h-3.5 w-3.5 text-white" />
+                      <div className="flex items-center gap-1.5">
+                        {fi >= 0 ? (
+                          <div
+                            className="group/img relative h-9 w-12 cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-xs transition-transform duration-200 hover:scale-110 hover:border-indigo-400"
+                            onClick={() => setZoomUrl(fotos[fi].previewUrl)}
+                            title={`Ampliar ${r.Foto}`}
+                          >
+                            <img
+                              src={fotos[fi].previewUrl}
+                              alt={r.Foto}
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                              <ZoomIn className="h-3.5 w-3.5 text-white" />
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <span className="font-mono text-[11px] text-slate-400" title={r.Foto}>
-                          {r.Foto || "—"}
-                        </span>
-                      )}
+                        ) : (
+                          <span className="font-mono text-[11px] text-slate-400" title={r.Foto}>
+                            {r.Foto || "—"}
+                          </span>
+                        )}
+
+                        {rel &&
+                          (fiRel >= 0 ? (
+                            <div
+                              className="group/img relative h-9 w-12 cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-xs transition-transform duration-200 hover:scale-110 hover:border-indigo-400"
+                              onClick={() => setZoomUrl(fotos[fiRel].previewUrl)}
+                              title={`Ampliar ${rel.Foto}`}
+                            >
+                              <img
+                                src={fotos[fiRel].previewUrl}
+                                alt={rel.Foto}
+                                className="h-full w-full object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                <ZoomIn className="h-3.5 w-3.5 text-white" />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="font-mono text-[11px] text-slate-400" title={rel.Foto}>
+                              {rel.Foto || "—"}
+                            </span>
+                          ))}
+                      </div>
                     </td>
 
                     {/* Colunas Específicas por Modalidade e Concessão */}
                     {isMonitoring ? (
                       <>
                         <td className="px-3.5 py-2.5 font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                          {r.Identificação || "—"}
+                          {codDisplay}
                         </td>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">
                           {tipoRelatorio === "SOCICAM"
@@ -504,8 +580,8 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                         <td className="max-w-[170px] truncate px-3.5 py-2.5 text-slate-600" title={r.Determinação}>
                           {r.Determinação || "—"}
                         </td>
-                        <td className="max-w-[170px] truncate px-3.5 py-2.5 text-slate-600" title={r.Observações}>
-                          {r.Observações || "—"}
+                        <td className="max-w-[170px] truncate px-3.5 py-2.5 text-slate-600" title={obsDisplay}>
+                          {obsDisplay}
                         </td>
                         <td className="max-w-[170px] truncate px-3.5 py-2.5 text-slate-600" title={r["Análise ARPE"]}>
                           {r["Análise ARPE"] || "—"}
@@ -513,15 +589,25 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                       </>
                     ) : tipoRelatorio === "SOCICAM" ? (
                       <>
+                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${isNc
+                                ? "bg-rose-50 border-rose-200 text-rose-700"
+                                : "bg-amber-50 border-amber-200 text-amber-700"
+                              }`}
+                          >
+                            {isNc ? "NC" : "PA"}
+                          </span>
+                        </td>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r.Terminal || "—"}</td>
-                        <td className="px-3.5 py-2.5 font-bold text-slate-900 max-w-[170px] truncate" title={r["Não Conformidade"]}>
-                          {r["Não Conformidade"] || "—"}
+                        <td className="px-3.5 py-2.5 font-bold text-slate-900 max-w-[170px] truncate" title={ncSiglasDisplay}>
+                          {ncSiglasDisplay}
                         </td>
                         <td className="px-3.5 py-2.5 font-mono text-xs text-slate-700 whitespace-nowrap">
-                          {r.Identificação || "—"}
+                          {codDisplay}
                         </td>
-                        <td className="max-w-[180px] truncate px-3.5 py-2.5 text-slate-600" title={r.Observações}>
-                          {r.Observações || "—"}
+                        <td className="max-w-[180px] truncate px-3.5 py-2.5 text-slate-600" title={obsDisplay}>
+                          {obsDisplay}
                         </td>
                         <td className="max-w-[150px] truncate px-3.5 py-2.5 text-slate-600" title={r.Determinação}>
                           {r.Determinação || "—"}
@@ -530,15 +616,15 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                     ) : tipoRelatorio === "CRC" ? (
                       <>
                         <td className="px-3.5 py-2.5 font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                          {r.Identificação || "—"}
+                          {codDisplay}
                         </td>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r.Pista || "—"}</td>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r.Trecho || "—"}</td>
-                        <td className="px-3.5 py-2.5 font-bold text-slate-900 max-w-[180px] truncate" title={r["Não Conformidade"]}>
-                          {r["Não Conformidade"] || "—"}
+                        <td className="px-3.5 py-2.5 font-bold text-slate-900 max-w-[180px] truncate" title={ncSiglasDisplay}>
+                          {ncSiglasDisplay}
                         </td>
-                        <td className="max-w-[180px] truncate px-3.5 py-2.5 text-slate-600" title={r.Observações}>
-                          {r.Observações || "—"}
+                        <td className="max-w-[180px] truncate px-3.5 py-2.5 text-slate-600" title={obsDisplay}>
+                          {obsDisplay}
                         </td>
                       </>
                     ) : (
@@ -558,10 +644,10 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r.Trecho || "—"}</td>
                         <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">{r["Direção (faixa)"] || "—"}</td>
                         <td className="px-3.5 py-2.5 font-mono text-xs font-bold text-indigo-700 whitespace-nowrap">
-                          {r.Identificação || "—"}
+                          {codDisplay}
                         </td>
-                        <td className="max-w-[200px] truncate px-3.5 py-2.5 text-slate-600" title={r.Observações || r["Não Conformidade"] || r["Ponto de Atenção"]}>
-                          {r.Observações || r["Não Conformidade"] || r["Ponto de Atenção"] || "—"}
+                        <td className="max-w-[200px] truncate px-3.5 py-2.5 text-slate-600" title={obsDisplay}>
+                          {obsDisplay}
                         </td>
                       </>
                     )}
@@ -571,11 +657,11 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
                       <button
                         type="button"
                         onClick={() => {
-                          setSelNc([rowKey]);
+                          setSelNc(group.rowKeys);
                           setConfirmMode("nc");
                         }}
                         className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                        title="Excluir ocorrência"
+                        title={rel ? "Excluir relação (ambas as fotos)" : "Excluir ocorrência"}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

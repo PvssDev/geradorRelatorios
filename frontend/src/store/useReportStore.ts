@@ -1069,7 +1069,9 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           ...rec,
           "Nº": novoNum,
           is_relacionado: false,
-          grupo_relacao: `grp_${rec["ID da Fiscalização"]}_${novoNum}_${Date.now()}`,
+          grupo_relacao:
+            rec.grupo_relacao ||
+            `grp_${rec["ID da Fiscalização"]}_${novoNum}_${Date.now()}`,
         });
       }
 
@@ -1198,11 +1200,26 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       Identificação: baseNc.Identificação || baseCod,
       Codificação: baseNc.Codificação || baseCod,
       grupo_relacao: grpId,
-      is_relacionado: true,
+      is_relacionado: Boolean(baseNc.is_relacionado),
       "Direção (faixa)": faixaComb ? faixaComb.extenso : baseNc["Direção (faixa)"],
     };
 
-    const isPa = tipoRegistro === "Ponto de Atenção";
+    const isBasePa = Boolean(
+      baseNc["Ponto de Atenção"] && !baseNc["Não Conformidade"]
+    );
+    if (
+      tipoRegistro !== undefined &&
+      ((isBasePa && tipoRegistro === "Não Conformidade") ||
+        (!isBasePa && tipoRegistro === "Ponto de Atenção"))
+    ) {
+      return {
+        ok: false,
+        error:
+          "Não é permitido relacionar Não Conformidade com Ponto de Atenção.",
+      };
+    }
+
+    const isPa = tipoRegistro !== undefined ? tipoRegistro === "Ponto de Atenção" : isBasePa;
     const siglasStr = siglas && siglas.length > 0 ? siglas.join(", ") : undefined;
 
     let ncField = updatedBase["Não Conformidade"];
@@ -1301,7 +1318,6 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           nextList[i] = {
             ...nextList[i],
             "Direção (faixa)": faixaComb.extenso,
-            is_relacionado: true,
           };
         }
       }
@@ -1367,8 +1383,31 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const ws = state.workspaces[key];
       const removeSet = new Set(keys.map((k) => `${k.idFiscalizacao}__${k.numero}`));
 
-      const remaining = ws.registrosNc.filter(
-        (nc) => !removeSet.has(`${nc["ID da Fiscalização"]}__${nc["Nº"]}`)
+      // Exclui o grupo completo se qualquer membro da relação for removido
+      const removedGroups = new Set<string>();
+      ws.registrosNc.forEach((nc) => {
+        const ncKey = `${nc["ID da Fiscalização"]}__${nc["Nº"]}`;
+        if (removeSet.has(ncKey) && nc.grupo_relacao) {
+          removedGroups.add(nc.grupo_relacao);
+        }
+      });
+
+      const withoutRemoved = ws.registrosNc.filter((nc) => {
+        const ncKey = `${nc["ID da Fiscalização"]}__${nc["Nº"]}`;
+        if (removeSet.has(ncKey)) return false;
+        if (nc.grupo_relacao && removedGroups.has(nc.grupo_relacao)) return false;
+        return true;
+      });
+
+      // Garante invariante: nenhum registro secundário (is_relacionado) permanece órfão
+      const baseGroups = new Set<string>();
+      withoutRemoved.forEach((nc) => {
+        if (!nc.is_relacionado && nc.grupo_relacao) {
+          baseGroups.add(nc.grupo_relacao);
+        }
+      });
+      const remaining = withoutRemoved.filter(
+        (nc) => !nc.is_relacionado || (nc.grupo_relacao && baseGroups.has(nc.grupo_relacao))
       );
 
       // Recalcula a numeração sequencial ("Nº") por ID da Fiscalização
