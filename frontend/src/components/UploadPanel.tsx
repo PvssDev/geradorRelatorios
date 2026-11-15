@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   X,
   Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
@@ -64,6 +65,17 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
       .length;
   }, [ws.photos, fotosEmNc]);
 
+  const abrirArquivoLocal = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const onFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     addUploadedPhotos(files);
@@ -109,9 +121,19 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               Planilha de Demonstrativo de Elegibilidade (Quadro 1) (.xlsx)
             </div>
             <div className="text-xs text-muted-foreground">
-              {ws.planilhaElegibilidadeFile
-                ? `${ws.planilhaElegibilidadeFile.name} carregada com sucesso`
-                : "Envie a planilha .xlsx de demonstrativo para compor o Quadro 1 dinâmico de elegibilidade"}
+              {ws.planilhaElegibilidadeFile ? (
+                <button
+                  type="button"
+                  onClick={() => abrirArquivoLocal(ws.planilhaElegibilidadeFile!)}
+                  className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline cursor-pointer"
+                  title="Clique para abrir/baixar a planilha anexada"
+                >
+                  <span>{ws.planilhaElegibilidadeFile.name}</span>
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                </button>
+              ) : (
+                "Envie a planilha .xlsx de demonstrativo para compor o Quadro 1 dinâmico de elegibilidade"
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -159,9 +181,22 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               Relatório Anterior de Monitoramento (.docx)
             </div>
             <div className="text-xs text-muted-foreground">
-              {ws.documentoAnteriorFile
-                ? `${ws.documentoAnteriorFile.name} · ${ws.oldPhotosToMatch.length} pendência(s) extraída(s)`
-                : "Envie o documento .docx anterior para auditar as NCs pendentes (obrigatório para CRC Monitoramento)"}
+              {ws.documentoAnteriorFile ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => abrirArquivoLocal(ws.documentoAnteriorFile!)}
+                    className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline cursor-pointer"
+                    title="Clique para abrir/baixar o documento anexado"
+                  >
+                    <span>{ws.documentoAnteriorFile.name}</span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </button>
+                  <span>· {ws.oldPhotosToMatch.length} pendência(s) extraída(s)</span>
+                </div>
+              ) : (
+                "Envie o documento .docx anterior para auditar as NCs pendentes (obrigatório para CRC Monitoramento)"
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
