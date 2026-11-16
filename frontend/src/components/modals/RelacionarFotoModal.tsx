@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { X, Link2, CheckCircle2, AlertTriangle, Images, Search } from "lucide-react";
+import { Link2, CheckCircle2, AlertTriangle, Images, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore, derivarProximaCodificacao } from "../../store/useReportStore";
 import { obterTermosUI, SituacaoNC } from "../../types/report.types";
 import { modalInputCls, modalPill } from "./modalHelpers";
-import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
+import { ThemedModalShell } from "./ThemedModalShell";
 import {
   contrairCodificacoes,
   resolverSiglaFaixaCombinada,
@@ -15,7 +14,6 @@ export const RelacionarFotoModal: React.FC<{
   initialPhotoName?: string;
   onClose: () => void;
 }> = ({ initialPhotoName, onClose }) => {
-  useLockBodyScroll(true);
   const {
     tipoRelatorio,
     categoriaRelatorio,
@@ -297,36 +295,14 @@ export const RelacionarFotoModal: React.FC<{
     onClose();
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
-      role="dialog"
-      aria-modal="true"
+  return (
+    <ThemedModalShell
+      icon={<Link2 className="h-4 w-4" />}
+      title="Relacionar 2ª Foto a uma Ocorrência"
+      subtitle="Posiciona 2 fotos lado a lado no mesmo quadro do Memorial Fotográfico"
+      maxWidthClass="max-w-3xl"
+      onClose={onClose}
     >
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-slate-700/30 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-        {/* Topo Dark Executivo com Badge de Ícone */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-[#0b1728] px-6 py-4 text-white">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-              <Link2 className="h-4 w-4" />
-            </div>
-            <div>
-              <h3 className="truncate text-sm font-bold tracking-wide">
-                Relacionar 2ª Foto a uma Ocorrência
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                Posiciona 2 fotos lado a lado no mesmo quadro do Memorial Fotográfico
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
 
         <form onSubmit={handleConfirm} className="space-y-5 overflow-y-auto p-6">
           {ocorrenciasBase.length === 0 ? (
@@ -434,12 +410,12 @@ export const RelacionarFotoModal: React.FC<{
                 </div>
 
                 {/* Coluna Direita: 2ª Foto sendo relacionada */}
-                <div className="rounded-xl border-2 border-accent/60 bg-card p-4 space-y-3">
+                <div className="rounded-xl border-2 border-[var(--modal-border)] bg-card p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-accent">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--modal-primary)]">
                       Coluna Direita · 2ª Foto Relacionada
                     </span>
-                    <span className="rounded-md bg-accent px-2 py-0.5 font-mono text-[10px] font-semibold text-accent-foreground">
+                    <span className="rounded-md bg-[var(--modal-primary)] px-2 py-0.5 font-mono text-[10px] font-semibold text-white">
                       Nova Evidência
                     </span>
                   </div>
@@ -706,7 +682,7 @@ export const RelacionarFotoModal: React.FC<{
                 <button
                   type="submit"
                   disabled={!targetNc || !foto2Name || jaTemDuas || fotosDisponiveis.length === 0}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--modal-primary)] px-5 py-2 text-xs font-bold text-white shadow-md hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
                 >
                   <Link2 className="h-4 w-4" />
                   Confirmar Relação de Fotos
@@ -715,9 +691,7 @@ export const RelacionarFotoModal: React.FC<{
             </>
           )}
         </form>
-      </div>
-    </div>,
-    document.body
+    </ThemedModalShell>
   );
 };
 

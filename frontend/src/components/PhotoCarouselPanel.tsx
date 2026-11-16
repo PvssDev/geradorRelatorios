@@ -292,7 +292,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
     const nextOldSrc = getOldImgSrc(nextOldItem);
 
     return (
-      <div className={`relative overflow-hidden border p-4 sm:p-6 ${isPerf ? "rounded-2xl bg-slate-900 border-slate-700 shadow-sm" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
+      <div className={`relative overflow-hidden border p-4 sm:p-6 ${isPerf ? "rounded-2xl bg-slate-900 border-slate-700 shadow-sm" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl "}`}>
 
         {/* Keyframes de animação vertical (Desativados no modo desempenho) */}
         {!isPerf && (
@@ -329,7 +329,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
         {/* Glow de iluminação no topo (Desativado no modo desempenho) */}
         {!isPerf && (
           <div
-            className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[550px] -translate-x-1/2 rounded-full blur-3xl opacity-20 transition-all duration-300"
+            className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[550px] -translate-x-1/2 rounded-full blur-xl opacity-15 transition-all duration-300"
             style={{ backgroundColor: theme.primary }}
           />
         )}
@@ -415,7 +415,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 disabled={totalOld <= 1}
                 onClick={handleOldPrev}
                 aria-label="Ocorrência anterior (sobe)"
-                className="absolute top-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+                className="absolute top-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
                 title="Foto anterior (para cima)"
               >
                 <ChevronUp className="h-5 w-5 stroke-[2.5]" />
@@ -441,7 +441,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                     </div>
                   )}
                   <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                     {prevOldItem.id_nc}
                   </span>
                 </div>
@@ -471,7 +471,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                   </div>
                 )}
 
-                <span className="absolute bottom-3 left-3 rounded-lg bg-black/75 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-md">
+                <span className="absolute bottom-3 left-3 rounded-lg bg-black/75 px-2.5 py-1 text-xs font-semibold text-white">
                   {oldItem.id_nc || "Doc Anterior"}
                 </span>
 
@@ -507,7 +507,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                     </div>
                   )}
                   <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                     {nextOldItem.id_nc}
                   </span>
                 </div>
@@ -519,7 +519,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 disabled={totalOld <= 1}
                 onClick={handleOldNext}
                 aria-label="Próxima ocorrência (desce)"
-                className="absolute bottom-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+                className="absolute bottom-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
                 title="Próxima foto (para baixo)"
               >
                 <ChevronDown className="h-5 w-5 stroke-[2.5]" />
@@ -528,7 +528,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
             {/* Metadados: Legenda Antiga (Lado Esquerdo) */}
             {oldItem && (
-              <div className="mt-4 flex flex-1 flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 backdrop-blur-md shadow-sm">
+              <div className="mt-4 flex flex-1 flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 shadow-sm">
                 <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400" style={{ color: theme.primary }}>
                   Legenda Antiga
                 </span>
@@ -578,7 +578,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 disabled={totalFotos <= 1}
                 onClick={handleNewPrev}
                 aria-label="Foto anterior (sobe)"
-                className="absolute top-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+                className="absolute top-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
                 title="Foto nova anterior (para cima)"
               >
                 <ChevronUp className="h-5 w-5 stroke-[2.5]" />
@@ -598,7 +598,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md truncate max-w-[90%]">
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white truncate max-w-[90%]">
                     {prevNewPhoto.name}
                   </span>
                 </div>
@@ -629,7 +629,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 )}
 
                 <span
-                  className="absolute bottom-3 left-3 rounded-lg px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-md shadow-md max-w-[85%] truncate"
+                  className="absolute bottom-3 left-3 rounded-lg px-2.5 py-1 text-xs font-semibold text-white shadow-md max-w-[85%] truncate"
                   style={{ backgroundColor: theme.primary }}
                 >
                   {currentNewPhoto ? currentNewPhoto.name : "Nenhuma foto"}
@@ -661,7 +661,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md truncate max-w-[90%]">
+                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white truncate max-w-[90%]">
                     {nextNewPhoto.name}
                   </span>
                 </div>
@@ -673,7 +673,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                 disabled={totalFotos <= 1}
                 onClick={handleNewNext}
                 aria-label="Próxima foto nova (desce)"
-                className="absolute bottom-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+                className="absolute bottom-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
                 title="Próxima foto (para baixo)"
               >
                 <ChevronDown className="h-5 w-5 stroke-[2.5]" />
@@ -682,7 +682,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
             {/* Metadados: Constatação Antiga (Lado Direito) */}
             {oldItem && (
-              <div className="mt-4 flex flex-1 flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 backdrop-blur-md shadow-sm">
+              <div className="mt-4 flex flex-1 flex-col gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300 shadow-sm">
                 <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400" style={{ color: theme.primary }}>
                   Constatação Antiga
                 </span>
@@ -698,7 +698,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
         {showAllOldModal &&
           createPortal(
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-in fade-in"
               onClick={() => setShowAllOldModal(false)}
             >
             <div
@@ -735,10 +735,17 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                       }}
                       className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border-2 bg-slate-800 transition-all hover:scale-[1.02] ${
                         isSelected
-                          ? "ring-2 ring-primary border-primary shadow-lg"
+                          ? "shadow-lg"
                           : "border-white/10 hover:border-white/30"
                       }`}
-                      style={isSelected ? { borderColor: theme.primary } : {}}
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: theme.primary,
+                              boxShadow: `0 0 0 2px ${theme.primary}`,
+                            }
+                          : {}
+                      }
                     >
                       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-950">
                         {src ? (
@@ -781,7 +788,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
         {zoomUrl &&
           createPortal(
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-in fade-in"
               onClick={() => setZoomUrl(null)}
             >
             <div className="relative max-h-[90vh] max-w-4xl animate-in fade-in zoom-in-95 duration-200">
@@ -827,7 +834,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
   const endDot = Math.min(totalFotos, startDot + maxDots);
 
   return (
-    <div className={`relative overflow-hidden border p-4 sm:p-6 ${isPerf ? "rounded-2xl bg-slate-900 border-slate-700 shadow-sm" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl backdrop-blur-xl"}`}>
+    <div className={`relative overflow-hidden border p-4 sm:p-6 ${isPerf ? "rounded-2xl bg-slate-900 border-slate-700 shadow-sm" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl "}`}>
 
       {/* Estilos inline para animação fluida (Desativado no modo desempenho) */}
       {!isPerf && (
@@ -864,7 +871,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
       {/* Iluminação ambiente no topo (Radial Glow - Desativado no modo desempenho) */}
       {!isPerf && (
         <div
-          className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[500px] -translate-x-1/2 rounded-full blur-3xl opacity-20 transition-all duration-300"
+          className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[500px] -translate-x-1/2 rounded-full blur-xl opacity-15 transition-all duration-300"
           style={{ backgroundColor: theme.primary }}
         />
       )}
@@ -940,7 +947,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
           className={`absolute left-2 sm:left-4 z-40 flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
             isPerf
               ? "border-slate-700 bg-slate-800 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-20 disabled:pointer-events-none shadow-sm"
-              : "rounded-full border-white/30 bg-white/90 text-slate-900 shadow-2xl backdrop-blur-md hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+              : "rounded-full border-white/30 bg-white/90 text-slate-900 shadow-2xl hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
           }`}
         >
           <ChevronLeft className="h-6 w-6 stroke-[2.5]" />
@@ -950,7 +957,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
         <div className="relative flex w-full max-w-2xl items-center justify-center">
           {totalFotos === 0 ? (
             /* Estado Vazio */
-            <div className="flex h-64 w-full max-w-md flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-white/20 bg-white/5 p-6 text-center text-slate-400 backdrop-blur-md">
+            <div className="flex h-64 w-full max-w-md flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-white/20 bg-white/5 p-6 text-center text-slate-400">
               <ImageIcon className="h-12 w-12 text-white/30 stroke-1" />
               <div className="text-sm font-semibold text-slate-200">Nenhuma foto adicionada</div>
               <p className="text-xs text-slate-400">
@@ -976,7 +983,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-3 left-3 rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                  <span className="absolute bottom-3 left-3 rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                     Foto #{String(prevIdx! + 1).padStart(2, "0")}
                   </span>
                 </div>
@@ -1005,7 +1012,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
                   {/* Badge de Status "Em NC" */}
                   {currentInNc && (
-                    <span className="absolute right-3.5 top-3.5 inline-flex items-center gap-1.5 rounded-full bg-ok px-3 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur-md animate-in fade-in duration-300">
+                    <span className="absolute right-3.5 top-3.5 inline-flex items-center gap-1.5 rounded-full bg-ok px-3 py-1 text-[11px] font-bold text-white shadow-lg animate-in fade-in duration-300">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Em NC
                     </span>
                   )}
@@ -1015,13 +1022,13 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                     type="button"
                     onClick={() => setZoomUrl(currentPhoto.previewUrl)}
                     aria-label="Ampliar foto"
-                    className="absolute left-3.5 top-3.5 rounded-full bg-black/60 p-2 text-white shadow-lg backdrop-blur-md hover:scale-110 active:scale-95 transition-all"
+                    className="absolute left-3.5 top-3.5 rounded-full bg-black/60 p-2 text-white shadow-lg hover:scale-110 active:scale-95 transition-all"
                   >
                     <ZoomIn className="h-4 w-4" />
                   </button>
 
                   {/* Barra de Informações da Foto Ativa no Rodapé */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent p-3.5 pt-7 text-left text-white backdrop-blur-[2px]">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent p-3.5 pt-7 text-left text-white">
                     <div className="flex items-center justify-between gap-2">
                       <span
                         className="rounded-lg px-2.5 py-0.5 font-mono text-[11px] font-bold text-white shadow"
@@ -1054,7 +1061,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                  <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                     Foto #{String(nextIdx! + 1).padStart(2, "0")}
                   </span>
                 </div>
@@ -1072,7 +1079,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
           className={`absolute right-2 sm:right-4 z-40 flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
             isPerf
               ? "border-slate-700 bg-slate-800 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-20 disabled:pointer-events-none shadow-sm"
-              : "rounded-full border-white/30 bg-white/90 text-slate-900 shadow-2xl backdrop-blur-md hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+              : "rounded-full border-white/30 bg-white/90 text-slate-900 shadow-2xl hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
           }`}
         >
           <ChevronRight className="h-6 w-6 stroke-[2.5]" />
@@ -1119,7 +1126,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
       {/* Prévia Automática da Legenda do Memorial Fotográfico (.docx) */}
       {currentPhoto && activeLegenda && (
-        <div className={`relative z-10 mt-4 mx-auto w-full max-w-xl rounded-2xl border px-4 py-2.5 text-center shadow-sm ${isPerf ? "bg-slate-950 border-slate-800" : "border-white/10 bg-black/45 shadow-lg backdrop-blur-md transition-all duration-300"}`}>
+        <div className={`relative z-10 mt-4 mx-auto w-full max-w-xl rounded-2xl border px-4 py-2.5 text-center shadow-sm ${isPerf ? "bg-slate-950 border-slate-800" : "border-white/10 bg-black/45 shadow-lg transition-all duration-300"}`}>
           <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">
             <span
               className="inline-block h-1.5 w-1.5 rounded-full animate-pulse"
@@ -1137,7 +1144,7 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
       {zoomUrl &&
         createPortal(
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-in fade-in"
             onClick={() => setZoomUrl(null)}
           >
             <div className="relative max-h-[90vh] max-w-4xl animate-in fade-in zoom-in-95 duration-200">

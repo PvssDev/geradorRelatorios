@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from "react";
-import { X, Images, Search, CheckCircle2 } from "lucide-react";
+import { Images, Search, CheckCircle2 } from "lucide-react";
 import { useReportStore } from "../../store/useReportStore";
 import { UploadedPhotoItem } from "../../types/report.types";
 import { modalInputCls } from "./modalHelpers";
+import { ThemedModalShell } from "./ThemedModalShell";
 
 export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
   onClose,
@@ -34,25 +35,12 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
   }, [ws.photos, filtro]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
-      role="dialog"
-      aria-modal="true"
+    <ThemedModalShell
+      icon={<Images className="h-4 w-4" />}
+      title={`Galeria de Fotos do Levantamento (${ws.photos.length} fotos)`}
+      maxWidthClass="max-w-4xl"
+      onClose={onClose}
     >
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card-lg">
-        <div className="flex items-center justify-between border-b border-border bg-navy-gradient px-5 py-4 text-primary-foreground">
-          <h3 className="flex items-center gap-2 text-base font-bold">
-            <Images className="h-5 w-5 text-accent" />
-            Galeria de Fotos do Levantamento ({ws.photos.length} fotos)
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-primary-foreground/80 hover:bg-white/10 hover:text-primary-foreground"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
 
         <div className="space-y-4 overflow-y-auto p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -99,10 +87,10 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
                     }}
                     className={`group relative overflow-hidden rounded-xl border-2 text-left transition ${
                       isCurrent
-                        ? "border-accent ring-2 ring-accent/30"
+                        ? "border-[var(--modal-primary)] ring-2 ring-[var(--modal-primary)]/30"
                         : inNc
                         ? "border-ok/50 opacity-80 hover:opacity-100"
-                        : "border-border hover:border-accent/60"
+                        : "border-border hover:border-[var(--modal-primary)]/60"
                     }`}
                   >
                     <div className="relative aspect-[4/3] w-full bg-navy-2">
@@ -137,8 +125,7 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </ThemedModalShell>
   );
 };
 

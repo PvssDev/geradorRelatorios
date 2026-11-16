@@ -1,7 +1,6 @@
 import React from "react";
-import { createPortal } from "react-dom";
-import { Trash2, X } from "lucide-react";
-import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
+import { Trash2 } from "lucide-react";
+import { ThemedModalShell } from "./ThemedModalShell";
 
 export const ConfirmDeleteModal: React.FC<{
   title: string;
@@ -10,33 +9,13 @@ export const ConfirmDeleteModal: React.FC<{
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ title, description, itemsPreview, onConfirm, onClose }) => {
-  useLockBodyScroll(true);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
-      role="dialog"
-      aria-modal="true"
+  return (
+    <ThemedModalShell
+      icon={<Trash2 className="h-4 w-4" />}
+      title={title}
+      accentColor="#e11d48"
+      onClose={onClose}
     >
-      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-slate-700/30 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-        {/* Topo Dark Executivo com Badge Rose de Alerta */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-[#0b1728] px-5 py-4 text-white">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-sm">
-              <Trash2 className="h-4 w-4" />
-            </div>
-            <h3 className="truncate text-sm font-bold tracking-wide">
-              {title}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
 
         <div className="space-y-4 p-5">
           <p className="text-xs sm:text-sm text-slate-700 font-medium">{description}</p>
@@ -72,9 +51,7 @@ export const ConfirmDeleteModal: React.FC<{
             </button>
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+    </ThemedModalShell>
   );
 };
 

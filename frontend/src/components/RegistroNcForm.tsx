@@ -572,11 +572,15 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
               }
               className="rounded-lg border border-input bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground outline-none transition-all duration-200 hover:border-primary/50 hover:bg-secondary/90 hover:shadow-xs focus:border-ring"
             >
-              {ws.fiscalizacoes.map((f, idx) => (
-                <option key={`${f["ID da Fiscalização"]}_${idx}`} value={idx}>
-                  {f["ID da Fiscalização"] || `#${idx + 1}`} — {f.Local}
-                </option>
-              ))}
+              {ws.fiscalizacoes.map((f, idx) => {
+                const destino = f.Cidade?.trim() || f.Local?.trim() || "";
+                return (
+                  <option key={`${f["ID da Fiscalização"]}_${idx}`} value={idx}>
+                    {f["ID da Fiscalização"] || `#${idx + 1}`}
+                    {destino ? ` — ${destino}` : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
         ) : activeFisc?.["ID da Fiscalização"] ? (
@@ -584,6 +588,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
             Vinculado a:{" "}
             <b className="text-foreground">
               {activeFisc["ID da Fiscalização"]}
+              {(activeFisc.Cidade?.trim() || activeFisc.Local?.trim()) &&
+                ` — ${activeFisc.Cidade?.trim() || activeFisc.Local?.trim()}`}
             </b>
           </span>
         ) : null}
@@ -989,7 +995,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
                     : "Adicionar Registro ao Relatório"}
               </span>
             </div>
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white transition-transform duration-200 group-hover:scale-110">
               <ChevronRight className="h-4 w-4 stroke-[2.5]" />
             </span>
           </button>

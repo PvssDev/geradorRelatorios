@@ -27,6 +27,7 @@ import {
   PastaNaoEncontradaError,
 } from "../services/localDirectoryStorage";
 import { PastaGeradorBDModal } from "./modals/PastaGeradorBDModal";
+import { getConcessionTheme } from "../utils/concessionTheme";
 import logoIcone from "../assets/logo/logo_icone.png";
 
 interface SidebarProps {
@@ -66,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setPastaLocalStatus,
   } = useReportStore();
   const ws = getActiveWorkspace();
+  const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -525,13 +527,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }
                       if (onNavigate) onNavigate();
                     }}
+                    style={unlocked && done ? { color: theme.primary } : undefined}
                     className={`relative flex h-11 items-center text-xs font-medium transition-colors overflow-hidden ${
                       !unlocked
                         ? "cursor-not-allowed text-sidebar-foreground/30"
                         : cur
-                          ? `${done ? "text-emerald-400" : "text-white"} font-semibold`
+                          ? `${done ? "" : "text-white"} font-semibold`
                           : done
-                            ? "text-emerald-400 hover:text-emerald-300"
+                            ? "hover:opacity-90"
                             : "text-white/80 hover:text-white"
                     }`}
                   >
@@ -543,18 +546,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             ? { duration: 0 }
                             : { type: "spring", stiffness: 380, damping: 32 }
                         }
-                        className={`absolute left-0 h-6 w-1 rounded-r-full transition-colors duration-200 ${
-                          done ? "bg-emerald-400" : "bg-sky-400"
-                        }`}
+                        style={{ backgroundColor: theme.primary }}
+                        className="absolute left-0 h-6 w-1 rounded-r-full transition-colors duration-200"
                       />
                     )}
                     <div className="relative grid h-11 w-11 shrink-0 place-items-center">
                       <Icon
+                        style={unlocked && done ? { color: theme.primary } : undefined}
                         className={`h-4 w-4 transition-colors ${
                           !unlocked
                             ? "text-sidebar-foreground/30"
                             : done
-                              ? "text-emerald-400"
+                              ? ""
                               : cur
                                 ? "text-white"
                                 : "text-white/80"

@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { X, Edit3, Trash2, Save, AlertTriangle, Search, FileText } from "lucide-react";
+import { Edit3, Trash2, Save, AlertTriangle, Search, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore, derivarProximaCodificacao } from "../../store/useReportStore";
 import { SituacaoNC, obterTermosUI } from "../../types/report.types";
-import { modalInputCls, modalPill } from "./modalHelpers";
+import { modalInputCls, modalPill, modalPrimaryBtnCls } from "./modalHelpers";
+import { ThemedModalShell } from "./ThemedModalShell";
 
 export const EditRecordsModal: React.FC<{
   initialTab?: "fisc" | "nc";
@@ -227,57 +228,43 @@ export const EditRecordsModal: React.FC<{
   }, [optionsNc, editSiglas]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
-      role="dialog"
-      aria-modal="true"
+    <ThemedModalShell
+      icon={<Edit3 className="h-5 w-5" />}
+      title={`Editar Dados Registrados — ${tipoRelatorio} (${categoriaRelatorio})`}
+      maxWidthClass="max-w-2xl"
+      onClose={onClose}
     >
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card-lg">
-        <div className="flex items-center justify-between border-b border-border bg-navy-gradient px-5 py-4 text-primary-foreground">
-          <h3 className="flex items-center gap-2 text-base font-bold">
-            <Edit3 className="h-5 w-5 text-accent" />
-            Editar Dados Registrados — {tipoRelatorio} ({categoriaRelatorio})
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-primary-foreground/80 hover:bg-white/10 hover:text-primary-foreground"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Abas */}
-        <div className="flex gap-2 border-b border-border bg-muted px-5 pt-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab("fisc")}
-            className={`rounded-t-lg border-b-2 px-4 py-2 text-xs font-bold transition ${
-              activeTab === "fisc"
-                ? "border-accent bg-card text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {terms.term_fisc_plural} ({ws.fiscalizacoes.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("nc");
-              if (!filterIdForNc && idsComNc[0]) setFilterIdForNc(idsComNc[0]);
-              setSelectedNcLocalIdx(0);
-            }}
-            className={`rounded-t-lg border-b-2 px-4 py-2 text-xs font-bold transition ${
-              activeTab === "nc"
-                ? "border-accent bg-card text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tipoRelatorio === "CRA" && !isMonitoring
-              ? `Não Conformidades e Pontos de Atenção (${ws.registrosNc.length})`
-              : `Não Conformidades (${ws.registrosNc.length})`}
-          </button>
-        </div>
+      {/* Abas */}
+      <div className="flex gap-2 border-b border-border bg-muted px-5 pt-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab("fisc")}
+          className={`rounded-t-lg border-b-2 px-4 py-2 text-xs font-bold transition ${
+            activeTab === "fisc"
+              ? "border-[var(--modal-primary)] bg-card text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {terms.term_fisc_plural} ({ws.fiscalizacoes.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("nc");
+            if (!filterIdForNc && idsComNc[0]) setFilterIdForNc(idsComNc[0]);
+            setSelectedNcLocalIdx(0);
+          }}
+          className={`rounded-t-lg border-b-2 px-4 py-2 text-xs font-bold transition ${
+            activeTab === "nc"
+              ? "border-[var(--modal-primary)] bg-card text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {tipoRelatorio === "CRA" && !isMonitoring
+            ? `Não Conformidades e Pontos de Atenção (${ws.registrosNc.length})`
+            : `Não Conformidades (${ws.registrosNc.length})`}
+        </button>
+      </div>
 
         <div className="overflow-y-auto p-5">
           {activeTab === "fisc" ? (
@@ -430,7 +417,7 @@ export const EditRecordsModal: React.FC<{
 
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-navy-2 active:scale-[0.98] transition-all"
+                  className={`${modalPrimaryBtnCls} w-full py-2.5`}
                 >
                   <Save className="h-4 w-4" />
                   Salvar Alterações {terms.term_fisc_prep}
@@ -732,7 +719,7 @@ export const EditRecordsModal: React.FC<{
 
                   <button
                     type="submit"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-navy-2 active:scale-[0.98] transition-all"
+                    className={`${modalPrimaryBtnCls} w-full py-2.5`}
                   >
                     <Save className="h-4 w-4" />
                     Salvar Alterações no Item #{currentNc["Nº"]}
@@ -742,7 +729,6 @@ export const EditRecordsModal: React.FC<{
             </form>
           )}
         </div>
-      </div>
-    </div>
+    </ThemedModalShell>
   );
 };
