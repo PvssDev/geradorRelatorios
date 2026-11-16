@@ -104,6 +104,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     setTrechoPersistido,
     addOrUpdateRegistroNc,
     upsertActiveFiscalizacao,
+    monitoringNewPhotoName: selectedNewPhotoMon,
+    setMonitoringNewPhotoName: setSelectedNewPhotoMon,
   } = useReportStore();
 
   const ws = getActiveWorkspace();
@@ -127,7 +129,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
   const [posConcessionariaMon, setPosConcessionariaMon] = useState("");
   const [constatacaoMon, setConstatacaoMon] = useState("");
   const [analiseArpeMon, setAnaliseArpeMon] = useState("");
-  const [selectedNewPhotoMon, setSelectedNewPhotoMon] = useState("");
 
   // Reseta tipo para NC caso entre em Monitoramento
   useEffect(() => {
@@ -160,24 +161,29 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       setAnaliseArpeMon(saved?.["Análise ARPE"] || "");
       setLegendaFotoMon(saved?.["Legenda da Foto"] || "");
       setSituacaoMon(saved?.Situação || "Pendente");
-      const defaultPhoto =
-        ws.photos[
-          Math.min(ws.carouselIndex, Math.max(0, ws.photos.length - 1))
-        ]?.name || "";
-      setSelectedNewPhotoMon(saved?.Foto || defaultPhoto);
+      if (saved?.Foto) {
+        setSelectedNewPhotoMon(saved.Foto);
+      } else if (
+        !selectedNewPhotoMon ||
+        !ws.photos.some((p) => p.name === selectedNewPhotoMon)
+      ) {
+        setSelectedNewPhotoMon(ws.photos[0]?.name || "");
+      }
     } else if (isMonitoring) {
-      const defaultPhoto =
-        ws.photos[
-          Math.min(ws.carouselIndex, Math.max(0, ws.photos.length - 1))
-        ]?.name || "";
-      setSelectedNewPhotoMon(defaultPhoto);
+      if (
+        !selectedNewPhotoMon ||
+        !ws.photos.some((p) => p.name === selectedNewPhotoMon)
+      ) {
+        setSelectedNewPhotoMon(ws.photos[0]?.name || "");
+      }
     }
   }, [
     isMonitoring,
     currentOldItem,
-    ws.carouselIndex,
     ws.photos,
     ws.registrosNc,
+    selectedNewPhotoMon,
+    setSelectedNewPhotoMon,
   ]);
 
   const fotos = ws.photos;

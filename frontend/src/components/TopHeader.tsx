@@ -1,9 +1,10 @@
 import React from "react";
-import { FileText, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useReportStore } from "../store/useReportStore";
 import { CategoriaRelatorio, TipoRelatorio } from "../types/report.types";
 import { getConcessionTheme } from "../utils/concessionTheme";
 import { useSmartHeader } from "../hooks/useSmartHeader";
+import logoIcone from "../assets/logo/logo_icone.png";
 
 interface TopHeaderProps {
   onToggleMobileMenu: () => void;
@@ -112,8 +113,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
 
   const kicker =
     tipoRelatorio === "SOCICAM"
-      ? `ARPE · ${categoriaRelatorio} de Terminais`
-      : `ARPE · ${categoriaRelatorio} Rodoviária`;
+      ? `CTR · ${categoriaRelatorio} de Terminais`
+      : `CTR · ${categoriaRelatorio} Rodoviária`;
 
   return (
     <header
@@ -144,8 +145,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
             <Menu className="h-5 w-5" />
           </button>
 
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#071d36] text-white shadow-card">
-            <FileText className="h-6 w-6 text-white" />
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#071d36] p-2 text-white shadow-card">
+            <img
+              src={logoIcone}
+              alt="CTR"
+              className="h-full w-full object-contain brightness-0 invert"
+            />
           </span>
 
           <div>

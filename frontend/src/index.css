@@ -313,3 +313,13 @@
   stroke-dashoffset: 24;
   animation: checkDraw 0.24s ease-out 0.06s forwards;
 }
+
+/* Oculta barra de rolagem mantendo o scroll funcional quando necessário */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -15,6 +15,7 @@ from core.rules.socicam_rules import (
     normalizar_nome_terminal_rodoviario,
     normalizar_nome_terminal_curto,
     extrair_sigla_terminal,
+    formatar_titulo_apendice_unico_socicam,
     formatar_extenso_achados_socicam,
     formatar_frase_conclusao_achados_socicam,
     classificar_achados_socicam,
@@ -159,7 +160,7 @@ class SocicamReport(BaseReport, IReportContract):
             linhas.append(f"\tAPÊNDICE A - REGISTROS FOTOGRÁFICOS DAS NÃO CONFORMIDADES APONTADAS PARA O {local_sigla}\t7")
             linhas.append(f"\tAPÊNDICE B - REGISTROS FOTOGRÁFICOS DOS PONTOS DE ATENÇÃO APONTADOS PARA O {local_sigla}\t7")
         else:
-            linhas.append(f"\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO NO {local_sigla}\t7")
+            linhas.append(f"\t{formatar_titulo_apendice_unico_socicam(local_val)}\t7")
 
         return linhas
 
@@ -384,7 +385,7 @@ class SocicamReport(BaseReport, IReportContract):
 
             criar_grade_fotos_fn(doc, pas_reais, row.get("Local", "") if hasattr(row, "get") else row["Local"], fotos_dir, data_fisc, self.key)
         else:
-            p_ap_a = adicionar_titulo_secao(doc, f"APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - FISCALIZAÇÃO NO {local_sigla}")
+            p_ap_a = adicionar_titulo_secao(doc, formatar_titulo_apendice_unico_socicam(local_val))
             p_ap_a.paragraph_format.page_break_before = True
 
             df_render = pas_reais if (tem_pa and not tem_nc) else ncs_reais
