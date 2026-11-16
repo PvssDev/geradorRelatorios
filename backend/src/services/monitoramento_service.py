@@ -4,7 +4,11 @@ import io
 import os
 import tempfile
 from typing import Any, BinaryIO, Dict, List
-from monitoramento_utils import extrair_metadados_anterior, extrair_ncs_e_fotos_anterior
+from monitoramento_utils import (
+    contar_registros_quadros_anterior,
+    extrair_metadados_anterior,
+    extrair_ncs_e_fotos_anterior,
+)
 from services.image_service import comprimir_imagem_para_word
 
 
@@ -49,6 +53,7 @@ def processar_documento_monitoramento_anterior(file_bytes: bytes, filename: str 
     stream.name = filename
 
     metadados = extrair_metadados_anterior(stream)
+    total_registros_quadros = contar_registros_quadros_anterior(stream)
     itens_serializados: List[Dict[str, Any]] = []
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
@@ -88,6 +93,20 @@ def processar_documento_monitoramento_anterior(file_bytes: bytes, filename: str 
                 "old_photo_b64": photo_b64_url,
                 "display_label": item.get("display_label", item.get("id_nc", "Sem Identificação"))
             })
+
+    if metadados.get("is_fiscalizacao"):
+        tipo_doc = "Fiscalização"
+    elif isinstance(metadados.get("N_prev"), int):
+        tipo_doc = "Monitoramento"
+    else:
+        tipo_doc = "Não identificado"
+
+    metadados["tipo_documento"] = tipo_doc
+    metadados["total_registros_encontrados"] = total_registros_quadros
+    metadados["total_pendencias_extraidas"] = len(itens_serializados)
+    metadados["total_fotos_extraidas"] = sum(
+        1 for it in itens_serializados if it.get("old_photo_b64")
+    )
 
     return {
         "metadados": metadados,

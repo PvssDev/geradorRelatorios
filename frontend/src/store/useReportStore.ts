@@ -5,6 +5,7 @@ import {
   CustomNcItem,
   FiscalizacaoItem,
   MonitoramentoAnteriorItem,
+  MonitoramentoAnteriorMeta,
   PessoaItem,
   RegistroNcItem,
   RelatorioGeradoItem,
@@ -27,6 +28,7 @@ export interface ModalityWorkspaceState {
   pistaPersistida: string;
   trechoPersistido: string;
   documentoAnteriorFile: File | null;
+  documentoAnteriorMeta: MonitoramentoAnteriorMeta | null;
   planilhaElegibilidadeFile: File | null;
   oldPhotosToMatch: MonitoramentoAnteriorItem[];
   relatoriosGerados: RelatorioGeradoItem[];
@@ -44,6 +46,7 @@ function createEmptyWorkspace(): ModalityWorkspaceState {
     pistaPersistida: "",
     trechoPersistido: "",
     documentoAnteriorFile: null,
+    documentoAnteriorMeta: null,
     planilhaElegibilidadeFile: null,
     oldPhotosToMatch: [],
     relatoriosGerados: [],
@@ -255,7 +258,7 @@ interface ReportStore {
   setCarouselIndex: (idx: number) => void;
   monitoringNewPhotoName: string;
   setMonitoringNewPhotoName: (name: string) => void;
-  setMonitoramentoAnteriorData: (file: File | null, items: MonitoramentoAnteriorItem[]) => void;
+  setMonitoramentoAnteriorData: (file: File | null, items: MonitoramentoAnteriorItem[], meta?: MonitoramentoAnteriorMeta | null) => void;
   setPlanilhaElegibilidadeFile: (file: File | null) => void;
 
   // Ações de Fiscalização / Monitoramento
@@ -729,7 +732,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       };
     }),
 
-  setMonitoramentoAnteriorData: (file, items) =>
+  setMonitoramentoAnteriorData: (file, items, meta = null) =>
     set((state) => {
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
@@ -739,6 +742,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           [key]: {
             ...ws,
             documentoAnteriorFile: file,
+            documentoAnteriorMeta: meta,
             oldPhotosToMatch: items,
             carouselIndex: 0,
           },

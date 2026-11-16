@@ -67,6 +67,17 @@ export interface UploadedPhotoItem {
   uploadOrder: number;
 }
 
+export interface MonitoramentoAnteriorMeta {
+  tipo_documento?: "Fiscalização" | "Monitoramento" | "Não identificado";
+  is_fiscalizacao?: boolean;
+  N_prev?: number | string;
+  N_curr?: number | string;
+  total_registros_encontrados?: number;
+  total_pendencias_extraidas?: number;
+  total_fotos_extraidas?: number;
+  [key: string]: unknown;
+}
+
 export interface MonitoramentoAnteriorItem {
   id_nc: string;
   constatacao: string;
