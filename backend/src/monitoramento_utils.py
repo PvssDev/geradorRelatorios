@@ -429,34 +429,39 @@ def extrair_ncs_e_fotos_anterior(documento_anterior, output_dir=None):
                             break
                 
                 if in_appendix:
-                    # Seleciona pares (célula_imagem, célula_legenda) suportando:
-                    # 1) Pares 2x2 de Monitoramento [Anterior | Atual] (extrai apenas a foto Atual à direita)
-                    # 2) Grades multi-linha/multi-coluna (ex: 20x2) e tabelas 2x1 de Fiscalização
-                    image_legend_pairs = []
-                    num_rows = len(t.rows)
-                    num_cols = len(t.columns)
+                    # Seleciona pares (célula_imagem, célula_legenda) usando row.cells com checagem
+                    # de limites para evitar IndexError em tabelas com células mescladas/irregulares.
+                    try:
+                        image_legend_pairs = []
+                        rows = list(t.rows)
+                        num_rows = len(rows)
 
-                    if num_rows == 2 and num_cols == 2:
-                        embeds_left = t.cell(0, 0)._element.xpath('.//@r:embed')
-                        embeds_right = t.cell(0, 1)._element.xpath('.//@r:embed')
-                        if is_monitoring_doc and embeds_right:
-                            image_legend_pairs.append((t.cell(0, 1), t.cell(1, 1)))
+                        if num_rows == 2 and len(rows[0].cells) == 2 and len(rows[1].cells) == 2:
+                            r0_cells = rows[0].cells
+                            r1_cells = rows[1].cells
+                            embeds_left = r0_cells[0]._element.xpath('.//@r:embed')
+                            embeds_right = r0_cells[1]._element.xpath('.//@r:embed')
+                            if is_monitoring_doc and embeds_right:
+                                image_legend_pairs.append((r0_cells[1], r1_cells[1]))
+                            else:
+                                if embeds_left:
+                                    image_legend_pairs.append((r0_cells[0], r1_cells[0]))
+                                if embeds_right:
+                                    image_legend_pairs.append((r0_cells[1], r1_cells[1]))
                         else:
-                            if embeds_left:
-                                image_legend_pairs.append((t.cell(0, 0), t.cell(1, 0)))
-                            if embeds_right:
-                                image_legend_pairs.append((t.cell(0, 1), t.cell(1, 1)))
-                    else:
-                        for r_idx in range(num_rows):
-                            for c_idx in range(num_cols):
-                                cell_candidate = t.cell(r_idx, c_idx)
-                                if cell_candidate._element.xpath('.//@r:embed'):
-                                    leg_candidate = (
-                                        t.cell(r_idx + 1, c_idx)
-                                        if r_idx + 1 < num_rows
-                                        else cell_candidate
-                                    )
-                                    image_legend_pairs.append((cell_candidate, leg_candidate))
+                            for r_idx, row in enumerate(rows):
+                                row_cells = row.cells
+                                next_cells = rows[r_idx + 1].cells if r_idx + 1 < num_rows else None
+                                for c_idx, cell_candidate in enumerate(row_cells):
+                                    if cell_candidate._element.xpath('.//@r:embed'):
+                                        leg_candidate = (
+                                            next_cells[c_idx]
+                                            if next_cells is not None and c_idx < len(next_cells)
+                                            else cell_candidate
+                                        )
+                                        image_legend_pairs.append((cell_candidate, leg_candidate))
+                    except Exception:
+                        image_legend_pairs = []
 
                     for cell_img, cell_leg in image_legend_pairs:
                         legend_text = cell_leg.text.strip() if cell_leg else ""

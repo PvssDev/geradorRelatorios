@@ -81,6 +81,15 @@ def normalizar_nome_terminal_curto(local_val: Any) -> str:
     return f"Terminal de {l_str}"
 
 
+def formatar_titulo_apendice_unico_socicam(local_val: Any) -> str:
+    """
+    Retorna o título padronizado do Apêndice Único da SOCICAM Fiscalização
+    no formato 'APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - NO TERMINAL DE ...'.
+    """
+    terminal_curto = normalizar_nome_terminal_curto(local_val).upper()
+    return f"APÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - NO {terminal_curto}"
+
+
 def extrair_sigla_terminal(local_val: Any) -> str:
     """
     Extrai a sigla ou nome em caixa alta do terminal para os títulos de Apêndices e Sumário.

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useId } from "react";
+import { motion } from "framer-motion";
 import {
   CloudUpload,
   Building2,
@@ -103,9 +104,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
   else if (hasFiscalizacao) maxUnlockedStep = 2;
 
   const [selectedStep, setSelectedStep] = useState<number>(maxUnlockedStep);
+  const scrollLockUntilRef = useRef<number>(0);
+  const navIndicatorId = useId();
 
   useEffect(() => {
     setSelectedStep(maxUnlockedStep);
+  }, [maxUnlockedStep]);
+
+  // Scroll-Spy bidirecional: acompanha a seção visível (#b1..#b4) ao rolar para cima ou para baixo
+  useEffect(() => {
+    let rafId = 0;
+
+    const updateActiveStepOnScroll = () => {
+      rafId = 0;
+      if (Date.now() < scrollLockUntilRef.current) return;
+
+      const atBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 40;
+      if (atBottom) {
+        setSelectedStep(maxUnlockedStep);
+        return;
+      }
+
+      const threshold = window.innerHeight * 0.35;
+      let active = 1;
+      for (let n = 1; n <= maxUnlockedStep; n++) {
+        const el = document.getElementById(`b${n}`);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= threshold) {
+          active = n;
+        }
+      }
+      setSelectedStep(active);
+    };
+
+    const handleScroll = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(updateActiveStepOnScroll);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
   }, [maxUnlockedStep]);
 
   // Identificação automática da pasta geradorBD na entrada do site
@@ -232,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       <aside
-        className={`flex h-full shrink-0 flex-col justify-between overflow-x-hidden overflow-y-auto border-r border-white/10 bg-navy-gradient p-4 text-sidebar-foreground shadow-2xl select-none transition-[width] duration-300 ease-out ${
+        className={`no-scrollbar flex h-full shrink-0 flex-col justify-between overflow-x-hidden overflow-y-auto border-r border-white/10 bg-navy-gradient p-4 text-sidebar-foreground shadow-2xl select-none transition-[width] duration-300 ease-out ${
           expanded ? "w-72" : "w-[76px]"
         }`}
       >
@@ -346,7 +390,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }
               aria-label="Armazenamento Local geradorBD"
             >
-              <div className="relative grid h-11 w-11 shrink-0 place-items-center text-accent">
+              <div className="relative grid h-11 w-11 shrink-0 place-items-center text-white/90">
                 <HardDrive className="h-4 w-4" />
                 <span
                   className={`absolute top-2 right-2 h-2 w-2 rounded-full transition-colors ${
@@ -467,10 +511,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           : `${n}. ${label}`
                     }
                     onClick={(e) => {
+                      e.stopPropagation();
                       if (!unlocked) {
                         e.preventDefault();
                         return;
                       }
+                      scrollLockUntilRef.current = Date.now() + 700;
                       setSelectedStep(n);
                       const target = document.getElementById(`b${n}`);
                       if (target) {
@@ -486,13 +532,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           ? `${done ? "text-emerald-400" : "text-white"} font-semibold`
                           : done
                             ? "text-emerald-400 hover:text-emerald-300"
-                            : "text-sidebar-foreground/65 hover:text-white"
+                            : "text-white/80 hover:text-white"
                     }`}
                   >
                     {cur && (
-                      <span
-                        className={`absolute left-0 h-6 w-1 rounded-r-full ${
-                          done ? "bg-emerald-400" : "bg-accent"
+                      <motion.span
+                        layoutId={navIndicatorId}
+                        transition={
+                          performanceMode
+                            ? { duration: 0 }
+                            : { type: "spring", stiffness: 380, damping: 32 }
+                        }
+                        className={`absolute left-0 h-6 w-1 rounded-r-full transition-colors duration-200 ${
+                          done ? "bg-emerald-400" : "bg-sky-400"
                         }`}
                       />
                     )}
@@ -504,8 +556,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             : done
                               ? "text-emerald-400"
                               : cur
-                                ? "text-accent"
-                                : "text-sidebar-foreground/65"
+                                ? "text-white"
+                                : "text-white/80"
                         }`}
                       />
                     </div>

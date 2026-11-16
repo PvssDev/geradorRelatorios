@@ -7,8 +7,15 @@ import { modalInputCls } from "./modalHelpers";
 export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
   onClose,
 }) => {
-  const { getActiveWorkspace, setCarouselIndex } = useReportStore();
+  const {
+    categoriaRelatorio,
+    getActiveWorkspace,
+    setCarouselIndex,
+    monitoringNewPhotoName,
+    setMonitoringNewPhotoName,
+  } = useReportStore();
   const ws = getActiveWorkspace();
+  const isMonitoring = categoriaRelatorio === "Monitoramento";
   const [filtro, setFiltro] = useState("");
 
   const fotosEmNc = useMemo(() => {
@@ -74,14 +81,20 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {filtradas.map(({ photo, index }) => {
-                const isCurrent = index === ws.carouselIndex;
+                const isCurrent = isMonitoring
+                  ? photo.name === (monitoringNewPhotoName || ws.photos[0]?.name)
+                  : index === ws.carouselIndex;
                 const inNc = fotosEmNc.has(photo.name.trim().toLowerCase());
                 return (
                   <button
                     key={photo.id}
                     type="button"
                     onClick={() => {
-                      setCarouselIndex(index);
+                      if (isMonitoring) {
+                        setMonitoringNewPhotoName(photo.name);
+                      } else {
+                        setCarouselIndex(index);
+                      }
                       onClose();
                     }}
                     className={`group relative overflow-hidden rounded-xl border-2 text-left transition ${

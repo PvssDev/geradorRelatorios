@@ -39,7 +39,7 @@ export async function otimizarArquivoOfficeParaEnvio(
     for (const mediaPath of mediaPaths) {
       const entry = zip.files[mediaPath];
       const rawBytes = await entry.async("uint8array");
-      if (rawBytes.byteLength <= 90 * 1024) continue;
+      if (rawBytes.byteLength <= 35 * 1024) continue;
 
       const ext = mediaPath.split(".").pop()?.toLowerCase() || "jpg";
       const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";

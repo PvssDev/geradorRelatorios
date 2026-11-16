@@ -253,6 +253,8 @@ interface ReportStore {
   clearPhotos: () => void;
   getAllPhotosForBatch: () => UploadedPhotoItem[];
   setCarouselIndex: (idx: number) => void;
+  monitoringNewPhotoName: string;
+  setMonitoringNewPhotoName: (name: string) => void;
   setMonitoramentoAnteriorData: (file: File | null, items: MonitoramentoAnteriorItem[]) => void;
   setPlanilhaElegibilidadeFile: (file: File | null) => void;
 
@@ -382,6 +384,9 @@ export const useReportStore = create<ReportStore>((set, get) => ({
   nomePastaLocal: "",
   setPastaLocalStatus: (conectada, nome = "") =>
     set({ pastaLocalConectada: conectada, nomePastaLocal: nome }),
+
+  monitoringNewPhotoName: "",
+  setMonitoringNewPhotoName: (name) => set({ monitoringNewPhotoName: name }),
 
   getActiveWorkspace: () => {
     const state = get();
@@ -1075,12 +1080,22 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         });
       }
 
-      // Avanço automático do carrossel
+      // Avanço automático do carrossel (no Monitoramento avança ambos os lados independentemente)
       let nextCarouselIdx = ws.carouselIndex;
+      let nextMonitoringNewPhotoName = state.monitoringNewPhotoName;
       if (advancePhoto && state.autoAdvanceActive) {
-        if (isMon && ws.oldPhotosToMatch.length > 0) {
-          if (nextCarouselIdx < ws.oldPhotosToMatch.length - 1) {
+        if (isMon) {
+          if (ws.oldPhotosToMatch.length > 0 && nextCarouselIdx < ws.oldPhotosToMatch.length - 1) {
             nextCarouselIdx += 1;
+          }
+          if (ws.photos.length > 0) {
+            const currentPhotoName =
+              state.monitoringNewPhotoName || rec.Foto || ws.photos[0].name;
+            const currNewIdx = ws.photos.findIndex((p) => p.name === currentPhotoName);
+            const resolvedIdx = currNewIdx >= 0 ? currNewIdx : 0;
+            if (resolvedIdx < ws.photos.length - 1) {
+              nextMonitoringNewPhotoName = ws.photos[resolvedIdx + 1].name;
+            }
           }
         } else if (ws.photos.length > 0) {
           if (nextCarouselIdx < ws.photos.length - 1) {
@@ -1090,6 +1105,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       }
 
       return {
+        monitoringNewPhotoName: nextMonitoringNewPhotoName,
         workspaces: {
           ...state.workspaces,
           [key]: {

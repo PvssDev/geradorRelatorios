@@ -156,7 +156,7 @@ def foto_esta_em_nc(photo, nomes_em_nc: set) -> bool:
     return base in nomes_em_nc or root in nomes_em_nc
 
 
-def comprimir_imagem_para_word(image_bytes: bytes, max_kb: int = 500) -> bytes:
+def comprimir_imagem_para_word(image_bytes: bytes, max_kb: int = 500, max_dim: int = 1600) -> bytes:
     """
     Otimiza e comprime imagens acima de `max_kb` KB para inserção leve no Word (.docx),
     respeitando orientação EXIF de celulares e mantendo nitidez regulatória.
@@ -170,7 +170,6 @@ def comprimir_imagem_para_word(image_bytes: bytes, max_kb: int = 500) -> bytes:
         if img.mode not in ("RGB", "L"):
             img = img.convert("RGB")
 
-        max_dim = 1600
         if max(img.size) > max_dim:
             img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 

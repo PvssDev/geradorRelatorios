@@ -92,9 +92,9 @@ export async function parseMonitoramentoAnteriorApi(
   file: File
 ): Promise<{ metadados: Record<string, unknown>; itens_pendentes: MonitoramentoAnteriorItem[] }> {
   const optimizedFile = await otimizarArquivoOfficeParaEnvio(file, {
-    maxWidth: 960,
-    maxHeight: 720,
-    quality: 0.7,
+    maxWidth: 640,
+    maxHeight: 480,
+    quality: 0.58,
   });
 
   const formData = new FormData();

@@ -54,6 +54,9 @@ def processar_documento_monitoramento_anterior(file_bytes: bytes, filename: str 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
         raw_items = extrair_ncs_e_fotos_anterior(stream, output_dir=temp_dir)
         _calcular_display_labels(raw_items)
+        # Orçamento dinâmico por foto para manter o JSON de resposta < 4.5 MB na Vercel
+        max_kb_per_photo = min(120, max(18, 2500 // max(1, len(raw_items))))
+        thumb_max_dim = 560 if len(raw_items) > 20 else 900
 
         for item in raw_items:
             photo_path = item.get("old_photo_path", "")
@@ -64,7 +67,9 @@ def processar_documento_monitoramento_anterior(file_bytes: bytes, filename: str 
                 with open(photo_path, "rb") as f:
                     raw_bytes = f.read()
                 try:
-                    compressed_bytes = comprimir_imagem_para_word(raw_bytes, max_kb=120)
+                    compressed_bytes = comprimir_imagem_para_word(
+                        raw_bytes, max_kb=max_kb_per_photo, max_dim=thumb_max_dim
+                    )
                     mime = "image/jpeg"
                 except Exception:
                     compressed_bytes = raw_bytes
