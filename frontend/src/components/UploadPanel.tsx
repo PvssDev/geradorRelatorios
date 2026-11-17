@@ -91,7 +91,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
     setParsingDoc(true);
     try {
       const res = await parseMonitoramentoAnteriorApi(file);
-      setMonitoramentoAnteriorData(file, res.itens_pendentes || []);
+      setMonitoramentoAnteriorData(file, res.itens_pendentes || [], res.metadados || null);
       toast.success(
         `Relatório anterior processado: ${res.itens_pendentes.length} pendência(s) extraída(s)!`
       );
@@ -182,7 +182,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             </div>
             <div className="text-xs text-muted-foreground">
               {ws.documentoAnteriorFile ? (
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="space-y-1.5">
                   <button
                     type="button"
                     onClick={() => abrirArquivoLocal(ws.documentoAnteriorFile!)}
@@ -192,7 +192,62 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                     <span>{ws.documentoAnteriorFile.name}</span>
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                   </button>
-                  <span>· {ws.oldPhotosToMatch.length} pendência(s) extraída(s)</span>
+
+                  {/* Telemetria em letras pequenas e coloridas do documento anterior */}
+                  {(() => {
+                    const meta = ws.documentoAnteriorMeta;
+                    const tipoDoc =
+                      meta?.tipo_documento ||
+                      (meta?.is_fiscalizacao
+                        ? "Fiscalização"
+                        : typeof meta?.N_prev === "number"
+                          ? "Monitoramento"
+                          : "Não identificado");
+                    const cicloLabel =
+                      tipoDoc === "Monitoramento" && typeof meta?.N_prev === "number"
+                        ? ` (${meta.N_prev}º → ${meta.N_curr ?? meta.N_prev + 1}º)`
+                        : tipoDoc === "Fiscalização"
+                          ? " (→ 1º Mon.)"
+                          : "";
+                    const totalReg =
+                      meta?.total_registros_encontrados ?? 0;
+                    const totalPend =
+                      meta?.total_pendencias_extraidas ?? ws.oldPhotosToMatch.length;
+                    const totalFotosAnt =
+                      meta?.total_fotos_extraidas ??
+                      ws.oldPhotosToMatch.filter((it) => Boolean(it.old_photo_b64)).length;
+
+                    const tipoCls =
+                      tipoDoc === "Fiscalização"
+                        ? "border-sky-200 bg-sky-100/90 text-sky-800"
+                        : tipoDoc === "Monitoramento"
+                          ? "border-indigo-200 bg-indigo-100/90 text-indigo-800"
+                          : "border-amber-200 bg-amber-100/90 text-amber-800";
+
+                    const regCls =
+                      totalReg > 0
+                        ? "border-teal-200 bg-teal-100/90 text-teal-800"
+                        : "border-amber-200 bg-amber-100/90 text-amber-800";
+
+                    const pendCls =
+                      totalPend > 0
+                        ? "border-emerald-200 bg-emerald-100/90 text-emerald-800"
+                        : "border-rose-200 bg-rose-100/90 text-rose-800";
+
+                    return (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
+                        <span className={`rounded-md border px-1.5 py-0.5 ${tipoCls}`}>
+                          Tipo: {tipoDoc}{cicloLabel}
+                        </span>
+                        <span className={`rounded-md border px-1.5 py-0.5 ${regCls}`}>
+                          {totalReg} registro(s) no quadro
+                        </span>
+                        <span className={`rounded-md border px-1.5 py-0.5 ${pendCls}`}>
+                          {totalPend} pendência(s) · {totalFotosAnt} foto(s) extraída(s)
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 "Envie o documento .docx anterior para auditar as NCs pendentes (obrigatório para CRC Monitoramento)"

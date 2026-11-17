@@ -128,7 +128,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onToggleMobileMenu }) => {
         transform: `translate3d(0, -${offsetY}px, 0)`,
         willChange: "transform",
       }}
-      className={`sticky top-0 z-30 border-b border-[#d8e5f2]/80 bg-white/95 backdrop-blur-md shadow-xs before:absolute before:inset-x-0 before:-top-[500px] before:h-[500px] before:bg-white/95 before:backdrop-blur-md pointer-events-auto ${
+      className={`sticky top-0 z-30 border-b border-[#d8e5f2]/80 bg-white/95 shadow-xs before:absolute before:inset-x-0 before:-top-[500px] before:h-[500px] before:bg-white/95 pointer-events-auto ${
         isAnimating
           ? "transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
           : "transition-none"

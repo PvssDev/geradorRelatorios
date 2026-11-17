@@ -1,17 +1,15 @@
 import React, { useState } from "react";
-import { createPortal } from "react-dom";
-import { X, Plus, Trash2, FileText } from "lucide-react";
+import { Plus, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../../store/useReportStore";
 import { saveContratosApi } from "../../services/api";
-import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
+import { ThemedModalShell } from "./ThemedModalShell";
+import { modalCountBadgeCls, modalPrimaryBtnCls, modalSoftCardCls } from "./modalHelpers";
 
 export const ContratosManagerModal: React.FC<{
   onSelectContrato?: (contrato: string) => void;
   onClose: () => void;
 }> = ({ onSelectContrato, onClose }) => {
-  useLockBodyScroll(true);
-
   const { contratos, setContratos } = useReportStore();
   const [novoContrato, setNovoContrato] = useState("");
 
@@ -41,31 +39,12 @@ export const ContratosManagerModal: React.FC<{
     toast.info("Contrato removido.");
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
-      role="dialog"
-      aria-modal="true"
+  return (
+    <ThemedModalShell
+      icon={<FileText className="h-4 w-4" />}
+      title={`Contratos Regulatórios · ${contratos.length}`}
+      onClose={onClose}
     >
-      <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-[28px] border border-slate-700/30 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-        {/* Topo Dark Navy Executivo com Ícone em Badge */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-[#0b1728] px-5 py-4 text-white">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-              <FileText className="h-4 w-4" />
-            </div>
-            <h3 className="truncate text-sm font-bold tracking-wide">
-              Contratos Regulatórios · {contratos.length}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
 
         {/* Corpo com Formulário e Lista de Cadastrados */}
         <div className="space-y-4 overflow-y-auto p-5">
@@ -81,14 +60,11 @@ export const ContratosManagerModal: React.FC<{
                 value={novoContrato}
                 onChange={(e) => setNovoContrato(e.target.value)}
                 placeholder="Ex: CT. nº 043/2011"
-                className="w-full h-11 rounded-2xl border border-slate-200 bg-[#f1f5f9] pl-10 pr-4 text-xs font-medium text-slate-800 outline-none transition-all duration-200 hover:border-blue-400 hover:bg-slate-100/80 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+                className="w-full h-11 rounded-2xl border border-slate-200 bg-[#f1f5f9] pl-10 pr-4 text-xs font-medium text-slate-800 outline-none transition-all duration-200 hover:border-slate-300 hover:bg-slate-100/80 focus:bg-white focus:border-[var(--concession-primary)] focus:ring-2 focus:ring-[var(--concession-primary)]/20"
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-xs shadow-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
-            >
+            <button type="submit" className={modalPrimaryBtnCls}>
               <Plus className="h-4 w-4 stroke-[2.5]" />
               <span>Adicionar contrato</span>
             </button>
@@ -100,9 +76,7 @@ export const ContratosManagerModal: React.FC<{
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 CADASTRADOS
               </span>
-              <span className="flex h-5 items-center justify-center rounded-full bg-blue-100 px-2 text-[10px] font-bold text-blue-700">
-                {contratos.length}
-              </span>
+              <span className={modalCountBadgeCls}>{contratos.length}</span>
             </div>
 
             {contratos.length === 0 ? (
@@ -112,10 +86,7 @@ export const ContratosManagerModal: React.FC<{
             ) : (
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                 {contratos.map((c, idx) => (
-                  <div
-                    key={`${c}_${idx}`}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-[#f0f6fd] p-3 transition-all hover:border-blue-200 hover:shadow-xs"
-                  >
+                  <div key={`${c}_${idx}`} className={modalSoftCardCls}>
                     <button
                       type="button"
                       onClick={() => {
@@ -141,8 +112,6 @@ export const ContratosManagerModal: React.FC<{
             )}
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+    </ThemedModalShell>
   );
 };

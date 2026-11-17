@@ -4,6 +4,7 @@ import {
   CustomNcItem,
   FiscalizacaoItem,
   MonitoramentoAnteriorItem,
+  MonitoramentoAnteriorMeta,
   PessoaItem,
   RegistroNcItem,
   RelatorioGeradoItem,
@@ -90,7 +91,7 @@ export async function saveCustomNcsApi(
 
 export async function parseMonitoramentoAnteriorApi(
   file: File
-): Promise<{ metadados: Record<string, unknown>; itens_pendentes: MonitoramentoAnteriorItem[] }> {
+): Promise<{ metadados: MonitoramentoAnteriorMeta; itens_pendentes: MonitoramentoAnteriorItem[] }> {
   const optimizedFile = await otimizarArquivoOfficeParaEnvio(file, {
     maxWidth: 640,
     maxHeight: 480,

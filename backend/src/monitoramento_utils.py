@@ -65,6 +65,13 @@ def extrair_metadados_anterior(documento_anterior):
                     meta["N_prev"] = int(m.group(1))
                     break
 
+        if not meta["is_fiscalizacao"] and meta["N_prev"] == "X":
+            for p in doc.paragraphs[:25]:
+                if "FISCALIZACAO" in strip_accents(p.text):
+                    meta["is_fiscalizacao"] = True
+                    meta["N_prev"] = 0
+                    break
+
         pattern_ctr = re.compile(r'CTR\s*(?:N\u00ba|n\u00ba|N\u00ba)?\s*(\d+/\d+)', re.IGNORECASE)
         for p in doc.paragraphs:
             m = pattern_ctr.search(p.text)
@@ -110,6 +117,54 @@ def extrair_metadados_anterior(documento_anterior):
 
     return meta
 
+_QUADRO_HEADER_TOKENS = (
+    'REFERÊNCIA', 'REFERENCIA', 'IDENTIFICAÇÃO', 'IDENTIFICACAO',
+    'CODIFICAÇÃO', 'CODIFICACAO', 'ID.NC', 'ID NC', 'ID_NC',
+    'TOTAL', 'QUADRO', 'NÃO CONFORMIDADE', 'NAO CONFORMIDADE',
+    'PONTO DE ATENÇÃO', 'PONTO DE ATENCAO', 'EVIDÊNCIA', 'EVIDENCIA',
+)
+
+
+def _extrair_linhas_tabela_quadro(table):
+    """Extrai as linhas válidas (id_nc, info_ou_constatacao) de uma tabela de quadro."""
+    itens = []
+    if not table or len(table.rows) < 2:
+        return itens
+
+    col_id = 0
+    col_desc = 1
+    if len(table.columns) >= 2:
+        for r_idx in range(min(2, len(table.rows))):
+            for c_idx, cell in enumerate(table.rows[r_idx].cells):
+                txt = cell.text.strip().upper()
+                if any(k in txt for k in ('CODIFICAÇÃO', 'CODIFICACAO', 'REFERÊNCIA', 'REFERENCIA', 'IDENTIFICAÇÃO', 'IDENTIFICACAO', 'ID.NC', 'ID NC', 'ID_NC', 'ITEM')):
+                    col_id = c_idx
+                elif any(k in txt for k in ('CONSTATAÇÃO', 'CONSTATACAO', 'DESCRIÇÃO', 'DESCRICAO', 'INFORMAÇÃO', 'INFORMACAO', 'NÃO CONFORMIDADE', 'NAO CONFORMIDADE')):
+                    if c_idx != col_id:
+                        col_desc = c_idx
+
+    for row_item in table.rows[1:]:
+        cells = row_item.cells
+        if len(cells) <= max(col_id, col_desc):
+            continue
+        txt0 = cells[col_id].text.strip()
+        txt1 = cells[col_desc].text.strip()
+        txt0_upper = txt0.upper()
+        if not txt0 or any(h in txt0_upper for h in _QUADRO_HEADER_TOKENS):
+            continue
+        if txt0 != txt1:
+            itens.append({
+                "id_nc": txt0,
+                "info_ou_constatacao": txt1
+            })
+        elif len(cells) > 1 and txt0:
+            itens.append({
+                "id_nc": txt0,
+                "info_ou_constatacao": cells[1].text.strip()
+            })
+    return itens
+
+
 def extrair_linhas_quadro1_anterior(documento_anterior):
     """
     Extrai as NCs e descrições do Quadro 1 do documento anterior.
@@ -127,39 +182,45 @@ def extrair_linhas_quadro1_anterior(documento_anterior):
         doc = Document(documento_anterior)
         quadro1 = encontrar_quadro1_table(doc)
         if quadro1:
-            col_id = 0
-            col_desc = 1
-            if len(quadro1.columns) >= 2:
-                for r_idx in range(min(2, len(quadro1.rows))):
-                    for c_idx, cell in enumerate(quadro1.rows[r_idx].cells):
-                        txt = cell.text.strip().upper()
-                        if any(k in txt for k in ['REFERÊNCIA', 'REFERENCIA', 'IDENTIFICAÇÃO', 'IDENTIFICACAO', 'ID.NC', 'ID NC', 'ID_NC', 'ITEM']):
-                            col_id = c_idx
-                        elif any(k in txt for k in ['CONSTATAÇÃO', 'CONSTATACAO', 'DESCRIÇÃO', 'DESCRICAO', 'INFORMAÇÃO', 'INFORMACAO', 'NÃO CONFORMIDADE', 'NAO CONFORMIDADE']):
-                            if c_idx != col_id:
-                                col_desc = c_idx
-
-            for row_item in quadro1.rows[1:]:
-                cells = row_item.cells
-                if len(cells) <= max(col_id, col_desc):
-                    continue
-                txt0 = cells[col_id].text.strip()
-                txt1 = cells[col_desc].text.strip()
-                if not txt0 or any(h in txt0.upper() for h in ['REFERÊNCIA', 'REFERENCIA', 'IDENTIFICAÇÃO', 'IDENTIFICACAO', 'ID.NC', 'TOTAL', 'QUADRO']):
-                    continue
-                if txt0 != txt1:
-                    ncs.append({
-                        "id_nc": txt0,
-                        "info_ou_constatacao": txt1
-                    })
-                elif len(cells) > 1 and txt0:
-                    ncs.append({
-                        "id_nc": txt0,
-                        "info_ou_constatacao": cells[1].text.strip()
-                    })
+            ncs = _extrair_linhas_tabela_quadro(quadro1)
     except Exception as e:
         print(f"Erro ao extrair linhas do Quadro 1 anterior: {e}")
     return ncs
+
+
+def contar_registros_quadros_anterior(documento_anterior):
+    """
+    Conta o total de registros (NCs + PAs) em todos os quadros de achados do documento anterior,
+    ignorando linhas de cabeçalho (como 'CODIFICAÇÃO') e rodapé ('TOTAL').
+    """
+    if not documento_anterior:
+        return 0
+    total = 0
+    try:
+        if hasattr(documento_anterior, "seek"):
+            try:
+                documento_anterior.seek(0)
+            except Exception:
+                pass
+        doc = Document(documento_anterior)
+        for t in doc.tables:
+            if len(t.rows) < 2 or len(t.columns) < 2:
+                continue
+            header_text = ' '.join(
+                c.text.strip().upper()
+                for r in t.rows[:min(2, len(t.rows))]
+                for c in r.cells
+            )
+            if 'SIGLA' in header_text and 'DEFINIÇÃO' in header_text:
+                continue
+            if any(k in header_text for k in (
+                'CODIFICAÇÃO', 'CODIFICACAO', 'IDENTIFICAÇÃO', 'IDENTIFICACAO',
+                'ID.NC', 'REFERÊNCIA', 'REFERENCIA', 'NÃO CONFORMIDADE', 'PONTO DE ATENÇÃO',
+            )):
+                total += len(_extrair_linhas_tabela_quadro(t))
+    except Exception as e:
+        print(f"Erro ao contar registros dos quadros: {e}")
+    return total
 
 def criar_tabela_quadro1_monitoramento(doc, headers, ncs_from_prev, ncs_reais, col_widths=None):
     """
@@ -498,8 +559,16 @@ def extrair_ncs_e_fotos_anterior(documento_anterior, output_dir=None):
                                 with open(photo_path, "wb") as f:
                                     f.write(img_bytes)
 
+                                existing_ids = {item["id_nc"].strip().lower() for item in result}
+                                unique_id = active_id
+                                if unique_id.strip().lower() in existing_ids:
+                                    n = 1
+                                    while f"{active_id}({n})".strip().lower() in existing_ids:
+                                        n += 1
+                                    unique_id = f"{active_id}({n})"
+
                                 result.append({
-                                    "id_nc": active_id,
+                                    "id_nc": unique_id,
                                     "constatacao": nc_details.get(active_id, {}).get("constatacao", current_nc_desc),
                                     "pista": current_pista,
                                     "trecho": current_trecho,

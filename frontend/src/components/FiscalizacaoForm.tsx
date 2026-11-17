@@ -346,6 +346,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
   const equipeDropdown = useAnchoredDropdown();
   const coordDropdown = useAnchoredDropdown();
   const contratoDropdown = useAnchoredDropdown();
+  const localDropdown = useAnchoredDropdown();
 
   const activeCoord =
     coordenadores.find((c) => c.nome === coord) ||
@@ -450,13 +451,11 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
         ? defaultLocal
         : local.trim() || defaultLocal;
     const nextMun =
-      tipoRelatorio === "CRA"
-        ? overrides.mun !== undefined
-          ? overrides.mun
-          : mun
-        : tipoRelatorio === "SOCICAM"
+      tipoRelatorio === "SOCICAM"
         ? nextLocal
-        : "";
+        : overrides.mun !== undefined
+        ? overrides.mun
+        : mun;
     const nextContrato =
       overrides.contrato !== undefined ? overrides.contrato : contrato;
     const nextEquipe =
@@ -627,38 +626,41 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
     ])
   );
 
-  const renderContratoField = (labelText: string) => {
+  const renderAnimatedSelectField = ({
+    labelText,
+    dropdown,
+    value,
+    placeholder,
+    options,
+    onSelect,
+    rightElement,
+  }: {
+    labelText: string;
+    dropdown: ReturnType<typeof useAnchoredDropdown>;
+    value: string;
+    placeholder: string;
+    options: string[];
+    onSelect: (val: string) => void;
+    rightElement?: ReactNode;
+  }) => {
     const isPerf = isPerformanceModeActive();
+    const availableOptions = Array.from(
+      new Set([...options, ...(value && !options.includes(value) ? [value] : [])])
+    );
     return (
-      <Field
-        label={labelText}
-        rightElement={
+      <Field label={labelText} rightElement={rightElement}>
+        <div ref={dropdown.cardRef} className="relative">
           <button
             type="button"
-            onClick={() =>
-              onOpenContratosModal((c) => {
-                setContrato(c);
-                syncToStore({ contrato: c });
-              })
-            }
-            className="text-[11px] font-medium text-muted-foreground hover:text-accent transition shrink-0"
-          >
-            + Gerenciar
-          </button>
-        }
-      >
-        <div ref={contratoDropdown.cardRef} className="relative">
-          <button
-            type="button"
-            onClick={contratoDropdown.toggle}
+            onClick={dropdown.toggle}
             aria-label={labelText}
-            aria-expanded={contratoDropdown.open}
+            aria-expanded={dropdown.open}
             className={`${inputCls} flex items-center justify-between gap-2 text-left cursor-pointer`}
           >
             <div className="min-w-0 flex-1 overflow-hidden">
               <AnimatePresence mode="wait" initial={false}>
                 <motion.span
-                  key={contrato || "empty-contrato"}
+                  key={value || `empty-${labelText}`}
                   initial={isPerf ? false : { opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={isPerf ? { opacity: 0 } : { opacity: 0, y: -4 }}
@@ -668,29 +670,28 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
                   }}
                   className="block truncate"
                 >
-                  {contrato || "Selecione o contrato..."}
+                  {value || placeholder}
                 </motion.span>
               </AnimatePresence>
             </div>
             <ChevronDown
               className={`h-4 w-4 shrink-0 text-[#45556c] transition-transform duration-200 ${
-                contratoDropdown.open ? "rotate-180" : ""
+                dropdown.open ? "rotate-180" : ""
               }`}
             />
           </button>
 
-          {contratosDisponiveis.length > 0 && (
-            <AnchoredPortalMenu dropdown={contratoDropdown}>
-              {contratosDisponiveis.map((c) => (
+          {availableOptions.length > 0 && (
+            <AnchoredPortalMenu dropdown={dropdown}>
+              {availableOptions.map((opt) => (
                 <DropdownOptionItem
-                  key={c}
-                  title={c}
-                  selected={contrato === c}
+                  key={opt}
+                  title={opt}
+                  selected={value === opt}
                   accentColor={theme.primary}
                   onClick={() => {
-                    setContrato(c);
-                    syncToStore({ contrato: c });
-                    contratoDropdown.setOpen(false);
+                    onSelect(opt);
+                    dropdown.setOpen(false);
                   }}
                 />
               ))}
@@ -700,6 +701,33 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
       </Field>
     );
   };
+
+  const renderContratoField = (labelText: string) =>
+    renderAnimatedSelectField({
+      labelText,
+      dropdown: contratoDropdown,
+      value: contrato,
+      placeholder: "Selecione o contrato...",
+      options: contratosDisponiveis,
+      onSelect: (c) => {
+        setContrato(c);
+        syncToStore({ contrato: c });
+      },
+      rightElement: (
+        <button
+          type="button"
+          onClick={() =>
+            onOpenContratosModal((c) => {
+              setContrato(c);
+              syncToStore({ contrato: c });
+            })
+          }
+          className="text-[11px] font-medium text-muted-foreground hover:text-accent transition shrink-0"
+        >
+          + Gerenciar
+        </button>
+      ),
+    });
 
   return (
     <Card
@@ -718,52 +746,76 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#1e3a5a]">
             {isMonitoring ? "Monitoramentos ativos:" : "Fiscalizações ativas:"}
           </span>
-          {ws.fiscalizacoes.length === 0 ? (
-            <span className="text-xs text-muted-foreground">
-              Preencha os campos abaixo (sincronização automática)
-            </span>
-          ) : (
-            ws.fiscalizacoes.map((f, idx) => {
-              const label =
-                f["ID da Fiscalização"]?.trim() || `#${idx + 1} (Sem ID)`;
-              const isAct = idx === activeIdx;
-              return (
-                <div
-                  key={`${label}_${idx}`}
-                  className="group relative inline-flex items-center"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setActiveFiscalizacaoIndex(idx)}
-                    className={`${pillFisc(isAct)} inline-flex items-center gap-1.5 pr-2`}
-                    style={
-                      isAct
-                        ? { backgroundColor: theme.primary }
-                        : { color: theme.primary }
+          <AnimatePresence initial={false} mode="popLayout">
+            {ws.fiscalizacoes.length === 0 ? (
+              <motion.span
+                key="empty-fisc"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{
+                  duration: isPerformanceModeActive() ? 0 : 0.15,
+                }}
+                className="text-xs text-muted-foreground"
+              >
+                Preencha os campos abaixo (sincronização automática)
+              </motion.span>
+            ) : (
+              ws.fiscalizacoes.map((f, idx) => {
+                const label =
+                  f["ID da Fiscalização"]?.trim() || `#${idx + 1} (Sem ID)`;
+                const isAct = idx === activeIdx;
+                const isPerf = isPerformanceModeActive();
+                return (
+                  <motion.div
+                    key={`${label}_${idx}`}
+                    layout="position"
+                    initial={isPerf ? false : { opacity: 0, scale: 0.82, x: -6 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={
+                      isPerf
+                        ? { opacity: 0 }
+                        : { opacity: 0, scale: 0.78, y: -4 }
                     }
+                    transition={{
+                      duration: isPerf ? 0 : 0.2,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    className="group relative inline-flex items-center"
                   >
-                    <span>{label}</span>
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRequestDeleteFisc(idx);
-                      }}
-                      className={`inline-flex h-4 w-4 items-center justify-center rounded-full transition-all ${
+                    <button
+                      type="button"
+                      onClick={() => setActiveFiscalizacaoIndex(idx)}
+                      className={`${pillFisc(isAct)} inline-flex items-center gap-1.5 pr-2`}
+                      style={
                         isAct
-                          ? "hover:bg-white/30 text-white"
-                          : "hover:bg-rose-100 hover:text-rose-600 text-slate-400 group-hover:text-slate-600"
-                      }`}
-                      title={`Apagar fiscalização ${label}`}
+                          ? { backgroundColor: theme.primary }
+                          : { color: theme.primary }
+                      }
                     >
-                      <X className="h-3 w-3 stroke-[2.5]" />
-                    </span>
-                  </button>
-                </div>
-              );
-            })
-          )}
+                      <span>{label}</span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRequestDeleteFisc(idx);
+                        }}
+                        className={`inline-flex h-4 w-4 items-center justify-center rounded-full transition-all ${
+                          isAct
+                            ? "hover:bg-white/30 text-white"
+                            : "hover:bg-rose-100 hover:text-rose-600 text-slate-400 group-hover:text-slate-600"
+                        }`}
+                        title={`Apagar fiscalização ${label}`}
+                      >
+                        <X className="h-3 w-3 stroke-[2.5]" />
+                      </span>
+                    </button>
+                  </motion.div>
+                );
+              })
+            )}
+          </AnimatePresence>
         </div>
 
         <button
@@ -856,17 +908,17 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
         {/* Linha 2: Campos específicos da Concessão (CRA vs CRC vs SOCICAM) */}
         {tipoRelatorio === "CRA" ? (
           <div className="grid gap-6 sm:grid-cols-3">
-            <Field label="Cidade (Município)">
-              <input
-                className={inputCls}
-                placeholder="Cabo de Santo Agostinho / Ipojuca"
-                value={mun}
-                onChange={(e) => {
-                  setMun(e.target.value);
-                  syncToStore({ mun: e.target.value });
-                }}
-              />
-            </Field>
+            {renderAnimatedSelectField({
+              labelText: "Cidade / Local (Município)",
+              dropdown: localDropdown,
+              value: mun,
+              placeholder: "Selecione o município...",
+              options: ["Cabo de Santo Agostinho", "Ipojuca"],
+              onSelect: (v) => {
+                setMun(v);
+                syncToStore({ mun: v });
+              },
+            })}
 
             <Field label="Hora">
               <input
@@ -884,34 +936,35 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
           </div>
         ) : tipoRelatorio === "SOCICAM" ? (
           <div className="grid gap-6 sm:grid-cols-2">
-            <Field label="Terminal Rodoviário (Local)">
-              <div className="relative">
-                <select
-                  className={`${inputCls} appearance-none pr-9 cursor-pointer`}
-                  value={local}
-                  onChange={(e) => {
-                    setLocal(e.target.value);
-                    setMun(e.target.value);
-                    syncToStore({
-                      local: e.target.value,
-                      mun: e.target.value,
-                    });
-                  }}
-                >
-                  {locaisSocicam.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#45556c]" />
-              </div>
-            </Field>
+            {renderAnimatedSelectField({
+              labelText: "Terminal Rodoviário (Local)",
+              dropdown: localDropdown,
+              value: local,
+              placeholder: "Selecione o terminal...",
+              options: locaisSocicam,
+              onSelect: (v) => {
+                setLocal(v);
+                setMun(v);
+                syncToStore({ local: v, mun: v });
+              },
+            })}
 
             {renderContratoField("Contrato de Concessão")}
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2">
+            {renderAnimatedSelectField({
+              labelText: "Cidade / Local (Município)",
+              dropdown: localDropdown,
+              value: mun,
+              placeholder: "Selecione o município...",
+              options: ["Jaboatão dos Guararapes", "Cabo de Santo Agostinho"],
+              onSelect: (v) => {
+                setMun(v);
+                syncToStore({ mun: v });
+              },
+            })}
+
             {renderContratoField("Contrato de Concessão")}
           </div>
         )}
@@ -1108,32 +1161,43 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
                   <UserCheck className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1 overflow-hidden">
-                  <div
-                    className="truncate text-xs font-bold text-foreground"
-                    title={coord}
-                  >
-                    {coord || "Selecione o(a) coordenador(a)..."}
-                  </div>
-                  <div
-                    className="truncate text-[11px] text-muted-foreground font-medium"
-                    title={
-                      activeCoord?.funcao
-                        ? `${activeCoord.funcao}${
-                            activeCoord.matricula
-                              ? ` · Matr. ${activeCoord.matricula}`
-                              : ""
-                          }`
-                        : "Coordenadoria de Transportes e Rodovias · ARPE"
-                    }
-                  >
-                    {activeCoord?.funcao
+                  {(() => {
+                    const isPerf = isPerformanceModeActive();
+                    const coordSubtitulo = activeCoord?.funcao
                       ? `${activeCoord.funcao}${
                           activeCoord.matricula
                             ? ` · Matr. ${activeCoord.matricula}`
                             : ""
                         }`
-                      : "Coordenadoria de Transportes e Rodovias · ARPE"}
-                  </div>
+                      : "Coordenadoria de Transportes e Rodovias · ARPE";
+                    return (
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                          key={coord || "empty-coord"}
+                          initial={isPerf ? false : { opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={isPerf ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                          transition={{
+                            duration: isPerf ? 0 : 0.16,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                        >
+                          <div
+                            className="truncate text-xs font-bold text-foreground"
+                            title={coord}
+                          >
+                            {coord || "Selecione o(a) coordenador(a)..."}
+                          </div>
+                          <div
+                            className="truncate text-[11px] text-muted-foreground font-medium"
+                            title={coordSubtitulo}
+                          >
+                            {coordSubtitulo}
+                          </div>
+                        </motion.div>
+                      </AnimatePresence>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1202,6 +1266,7 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
               `Identificação: ${targetId}`,
               `Total de ocorrências vinculadas: ${regsVinculados.length}`,
               ...(targetFisc?.Data ? [`Data da vistoria: ${targetFisc.Data}`] : []),
+              ...(targetFisc?.Cidade ? [`Cidade: ${targetFisc.Cidade}`] : []),
               ...(targetFisc?.Local ? [`Local: ${targetFisc.Local}`] : []),
             ]}
             onConfirm={handleConfirmDeleteFisc}

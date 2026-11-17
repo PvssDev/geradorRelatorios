@@ -323,3 +323,69 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Animação fluida de abertura para qualquer janela/modal */
+@keyframes modalBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalPanelPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-in.fade-in {
+  animation: modalBackdropFadeIn 180ms ease-out both;
+}
+
+.animate-in.fade-in.zoom-in-95 {
+  animation: modalPanelPopIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in.fade-in,
+  .animate-in.fade-in.zoom-in-95 {
+    animation: none;
+  }
+}
+
+@keyframes carouselSlideDown {
+  0% {
+    opacity: 0.35;
+    transform: translateY(-35px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes carouselSlideUp {
+  0% {
+    opacity: 0.35;
+    transform: translateY(35px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.anim-v-slide-next {
+  animation: carouselSlideDown 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.anim-v-slide-prev {
+  animation: carouselSlideUp 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
