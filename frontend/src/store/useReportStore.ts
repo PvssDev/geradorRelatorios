@@ -34,6 +34,27 @@ export interface ModalityWorkspaceState {
   relatoriosGerados: RelatorioGeradoItem[];
 }
 
+/**
+ * Busca circularmente o próximo índice disponível a partir de `currentIdx`.
+ * Caso todos os itens já estejam utilizados, avança para `(currentIdx + 1) % items.length`.
+ */
+function findNextCircularIndex<T>(
+  items: T[],
+  currentIdx: number,
+  isUsed: (item: T) => boolean
+): number {
+  const total = items.length;
+  if (total <= 1) return 0;
+  const safeIdx = Math.max(0, Math.min(currentIdx, total - 1));
+  for (let offset = 1; offset <= total; offset++) {
+    const candidateIdx = (safeIdx + offset) % total;
+    if (!isUsed(items[candidateIdx])) {
+      return candidateIdx;
+    }
+  }
+  return (safeIdx + 1) % total;
+}
+
 function createEmptyWorkspace(): ModalityWorkspaceState {
   return {
     fiscalizacoes: [],
@@ -736,6 +757,51 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     set((state) => {
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
+      const usedIds = new Set<string>();
+      const usedPhotoNames = new Set<string>();
+
+      const deduplicatedItems = items.map((item) => {
+        const rawId = (item.id_nc || "FOTO").trim();
+        let uniqueId = rawId;
+        if (usedIds.has(uniqueId.toLowerCase())) {
+          let n = 1;
+          while (usedIds.has(`${rawId}(${n})`.toLowerCase())) {
+            n += 1;
+          }
+          uniqueId = `${rawId}(${n})`;
+        }
+        usedIds.add(uniqueId.toLowerCase());
+
+        let uniquePhotoPath = item.old_photo_path || "";
+        if (uniquePhotoPath) {
+          const dotIdx = uniquePhotoPath.lastIndexOf(".");
+          const base = dotIdx > 0 ? uniquePhotoPath.slice(0, dotIdx) : uniquePhotoPath;
+          const ext = dotIdx > 0 ? uniquePhotoPath.slice(dotIdx) : "";
+          let candidate = uniquePhotoPath;
+          if (usedPhotoNames.has(candidate.toLowerCase())) {
+            let n = 1;
+            while (usedPhotoNames.has(`${base}(${n})${ext}`.toLowerCase())) {
+              n += 1;
+            }
+            candidate = `${base}(${n})${ext}`;
+          }
+          usedPhotoNames.add(candidate.toLowerCase());
+          uniquePhotoPath = candidate;
+        }
+
+        return {
+          ...item,
+          id_nc: uniqueId,
+          old_photo_path: uniquePhotoPath,
+          display_label:
+            item.display_label && uniqueId !== rawId
+              ? item.display_label === rawId
+                ? uniqueId
+                : `${item.display_label} (${uniqueId.slice(rawId.length + 1, -1)})`
+              : item.display_label,
+        };
+      });
+
       return {
         workspaces: {
           ...state.workspaces,
@@ -743,7 +809,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
             ...ws,
             documentoAnteriorFile: file,
             documentoAnteriorMeta: meta,
-            oldPhotosToMatch: items,
+            oldPhotosToMatch: deduplicatedItems,
             carouselIndex: 0,
           },
         },
@@ -1015,59 +1081,38 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const isMon = state.categoriaRelatorio === "Monitoramento";
       let nextNcs = [...ws.registrosNc];
 
+      const recFotoLower = (rec.Foto || "").trim().toLowerCase();
+      if (
+        recFotoLower &&
+        nextNcs.some((r) => (r.Foto || "").trim().toLowerCase() === recFotoLower)
+      ) {
+        return state;
+      }
+
       if (isMon && ws.oldPhotosToMatch.length > 0) {
-        // 1. Procura registro com mesma Identificação + Foto Anterior + ID Fiscalização
-        let targetIdx = nextNcs.findIndex(
+        const alreadyAudited = nextNcs.some(
           (r) =>
-            r.Identificação === rec.Identificação &&
-            r["Foto Anterior"] === rec["Foto Anterior"] &&
-            r["ID da Fiscalização"] === rec["ID da Fiscalização"] &&
-            !r.is_relacionado
-        );
-        // 2. Se não encontrou, procura com Foto Anterior vazia
-        if (targetIdx === -1) {
-          targetIdx = nextNcs.findIndex(
-            (r) =>
-              r.Identificação === rec.Identificação &&
-              !r["Foto Anterior"] &&
-              r["ID da Fiscalização"] === rec["ID da Fiscalização"] &&
-              !r.is_relacionado
-          );
-        }
-
-        if (targetIdx === -1) {
-          const countForId = nextNcs.filter(
-            (r) => r["ID da Fiscalização"] === rec["ID da Fiscalização"]
-          ).length;
-          const novoNum = countForId + 1;
-          nextNcs.push({
-            ...rec,
-            "Nº": novoNum,
-            is_relacionado: false,
-            grupo_relacao: `grp_${rec["ID da Fiscalização"]}_${novoNum}_${Date.now()}`,
-          });
-        } else {
-          nextNcs[targetIdx] = {
-            ...nextNcs[targetIdx],
-            ...rec,
-          };
-        }
-
-        // Sincronizar textos (Determinação, Observações, Análise ARPE, Situação) para a mesma Identificação
-        nextNcs = nextNcs.map((r) => {
-          if (
-            r.Identificação === rec.Identificação &&
+            !r.is_relacionado &&
+            (r.Identificação === rec.Identificação ||
+              (Boolean(rec["Foto Anterior"]) &&
+                r["Foto Anterior"] === rec["Foto Anterior"])) &&
             r["ID da Fiscalização"] === rec["ID da Fiscalização"]
-          ) {
-            return {
-              ...r,
-              Situação: rec.Situação,
-              Determinação: rec.Determinação,
-              Observações: rec.Observações,
-              "Análise ARPE": rec["Análise ARPE"],
-            };
-          }
-          return r;
+        );
+        if (alreadyAudited) {
+          return state;
+        }
+
+        const countForId = nextNcs.filter(
+          (r) => r["ID da Fiscalização"] === rec["ID da Fiscalização"]
+        ).length;
+        const novoNum = countForId + 1;
+        nextNcs.push({
+          ...rec,
+          "Nº": novoNum,
+          is_relacionado: false,
+          grupo_relacao:
+            rec.grupo_relacao ||
+            `grp_${rec["ID da Fiscalização"]}_${novoNum}_${Date.now()}`,
         });
       } else {
         const countForId = nextNcs.filter(
@@ -1084,27 +1129,47 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         });
       }
 
-      // Avanço automático do carrossel (no Monitoramento avança ambos os lados independentemente)
+      // Avanço automático circular do carrossel (busca próximo item livre dando a volta na lista)
       let nextCarouselIdx = ws.carouselIndex;
       let nextMonitoringNewPhotoName = state.monitoringNewPhotoName;
       if (advancePhoto && state.autoAdvanceActive) {
+        const usedNewPhotos = new Set(
+          nextNcs
+            .map((r) => (r.Foto || "").trim().toLowerCase())
+            .filter(Boolean)
+        );
+
         if (isMon) {
-          if (ws.oldPhotosToMatch.length > 0 && nextCarouselIdx < ws.oldPhotosToMatch.length - 1) {
-            nextCarouselIdx += 1;
+          if (ws.oldPhotosToMatch.length > 0) {
+            const auditedOldIds = new Set(
+              nextNcs
+                .filter((r) => !r.is_relacionado && r.Identificação)
+                .map((r) => r.Identificação)
+            );
+            nextCarouselIdx = findNextCircularIndex(
+              ws.oldPhotosToMatch,
+              nextCarouselIdx,
+              (item) => auditedOldIds.has(item.id_nc)
+            );
           }
           if (ws.photos.length > 0) {
             const currentPhotoName =
               state.monitoringNewPhotoName || rec.Foto || ws.photos[0].name;
             const currNewIdx = ws.photos.findIndex((p) => p.name === currentPhotoName);
             const resolvedIdx = currNewIdx >= 0 ? currNewIdx : 0;
-            if (resolvedIdx < ws.photos.length - 1) {
-              nextMonitoringNewPhotoName = ws.photos[resolvedIdx + 1].name;
-            }
+            const nextNewIdx = findNextCircularIndex(
+              ws.photos,
+              resolvedIdx,
+              (p) => usedNewPhotos.has(p.name.trim().toLowerCase())
+            );
+            nextMonitoringNewPhotoName = ws.photos[nextNewIdx].name;
           }
         } else if (ws.photos.length > 0) {
-          if (nextCarouselIdx < ws.photos.length - 1) {
-            nextCarouselIdx += 1;
-          }
+          nextCarouselIdx = findNextCircularIndex(
+            ws.photos,
+            nextCarouselIdx,
+            (p) => usedNewPhotos.has(p.name.trim().toLowerCase())
+          );
         }
       }
 
@@ -1356,9 +1421,32 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       return { ...nc, "Nº": counters[idF] };
     });
 
+    const isMon = state.categoriaRelatorio === "Monitoramento";
     let nextCarouselIdx = ws.carouselIndex;
-    if (state.autoAdvanceActive && ws.photos.length > 0 && nextCarouselIdx < ws.photos.length - 1) {
-      nextCarouselIdx += 1;
+    if (state.autoAdvanceActive) {
+      if (isMon && ws.oldPhotosToMatch.length > 0) {
+        const auditedOldIds = new Set(
+          renumbered
+            .filter((r) => !r.is_relacionado && r.Identificação)
+            .map((r) => r.Identificação)
+        );
+        nextCarouselIdx = findNextCircularIndex(
+          ws.oldPhotosToMatch,
+          nextCarouselIdx,
+          (item) => auditedOldIds.has(item.id_nc)
+        );
+      } else if (!isMon && ws.photos.length > 0) {
+        const usedNewPhotos = new Set(
+          renumbered
+            .map((r) => (r.Foto || "").trim().toLowerCase())
+            .filter(Boolean)
+        );
+        nextCarouselIdx = findNextCircularIndex(
+          ws.photos,
+          nextCarouselIdx,
+          (p) => usedNewPhotos.has(p.name.trim().toLowerCase())
+        );
+      }
     }
 
     set({

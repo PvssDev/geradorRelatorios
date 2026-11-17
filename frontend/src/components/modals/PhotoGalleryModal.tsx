@@ -1,9 +1,7 @@
-import React, { useState, useMemo } from "react";
-import { Images, Search, CheckCircle2 } from "lucide-react";
+import React, { useMemo } from "react";
 import { useReportStore } from "../../store/useReportStore";
 import { UploadedPhotoItem } from "../../types/report.types";
-import { modalInputCls } from "./modalHelpers";
-import { ThemedModalShell } from "./ThemedModalShell";
+import { DarkGalleryModal, DarkGalleryItem } from "./DarkGalleryModal";
 
 export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
   onClose,
@@ -17,7 +15,6 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
   } = useReportStore();
   const ws = getActiveWorkspace();
   const isMonitoring = categoriaRelatorio === "Monitoramento";
-  const [filtro, setFiltro] = useState("");
 
   const fotosEmNc = useMemo(() => {
     const set = new Set<string>();
@@ -27,108 +24,75 @@ export const PhotoGalleryModal: React.FC<{ onClose: () => void }> = ({
     return set;
   }, [ws.registrosNc]);
 
-  const filtradas = useMemo(() => {
-    const q = filtro.trim().toLowerCase();
-    return ws.photos
-      .map((photo: UploadedPhotoItem, index: number) => ({ photo, index }))
-      .filter(({ photo }) => !q || photo.name.toLowerCase().includes(q));
-  }, [ws.photos, filtro]);
+  const items: DarkGalleryItem[] = useMemo(
+    () =>
+      ws.photos.map((photo: UploadedPhotoItem, index: number) => {
+        const numLabel = `#${String(index + 1).padStart(2, "0")}`;
+        const isCurrent = isMonitoring
+          ? photo.name === (monitoringNewPhotoName || ws.photos[0]?.name)
+          : index === ws.carouselIndex;
+        const inNc = fotosEmNc.has(photo.name.trim().toLowerCase());
+        const statusLabel = inNc ? "Vinculada NC" : "Disponível";
+
+        return {
+          key: photo.id,
+          imageUrl: photo.previewUrl,
+          imageAlt: photo.name,
+          title: photo.name,
+          subtitle: isCurrent ? "Selecionada no carrossel" : "Clique para selecionar",
+          searchText: `${numLabel} ${photo.name} ${statusLabel}`,
+          topLeftBadge: {
+            label: numLabel,
+          },
+          topRightBadge: inNc
+            ? {
+                label: "✓ NC",
+                className: "bg-ok text-white",
+              }
+            : {
+                label: "Disponível",
+                className: "bg-slate-900/85 text-slate-300 border border-white/15",
+              },
+          isSelected: isCurrent,
+          onSelect: () => {
+            if (isMonitoring) {
+              setMonitoringNewPhotoName(photo.name);
+            } else {
+              setCarouselIndex(index);
+            }
+            onClose();
+          },
+        };
+      }),
+    [
+      ws.photos,
+      ws.carouselIndex,
+      isMonitoring,
+      monitoringNewPhotoName,
+      fotosEmNc,
+      setMonitoringNewPhotoName,
+      setCarouselIndex,
+      onClose,
+    ]
+  );
 
   return (
-    <ThemedModalShell
-      icon={<Images className="h-4 w-4" />}
-      title={`Galeria de Fotos do Levantamento (${ws.photos.length} fotos)`}
-      maxWidthClass="max-w-4xl"
+    <DarkGalleryModal
+      title="Galeria de Fotos do Levantamento"
+      totalCount={ws.photos.length}
+      items={items}
+      searchPlaceholder="Pesquisar por nome da foto, número (#01) ou status (NC, Disponível)..."
+      infoBanner={
+        <>
+          <strong>Como usar a galeria:</strong> clique em qualquer foto para
+          defini-la como a foto ativa do carrossel. Fotos com selo{" "}
+          <strong className="text-emerald-300">✓ NC</strong> já foram
+          adicionadas ao relatório; fotos marcadas como{" "}
+          <strong className="text-slate-200">Disponível</strong> ainda não
+          possuem vínculo.
+        </>
+      }
       onClose={onClose}
-    >
-
-        <div className="space-y-4 overflow-y-auto p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Clique em qualquer foto para defini-la como a foto central do
-              carrossel. Fotos com selo{" "}
-              <b className="text-ok">Vinculada [NC]</b> já foram adicionadas ao
-              relatório.
-            </p>
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                value={filtro}
-                onChange={(e) => setFiltro(e.target.value)}
-                placeholder="Filtrar por nome..."
-                className={`${modalInputCls} pl-9`}
-              />
-            </div>
-          </div>
-
-          {filtradas.length === 0 ? (
-            <div className="rounded-xl border border-border bg-secondary/40 p-8 text-center text-sm text-muted-foreground">
-              Nenhuma foto encontrada.
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {filtradas.map(({ photo, index }) => {
-                const isCurrent = isMonitoring
-                  ? photo.name === (monitoringNewPhotoName || ws.photos[0]?.name)
-                  : index === ws.carouselIndex;
-                const inNc = fotosEmNc.has(photo.name.trim().toLowerCase());
-                return (
-                  <button
-                    key={photo.id}
-                    type="button"
-                    onClick={() => {
-                      if (isMonitoring) {
-                        setMonitoringNewPhotoName(photo.name);
-                      } else {
-                        setCarouselIndex(index);
-                      }
-                      onClose();
-                    }}
-                    className={`group relative overflow-hidden rounded-xl border-2 text-left transition ${
-                      isCurrent
-                        ? "border-[var(--modal-primary)] ring-2 ring-[var(--modal-primary)]/30"
-                        : inNc
-                        ? "border-ok/50 opacity-80 hover:opacity-100"
-                        : "border-border hover:border-[var(--modal-primary)]/60"
-                    }`}
-                  >
-                    <div className="relative aspect-[4/3] w-full bg-navy-2">
-                      <img
-                        src={photo.previewUrl}
-                        alt={photo.name}
-                        className="h-full w-full object-cover"
-                      />
-                      <span className="absolute left-2 top-2 rounded-md bg-primary/85 px-2 py-0.5 font-mono text-[10px] font-bold text-primary-foreground">
-                        #{String(index + 1).padStart(2, "0")}
-                      </span>
-                      {inNc && (
-                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md bg-ok px-2 py-0.5 text-[10px] font-bold text-white">
-                          <CheckCircle2 className="h-3 w-3" /> NC
-                        </span>
-                      )}
-                    </div>
-                    <div className="bg-card p-2">
-                      <p
-                        className="truncate text-xs font-semibold text-foreground"
-                        title={photo.name}
-                      >
-                        {photo.name}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {isCurrent ? "Selecionada no carrossel" : "Clique para selecionar"}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-    </ThemedModalShell>
+    />
   );
 };
-
-/* -------------------------------------------------------------------------- */
-/* 5. JANELA MODAL DE RELACIONAR FOTO À OCORRÊNCIA                            */
-/* -------------------------------------------------------------------------- */

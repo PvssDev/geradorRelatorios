@@ -451,13 +451,11 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
         ? defaultLocal
         : local.trim() || defaultLocal;
     const nextMun =
-      tipoRelatorio === "CRA"
-        ? overrides.mun !== undefined
-          ? overrides.mun
-          : mun
-        : tipoRelatorio === "SOCICAM"
+      tipoRelatorio === "SOCICAM"
         ? nextLocal
-        : "";
+        : overrides.mun !== undefined
+        ? overrides.mun
+        : mun;
     const nextContrato =
       overrides.contrato !== undefined ? overrides.contrato : contrato;
     const nextEquipe =

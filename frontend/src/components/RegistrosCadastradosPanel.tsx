@@ -678,7 +678,7 @@ export const RegistrosCadastradosPanel: React.FC<RegistrosCadastradosPanelProps>
       {zoomUrl &&
         createPortal(
           <div
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 p-4 backdrop-blur-[2px]"
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 p-4"
             onClick={() => setZoomUrl(null)}
           >
             <div className="relative max-h-[90vh] max-w-4xl animate-in fade-in zoom-in-95 duration-200">

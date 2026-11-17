@@ -559,8 +559,16 @@ def extrair_ncs_e_fotos_anterior(documento_anterior, output_dir=None):
                                 with open(photo_path, "wb") as f:
                                     f.write(img_bytes)
 
+                                existing_ids = {item["id_nc"].strip().lower() for item in result}
+                                unique_id = active_id
+                                if unique_id.strip().lower() in existing_ids:
+                                    n = 1
+                                    while f"{active_id}({n})".strip().lower() in existing_ids:
+                                        n += 1
+                                    unique_id = f"{active_id}({n})"
+
                                 result.append({
-                                    "id_nc": active_id,
+                                    "id_nc": unique_id,
                                     "constatacao": nc_details.get(active_id, {}).get("constatacao", current_nc_desc),
                                     "pista": current_pista,
                                     "trecho": current_trecho,

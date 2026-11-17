@@ -149,42 +149,35 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       ]
       : null;
 
+  // Hidrata os campos de auditoria apenas ao entrar em Monitoramento ou trocar a ocorrência anterior
   useEffect(() => {
-    if (isMonitoring && currentOldItem) {
-      const saved = ws.registrosNc.find(
-        (r) => !r.is_relacionado && r.Identificação === currentOldItem.id_nc
-      );
-      setPosConcessionariaMon(saved?.Determinação || "");
-      setConstatacaoMon(
-        saved?.Observações || currentOldItem.constatacao || ""
-      );
-      setAnaliseArpeMon(saved?.["Análise ARPE"] || "");
-      setLegendaFotoMon(saved?.["Legenda da Foto"] || "");
-      setSituacaoMon(saved?.Situação || "Pendente");
-      if (saved?.Foto) {
-        setSelectedNewPhotoMon(saved.Foto);
-      } else if (
-        !selectedNewPhotoMon ||
-        !ws.photos.some((p) => p.name === selectedNewPhotoMon)
-      ) {
-        setSelectedNewPhotoMon(ws.photos[0]?.name || "");
-      }
-    } else if (isMonitoring) {
-      if (
-        !selectedNewPhotoMon ||
-        !ws.photos.some((p) => p.name === selectedNewPhotoMon)
-      ) {
-        setSelectedNewPhotoMon(ws.photos[0]?.name || "");
-      }
+    if (!isMonitoring || !currentOldItem) return;
+    const saved = ws.registrosNc.find(
+      (r) => !r.is_relacionado && r.Identificação === currentOldItem.id_nc
+    );
+    setPosConcessionariaMon(saved?.Determinação || "");
+    setConstatacaoMon(
+      saved?.Observações || currentOldItem.constatacao || ""
+    );
+    setAnaliseArpeMon(saved?.["Análise ARPE"] || "");
+    setLegendaFotoMon(saved?.["Legenda da Foto"] || "");
+    setSituacaoMon(saved?.Situação || "Pendente");
+    if (saved?.Foto) {
+      setSelectedNewPhotoMon(saved.Foto);
     }
-  }, [
-    isMonitoring,
-    currentOldItem,
-    ws.photos,
-    ws.registrosNc,
-    selectedNewPhotoMon,
-    setSelectedNewPhotoMon,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMonitoring, tipoRelatorio, currentOldItem?.id_nc]);
+
+  // Garante que a foto recente selecionada exista na lista atual sem travar a navegação
+  useEffect(() => {
+    if (!isMonitoring) return;
+    if (
+      !selectedNewPhotoMon ||
+      !ws.photos.some((p) => p.name === selectedNewPhotoMon)
+    ) {
+      setSelectedNewPhotoMon(ws.photos[0]?.name || "");
+    }
+  }, [isMonitoring, ws.photos, selectedNewPhotoMon, setSelectedNewPhotoMon]);
 
   const fotos = ws.photos;
   const fotoIdx = Math.max(
@@ -282,7 +275,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     ? selectedNewPhotoMon || activePhoto?.name || ""
     : activePhoto?.name || "";
 
-  // Trava de Unicidade Fotográfica: verifica se a foto já foi cadastrada em qualquer ocorrência
+  // Trava de Unicidade Fotográfica: verifica se a foto atual OU a foto anterior já foi cadastrada
   const registroExistenteComFoto = useMemo(() => {
     if (!targetPhotoName) return null;
     const nameLower = targetPhotoName.trim().toLowerCase();
@@ -293,7 +286,22 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     );
   }, [ws.registrosNc, targetPhotoName]);
 
-  const isFotoBloqueada = Boolean(registroExistenteComFoto);
+  const registroExistenteComFotoAnterior = useMemo(() => {
+    if (!isMonitoring || !currentOldItem) return null;
+    return (
+      ws.registrosNc.find(
+        (r) =>
+          !r.is_relacionado &&
+          (r.Identificação === currentOldItem.id_nc ||
+            (Boolean(currentOldItem.old_photo_path) &&
+              r["Foto Anterior"] === currentOldItem.old_photo_path))
+      ) || null
+    );
+  }, [isMonitoring, currentOldItem, ws.registrosNc]);
+
+  const isFotoBloqueada = Boolean(
+    registroExistenteComFoto || registroExistenteComFotoAnterior
+  );
 
   const addReg = () => {
     if (!targetPhotoName) {
@@ -301,9 +309,16 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       return;
     }
 
-    if (isFotoBloqueada) {
+    if (registroExistenteComFoto) {
       toast.error(
-        `Esta foto já está cadastrada no Item #${registroExistenteComFoto?.["Nº"]} (${registroExistenteComFoto?.Identificação || "Ocorrência"}). Selecione outra foto no bloco 2 para novo cadastro.`
+        `Esta foto atual já está cadastrada no Item #${registroExistenteComFoto["Nº"]} (${registroExistenteComFoto.Identificação || "Ocorrência"}). Selecione outra foto para novo cadastro.`
+      );
+      return;
+    }
+
+    if (registroExistenteComFotoAnterior) {
+      toast.error(
+        `Esta foto anterior (${currentOldItem?.id_nc}) já foi registrada no Item #${registroExistenteComFotoAnterior["Nº"]}. Selecione outra foto anterior ou edite em 'Editar Dados'.`
       );
       return;
     }
@@ -988,11 +1003,13 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
             <div className="flex items-center gap-2.5">
               <Plus className="h-4 w-4 stroke-[2.5]" />
               <span>
-                {isFotoBloqueada
-                  ? `Foto já cadastrada no Item #${registroExistenteComFoto?.["Nº"]}`
-                  : isMonitoring
-                    ? "Salvar Auditoria no Relatório"
-                    : "Adicionar Registro ao Relatório"}
+                {registroExistenteComFoto
+                  ? `Foto atual já cadastrada no Item #${registroExistenteComFoto["Nº"]}`
+                  : registroExistenteComFotoAnterior
+                    ? `Foto anterior já registrada no Item #${registroExistenteComFotoAnterior["Nº"]}`
+                    : isMonitoring
+                      ? "Salvar Auditoria no Relatório"
+                      : "Adicionar Registro ao Relatório"}
               </span>
             </div>
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white transition-transform duration-200 group-hover:scale-110">
@@ -1003,10 +1020,10 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           <button
             type="button"
             className={`${btn.secondary} py-3.5 px-5`}
-            disabled={!podeRelacionar || isFotoBloqueada}
+            disabled={!podeRelacionar || Boolean(registroExistenteComFoto)}
             title={
-              isFotoBloqueada
-                ? `Esta foto já possui cadastro próprio (Item #${registroExistenteComFoto?.["Nº"]}) e não pode ser relacionada como 2ª foto`
+              registroExistenteComFoto
+                ? `Esta foto já possui cadastro próprio (Item #${registroExistenteComFoto["Nº"]}) e não pode ser relacionada como 2ª foto`
                 : podeRelacionar
                   ? "Abrir janela para vincular uma 2ª foto a uma ocorrência já registrada (máx. 2 fotos por NC)"
                   : "Cadastre ao menos uma ocorrência e envie fotos para habilitar o relacionamento"

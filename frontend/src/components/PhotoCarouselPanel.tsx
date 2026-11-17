@@ -8,14 +8,14 @@ import {
   FastForward,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  ChevronDown,
   ZoomIn,
 } from "lucide-react";
 import { useReportStore } from "../store/useReportStore";
 import { MonitoramentoAnteriorItem } from "../types/report.types";
 import { getConcessionTheme, isPerformanceModeActive } from "../utils/concessionTheme";
 import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
+import { DarkGalleryModal } from "./modals/DarkGalleryModal";
+import { VerticalMonitorCarousel } from "./VerticalMonitorCarousel";
 
 interface PhotoCarouselPanelProps {
   selectedNewPhotoName?: string;
@@ -293,39 +293,6 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
     return (
       <div className={`relative overflow-hidden border p-4 sm:p-6 ${isPerf ? "rounded-2xl bg-slate-900 border-slate-700 shadow-sm" : "rounded-3xl border-slate-700/50 bg-gradient-to-b from-[#0a1a2f] via-[#0d223c] to-[#081526] shadow-2xl "}`}>
-
-        {/* Keyframes de animação vertical (Desativados no modo desempenho) */}
-        {!isPerf && (
-          <style>{`
-            @keyframes carouselSlideDown {
-              0% {
-                opacity: 0.35;
-                transform: translateY(-35px) scale(0.94);
-              }
-              100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-            @keyframes carouselSlideUp {
-              0% {
-                opacity: 0.35;
-                transform: translateY(35px) scale(0.94);
-              }
-              100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-            .anim-v-slide-next {
-              animation: carouselSlideDown 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            }
-            .anim-v-slide-prev {
-              animation: carouselSlideUp 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            }
-          `}</style>
-        )}
-
         {/* Glow de iluminação no topo (Desativado no modo desempenho) */}
         {!isPerf && (
           <div
@@ -378,153 +345,66 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
 
         {/* Grade de 2 Carrosséis Verticais Lado a Lado */}
         <div className="relative z-10 grid gap-6 md:grid-cols-2">
-          {/* ============================================================= */}
-          {/* COLUNA 1: CARROSSEL VERTICAL DE FOTOS ANTERIORES              */}
-          {/* ============================================================= */}
+          {/* COLUNA 1: CARROSSEL VERTICAL DE FOTOS ANTERIORES */}
           <div className="flex flex-col">
-            <div className="mb-2.5 flex min-h-[32px] items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-300">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: theme.primary }} />
-                <span className="truncate">Foto Anterior (Doc)</span>
-              </span>
-
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAllOldModal(true)}
-                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/10 px-2.5 py-1 text-[11px] font-semibold normal-case text-slate-200 hover:bg-white/20 hover:text-white shadow-sm transition-all duration-200"
-                  title="Abrir grade com todas as fotos do documento anterior"
-                >
-                  <Images className="h-3.5 w-3.5 shrink-0" />
-                  Galeria anterior
-                </button>
-                <span
-                  className="shrink-0 whitespace-nowrap rounded-lg bg-white/10 px-2 py-0.5 font-mono text-[11px] font-bold"
-                  style={{ color: theme.primary }}
-                >
-                  {oldIdx + 1} / {totalOld}
-                </span>
-              </div>
-            </div>
-
-            {/* Palco Vertical 3D (Fotos Anteriores) */}
-            <div className="relative flex h-[350px] sm:h-[390px] w-full flex-col items-center justify-center select-none overflow-hidden rounded-2xl bg-slate-950/40 border border-white/10 p-2 shadow-inner">
-              {/* Botão Superior (Sobe / Anterior) */}
-              <button
-                type="button"
-                disabled={totalOld <= 1}
-                onClick={handleOldPrev}
-                aria-label="Ocorrência anterior (sobe)"
-                className="absolute top-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
-                title="Foto anterior (para cima)"
-              >
-                <ChevronUp className="h-5 w-5 stroke-[2.5]" />
-              </button>
-
-              {/* Card Superior (Desativado no modo desempenho) */}
-              {!isPerf && prevOldItem && (
-                <div
-                  key={`prev_old_${prevOldIdx}`}
-                  onClick={handleOldPrev}
-                  className="group absolute top-2 z-10 w-[82%] h-[40%] cursor-pointer overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-900 shadow-xl transition-all duration-500 ease-out hover:opacity-85 -translate-y-2 scale-[0.86] opacity-50"
-                  title={`Anterior: ${prevOldItem.id_nc}`}
-                >
-                  {prevOldSrc ? (
-                    <img
-                      src={prevOldSrc}
-                      alt={prevOldItem.id_nc}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-slate-900">
-                      <ImageIcon className="h-8 w-8 text-white/30" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    {prevOldItem.id_nc}
-                  </span>
-                </div>
-              )}
-
-              {/* Card Central Ativo (Foto Anterior Ativa) */}
-              <div
-                key={`curr_old_${oldIdx}_${oldAnimKey}`}
-                className={`group relative z-30 flex aspect-[4/3] w-[92%] max-h-[70%] items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
-                  isPerf ? "shadow-md" : `shadow-2xl transition-all duration-300 ${oldDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"}`
-                }`}
-                style={{
-                  borderColor: theme.primary,
-                  boxShadow: isPerf ? undefined : `0 0 20px ${theme.primary}35`,
-                }}
-              >
-                {oldSrc ? (
-                  <img
-                    src={oldSrc}
-                    alt={oldItem.id_nc}
-                    className={`h-full w-full object-cover ${isPerf ? "" : "transition-transform duration-300 group-hover:scale-105"}`}
-                  />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-900">
-                    <ImageIcon className="h-10 w-10 text-white/30" />
-                    <span className="text-xs text-slate-400">Sem foto anterior</span>
-                  </div>
-                )}
-
-                <span className="absolute bottom-3 left-3 rounded-lg bg-black/75 px-2.5 py-1 text-xs font-semibold text-white">
-                  {oldItem.id_nc || "Doc Anterior"}
-                </span>
-
-                {oldSrc && (
-                  <button
-                    type="button"
-                    onClick={() => setZoomUrl(oldSrc)}
-                    className="absolute right-3 top-3 z-40 rounded-full bg-black/60 p-2 text-white/80 hover:text-white hover:bg-black/80 transition-all hover:scale-110 active:scale-95"
-                    title="Ampliar foto anterior"
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Card Inferior (Desativado no modo desempenho) */}
-              {!isPerf && nextOldItem && (
-                <div
-                  key={`next_old_${nextOldIdx}`}
-                  onClick={handleOldNext}
-                  className="group absolute bottom-2 z-10 w-[82%] h-[40%] cursor-pointer overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-900 shadow-xl transition-all duration-500 ease-out hover:opacity-85 translate-y-2 scale-[0.86] opacity-50"
-                  title={`Próximo: ${nextOldItem.id_nc}`}
-                >
-                  {nextOldSrc ? (
-                    <img
-                      src={nextOldSrc}
-                      alt={nextOldItem.id_nc}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-slate-900">
-                      <ImageIcon className="h-8 w-8 text-white/30" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    {nextOldItem.id_nc}
-                  </span>
-                </div>
-              )}
-
-              {/* Botão Inferior (Desce / Próximo) */}
-              <button
-                type="button"
-                disabled={totalOld <= 1}
-                onClick={handleOldNext}
-                aria-label="Próxima ocorrência (desce)"
-                className="absolute bottom-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
-                title="Próxima foto (para baixo)"
-              >
-                <ChevronDown className="h-5 w-5 stroke-[2.5]" />
-              </button>
-            </div>
+            <VerticalMonitorCarousel
+              title="Foto Anterior (Doc)"
+              galleryLabel="Galeria anterior"
+              galleryTitle="Abrir grade com todas as fotos do documento anterior"
+              onOpenGallery={() => setShowAllOldModal(true)}
+              total={totalOld}
+              currentIndex={oldIdx}
+              direction={oldDirection}
+              animKey={oldAnimKey}
+              prevItem={
+                prevOldItem
+                  ? {
+                      id: `old_${prevOldIdx}`,
+                      src: prevOldSrc,
+                      alt: prevOldItem.id_nc,
+                      label: prevOldItem.id_nc,
+                      prevTitle: `Anterior: ${prevOldItem.id_nc}`,
+                    }
+                  : null
+              }
+              currentItem={
+                oldItem
+                  ? {
+                      id: `old_${oldIdx}`,
+                      src: oldSrc,
+                      alt: oldItem.id_nc,
+                      label: oldItem.id_nc || "Doc Anterior",
+                    }
+                  : null
+              }
+              nextItem={
+                nextOldItem
+                  ? {
+                      id: `old_${nextOldIdx}`,
+                      src: nextOldSrc,
+                      alt: nextOldItem.id_nc,
+                      label: nextOldItem.id_nc,
+                      nextTitle: `Próximo: ${nextOldItem.id_nc}`,
+                    }
+                  : null
+              }
+              onPrev={handleOldPrev}
+              onNext={handleOldNext}
+              onZoom={(src) => setZoomUrl(src)}
+              themePrimary={theme.primary}
+              isPerf={isPerf}
+              emptyText="Sem foto anterior"
+              prevBtnAriaLabel="Ocorrência anterior (sobe)"
+              prevBtnTitle="Foto anterior (para cima)"
+              nextBtnAriaLabel="Próxima ocorrência (desce)"
+              nextBtnTitle="Próxima foto (para baixo)"
+              zoomTitle="Ampliar foto anterior"
+              blockedReason={
+                auditedStatus
+                  ? `Ocorrência anterior já registrada (${auditedStatus})`
+                  : null
+              }
+            />
 
             {/* Metadados: Legenda Antiga (Lado Esquerdo) */}
             {oldItem && (
@@ -539,146 +419,67 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
             )}
           </div>
 
-          {/* ============================================================= */}
-          {/* COLUNA 2: CARROSSEL VERTICAL DE FOTOS NOVAS (CAMPO)           */}
-          {/* ============================================================= */}
+          {/* COLUNA 2: CARROSSEL VERTICAL DE FOTOS NOVAS (CAMPO) */}
           <div className="flex flex-col">
-            <div className="mb-2.5 flex min-h-[32px] items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-300">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: theme.primary }} />
-                <span className="truncate">Foto Nova (Vistoria)</span>
-              </span>
-
-              <div className="flex shrink-0 items-center gap-1.5">
-                {totalFotos > 0 && onOpenGalleryModal && (
-                  <button
-                    type="button"
-                    onClick={onOpenGalleryModal}
-                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/10 px-2.5 py-1 text-[11px] font-semibold normal-case text-slate-200 hover:bg-white/20 hover:text-white shadow-sm transition-all duration-200"
-                    title="Abrir galeria de fotos de campo"
-                  >
-                    <Images className="h-3.5 w-3.5 shrink-0" />
-                    Galeria atual
-                  </button>
-                )}
-                <span
-                  className="shrink-0 whitespace-nowrap rounded-lg bg-white/10 px-2 py-0.5 font-mono text-[11px] font-bold"
-                  style={{ color: theme.primary }}
-                >
-                  {totalFotos > 0 ? `${newIdx + 1} / ${totalFotos}` : "0 fotos"}
-                </span>
-              </div>
-            </div>
-
-            {/* Palco Vertical 3D (Fotos Novas) */}
-            <div className="relative flex h-[350px] sm:h-[390px] w-full flex-col items-center justify-center select-none overflow-hidden rounded-2xl bg-slate-950/40 border border-white/10 p-2 shadow-inner">
-              {/* Botão Superior (Sobe / Anterior) */}
-              <button
-                type="button"
-                disabled={totalFotos <= 1}
-                onClick={handleNewPrev}
-                aria-label="Foto anterior (sobe)"
-                className="absolute top-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
-                title="Foto nova anterior (para cima)"
-              >
-                <ChevronUp className="h-5 w-5 stroke-[2.5]" />
-              </button>
-
-              {/* Card Superior (Desativado no modo desempenho) */}
-              {!isPerf && prevNewPhoto && (
-                <div
-                  key={`prev_new_${prevNewIdx}`}
-                  onClick={handleNewPrev}
-                  className="group absolute top-2 z-10 w-[82%] h-[40%] cursor-pointer overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-900 shadow-xl transition-all duration-500 ease-out hover:opacity-85 -translate-y-2 scale-[0.86] opacity-50"
-                  title={`Foto anterior ${prevNewIdx! + 1}: ${prevNewPhoto.name}`}
-                >
-                  <img
-                    src={prevNewPhoto.previewUrl}
-                    alt={prevNewPhoto.name}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white truncate max-w-[90%]">
-                    {prevNewPhoto.name}
-                  </span>
-                </div>
-              )}
-
-              {/* Card Central Ativo (Foto Nova Ativa) */}
-              <div
-                key={`curr_new_${newIdx}_${newAnimKey}`}
-                className={`group relative z-30 flex aspect-[4/3] w-[92%] max-h-[70%] items-center justify-center overflow-hidden rounded-2xl border-2 bg-slate-900 ${
-                  isPerf ? "shadow-md" : `shadow-2xl transition-all duration-300 ${newDirection === "next" ? "anim-v-slide-next" : "anim-v-slide-prev"}`
-                }`}
-                style={{
-                  borderColor: theme.primary,
-                  boxShadow: isPerf ? undefined : `0 0 20px ${theme.primary}40`,
-                }}
-              >
-                {currentNewPhoto ? (
-                  <img
-                    src={currentNewPhoto.previewUrl}
-                    alt={currentNewPhoto.name}
-                    className={`h-full w-full object-cover ${isPerf ? "" : "transition-transform duration-300 group-hover:scale-105"}`}
-                  />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-900">
-                    <ImageIcon className="h-10 w-10 text-white/30" />
-                    <span className="text-xs text-slate-400">Envie fotos no bloco 1</span>
-                  </div>
-                )}
-
-                <span
-                  className="absolute bottom-3 left-3 rounded-lg px-2.5 py-1 text-xs font-semibold text-white shadow-md max-w-[85%] truncate"
-                  style={{ backgroundColor: theme.primary }}
-                >
-                  {currentNewPhoto ? currentNewPhoto.name : "Nenhuma foto"}
-                </span>
-
-                {currentNewPhoto && (
-                  <button
-                    type="button"
-                    onClick={() => setZoomUrl(currentNewPhoto.previewUrl)}
-                    className="absolute right-3 top-3 z-40 rounded-full bg-black/60 p-2 text-white/80 hover:text-white hover:bg-black/80 transition-all hover:scale-110 active:scale-95"
-                    title="Ampliar foto nova"
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Card Inferior (Desativado no modo desempenho) */}
-              {!isPerf && nextNewPhoto && (
-                <div
-                  key={`next_new_${nextNewIdx}`}
-                  onClick={handleNewNext}
-                  className="group absolute bottom-2 z-10 w-[82%] h-[40%] cursor-pointer overflow-hidden rounded-2xl border-2 border-white/20 bg-slate-900 shadow-xl transition-all duration-500 ease-out hover:opacity-85 translate-y-2 scale-[0.86] opacity-50"
-                  title={`Próxima foto ${nextNewIdx! + 1}: ${nextNewPhoto.name}`}
-                >
-                  <img
-                    src={nextNewPhoto.previewUrl}
-                    alt={nextNewPhoto.name}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/40 transition-colors group-hover:bg-black/20" />
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white truncate max-w-[90%]">
-                    {nextNewPhoto.name}
-                  </span>
-                </div>
-              )}
-
-              {/* Botão Inferior (Desce / Próximo) */}
-              <button
-                type="button"
-                disabled={totalFotos <= 1}
-                onClick={handleNewNext}
-                aria-label="Próxima foto nova (desce)"
-                className="absolute bottom-2 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/90 text-slate-900 shadow-md transition-all duration-300 hover:scale-110 active:scale-95 disabled:pointer-events-none disabled:opacity-20"
-                title="Próxima foto (para baixo)"
-              >
-                <ChevronDown className="h-5 w-5 stroke-[2.5]" />
-              </button>
-            </div>
+            <VerticalMonitorCarousel
+              title="Foto Nova (Vistoria)"
+              galleryLabel="Galeria atual"
+              galleryTitle="Abrir galeria de fotos de campo"
+              onOpenGallery={totalFotos > 0 ? onOpenGalleryModal : undefined}
+              total={totalFotos}
+              currentIndex={newIdx}
+              direction={newDirection}
+              animKey={newAnimKey}
+              prevItem={
+                prevNewPhoto
+                  ? {
+                      id: `new_${prevNewIdx}`,
+                      src: prevNewPhoto.previewUrl,
+                      alt: prevNewPhoto.name,
+                      label: prevNewPhoto.name,
+                      prevTitle: `Foto anterior ${prevNewIdx! + 1}: ${prevNewPhoto.name}`,
+                    }
+                  : null
+              }
+              currentItem={
+                currentNewPhoto
+                  ? {
+                      id: `new_${newIdx}`,
+                      src: currentNewPhoto.previewUrl,
+                      alt: currentNewPhoto.name,
+                      label: currentNewPhoto.name,
+                    }
+                  : null
+              }
+              nextItem={
+                nextNewPhoto
+                  ? {
+                      id: `new_${nextNewIdx}`,
+                      src: nextNewPhoto.previewUrl,
+                      alt: nextNewPhoto.name,
+                      label: nextNewPhoto.name,
+                      nextTitle: `Próxima foto ${nextNewIdx! + 1}: ${nextNewPhoto.name}`,
+                    }
+                  : null
+              }
+              onPrev={handleNewPrev}
+              onNext={handleNewNext}
+              onZoom={(src) => setZoomUrl(src)}
+              themePrimary={theme.primary}
+              isPerf={isPerf}
+              emptyText="Envie fotos no bloco 1"
+              prevBtnAriaLabel="Foto anterior (sobe)"
+              prevBtnTitle="Foto nova anterior (para cima)"
+              nextBtnAriaLabel="Próxima foto nova (desce)"
+              nextBtnTitle="Próxima foto (para baixo)"
+              zoomTitle="Ampliar foto nova"
+              accentLabel
+              blockedReason={
+                isCurrentNewInNc
+                  ? "Foto atual já vinculada a um registro"
+                  : null
+              }
+            />
 
             {/* Metadados: Constatação Antiga (Lado Direito) */}
             {oldItem && (
@@ -695,93 +496,71 @@ export const PhotoCarouselPanel: React.FC<PhotoCarouselPanelProps> = ({
         </div>
 
         {/* Modal de Todas as Fotos Anteriores */}
-        {showAllOldModal &&
-          createPortal(
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-in fade-in"
-              onClick={() => setShowAllOldModal(false)}
-            >
-            <div
-              className="relative flex max-h-[85vh] w-full max-w-4xl flex-col rounded-3xl border border-white/15 bg-slate-900 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2">
-                  <Images className="h-5 w-5" style={{ color: theme.primary }} />
-                  <h3 className="text-base font-bold text-white">
-                    Fotos do Relatório Anterior ({totalOld})
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAllOldModal(false)}
-                  className="rounded-full bg-white/10 p-2 text-slate-300 hover:bg-white/20 hover:text-white transition-all"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+        {showAllOldModal && (
+          <DarkGalleryModal
+            title="Fotos do Relatório Anterior"
+            totalCount={totalOld}
+            searchPlaceholder="Pesquisar por código (ID), constatação ou situação (ex: Pendente, Saneada)..."
+            emptyLabel="Nenhuma foto anterior encontrada"
+            infoBanner={
+              <>
+                <strong>Como funciona o status:</strong> quando uma foto anterior
+                já foi registrada na auditoria atual, ela exibe a situação
+                escolhida — se registrada como{" "}
+                <strong className="text-amber-300">Pendente</strong>, permanece
+                marcada como pendente para acompanhamento. Fotos sem registro
+                exibem{" "}
+                <strong className="text-slate-200">Aguardando registro</strong>.
+              </>
+            }
+            items={ws.oldPhotosToMatch.map((it, idx) => {
+              const status = auditedOldIds.get(it.id_nc);
+              const statusText = status
+                ? `registrada ${status}`
+                : "aguardando registro nao auditada";
 
-              <div className="grid flex-1 grid-cols-2 gap-4 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4">
-                {ws.oldPhotosToMatch.map((it, idx) => {
-                  const src = getOldImgSrc(it);
-                  const isSelected = idx === oldIdx;
-                  const status = auditedOldIds.get(it.id_nc);
-                  return (
-                    <div
-                      key={`${it.id_nc}_${idx}`}
-                      onClick={() => {
-                        setCarouselIndex(idx);
-                        setShowAllOldModal(false);
-                      }}
-                      className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border-2 bg-slate-800 transition-all hover:scale-[1.02] ${
-                        isSelected
-                          ? "shadow-lg"
-                          : "border-white/10 hover:border-white/30"
-                      }`}
-                      style={
-                        isSelected
-                          ? {
-                              borderColor: theme.primary,
-                              boxShadow: `0 0 0 2px ${theme.primary}`,
-                            }
-                          : {}
-                      }
-                    >
-                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-950">
-                        {src ? (
-                          <img
-                            src={src}
-                            alt={it.id_nc}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <ImageIcon className="h-8 w-8 text-white/30" />
-                          </div>
-                        )}
-                        {status && (
-                          <span className="absolute top-2 right-2 rounded-full bg-ok px-2 py-0.5 text-[9px] font-bold text-white shadow">
-                            ✓ {status}
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-2 text-xs">
-                        <div className="font-mono font-bold text-white truncate">
-                          {it.id_nc}
-                        </div>
-                        {it.constatacao && (
-                          <div className="text-[11px] text-slate-400 truncate" title={it.constatacao}>
-                            {it.constatacao}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>,
-          document.body
+              let topRightBadge = {
+                label: "Aguardando registro",
+                className:
+                  "bg-slate-900/85 text-slate-300 border border-white/15",
+              };
+              if (status) {
+                const norm = status.toLowerCase();
+                if (norm.includes("parcial")) {
+                  topRightBadge = {
+                    label: `Registrada · ${status}`,
+                    className: "bg-sky-600 text-white",
+                  };
+                } else if (norm.includes("pendente")) {
+                  topRightBadge = {
+                    label: "Registrada · Pendente",
+                    className: "bg-amber-500 text-slate-950",
+                  };
+                } else {
+                  topRightBadge = {
+                    label: `✓ ${status}`,
+                    className: "bg-ok text-white",
+                  };
+                }
+              }
+
+              return {
+                key: `${it.id_nc}_${idx}`,
+                imageUrl: getOldImgSrc(it),
+                imageAlt: it.id_nc,
+                title: it.id_nc,
+                subtitle: it.constatacao || undefined,
+                searchText: `${it.id_nc || ""} ${it.constatacao || ""} ${statusText}`,
+                topRightBadge,
+                isSelected: idx === oldIdx,
+                onSelect: () => {
+                  setCarouselIndex(idx);
+                  setShowAllOldModal(false);
+                },
+              };
+            })}
+            onClose={() => setShowAllOldModal(false)}
+          />
         )}
 
         {/* Modal de Zoom */}

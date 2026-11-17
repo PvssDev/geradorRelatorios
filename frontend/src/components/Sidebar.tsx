@@ -75,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [modalErrorMessage, setModalErrorMessage] = useState("");
   const [lastPendingAction, setLastPendingAction] = useState<"salvar" | "carregar" | "trocar" | null>(null);
   const [storageOpen, setStorageOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
   const totalFotos = ws.photos.length;
   const ncsCount = ws.registrosNc.filter(
@@ -112,6 +113,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     setSelectedStep(maxUnlockedStep);
   }, [maxUnlockedStep]);
+
+  useEffect(() => {
+    if (!expanded) {
+      setStorageOpen(false);
+      setQuickActionsOpen(false);
+    }
+  }, [expanded]);
 
   // Scroll-Spy bidirecional: acompanha a seção visível (#b1..#b4) ao rolar para cima ou para baixo
   useEffect(() => {
@@ -606,55 +614,85 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           ) : (
-            <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-accent/40 via-sidebar-accent to-navy p-4 shadow-lg animate-in fade-in duration-200">
-              <div className="flex items-start justify-between gap-2">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
-                  <Wand2 className="h-4 w-4" />
+            <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-accent/40 via-sidebar-accent to-navy shadow-lg overflow-hidden animate-in fade-in duration-200">
+              <button
+                type="button"
+                onClick={() => setQuickActionsOpen((prev) => !prev)}
+                aria-expanded={quickActionsOpen}
+                className="flex w-full items-center justify-between gap-2 p-3.5 text-left hover:bg-white/5 transition"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
+                    <Wand2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-white whitespace-nowrap">
+                      Ações Rápidas
+                    </div>
+                    <div className="text-[10px] text-white/60 truncate">
+                      {quickActionsOpen ? "Clique para recolher" : "Preenchimento, densidade e atalhos"}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col items-end gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => onToggleDense(!dense)}
-                    title={`Densidade: ${dense ? "Compacta" : "Confortável"} (clique para alternar)`}
-                    className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition whitespace-nowrap"
-                  >
-                    <MoreVertical className="h-3 w-3" />
-                    {dense ? "Compacta" : "Confortável"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onTogglePerformanceMode(!performanceMode)}
-                    title={`Modo de Renderização: ${performanceMode ? "Desempenho" : "Padrão"} (clique para alternar)`}
-                    className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition whitespace-nowrap"
-                  >
-                    <Zap className={`h-3 w-3 ${performanceMode ? "text-amber-300" : "text-white/70"}`} />
-                    {performanceMode ? "Desempenho" : "Padrão"}
-                  </button>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-300 ${
+                    quickActionsOpen ? "rotate-180 text-white" : ""
+                  }`}
+                />
+              </button>
+
+              <div
+                className={`grid transition-all duration-300 ease-in-out ${
+                  quickActionsOpen
+                    ? "grid-rows-[1fr] opacity-100 px-3.5 pb-3.5"
+                    : "grid-rows-[0fr] opacity-0 px-3.5 pb-0 pointer-events-none"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="pt-2.5 border-t border-white/10 space-y-2.5">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onToggleDense(!dense)}
+                        title={`Densidade: ${dense ? "Compacta" : "Confortável"} (clique para alternar)`}
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition whitespace-nowrap"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                        {dense ? "Compacta" : "Confortável"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onTogglePerformanceMode(!performanceMode)}
+                        title={`Modo de Renderização: ${performanceMode ? "Desempenho" : "Padrão"} (clique para alternar)`}
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition whitespace-nowrap"
+                      >
+                        <Zap className={`h-3 w-3 ${performanceMode ? "text-amber-300" : "text-white/70"}`} />
+                        {performanceMode ? "Desempenho" : "Padrão"}
+                      </button>
+                    </div>
+
+                    <div className="text-[11px] leading-snug text-white/65">
+                      Preencha dados de teste ou vá direto para a emissão Word.
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDemo}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2 px-3 text-xs font-bold text-primary shadow hover:bg-secondary transition whitespace-nowrap"
+                      >
+                        <Wand2 className="h-3.5 w-3.5 text-accent" /> Auto preenchimento
+                      </button>
+                      <a
+                        href="#b5"
+                        onClick={onNavigate}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-1.5 px-3 text-[11px] font-semibold text-white hover:bg-white/20 transition whitespace-nowrap"
+                      >
+                        <Rocket className="h-3.5 w-3.5" /> Ir para emissão
+                      </a>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="mt-3 text-xs font-bold text-white whitespace-nowrap">
-                Ações Rápidas
-              </div>
-              <div className="mt-0.5 text-[11px] leading-snug text-white/65">
-                Preencha dados de teste ou vá direto para a emissão Word.
-              </div>
-
-              <div className="mt-3 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={handleDemo}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2 px-3 text-xs font-bold text-primary shadow hover:bg-secondary transition whitespace-nowrap"
-                >
-                  <Wand2 className="h-3.5 w-3.5 text-accent" /> Auto preenchimento
-                </button>
-                <a
-                  href="#b5"
-                  onClick={onNavigate}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-1.5 px-3 text-[11px] font-semibold text-white hover:bg-white/20 transition whitespace-nowrap"
-                >
-                  <Rocket className="h-3.5 w-3.5" /> Ir para emissão
-                </a>
               </div>
             </div>
           )}
