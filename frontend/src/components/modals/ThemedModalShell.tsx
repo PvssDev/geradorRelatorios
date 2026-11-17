@@ -46,7 +46,7 @@ export const ThemedModalShell: React.FC<ThemedModalShellProps> = ({
             "--modal-border": theme.lightBorder,
           } as React.CSSProperties
         }
-        className={`flex max-h-[90dvh] w-full ${maxWidthClass} flex-col overflow-hidden rounded-[28px] border border-slate-700/30 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150`}
+        className={`flex max-h-[90dvh] w-full ${maxWidthClass} flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150`}
       >
         <div className="flex items-center justify-between border-b border-slate-800 bg-[#0b1728] px-5 py-4 text-white">
           <div className="flex items-center gap-3 min-w-0">

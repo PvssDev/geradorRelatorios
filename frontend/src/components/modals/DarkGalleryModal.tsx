@@ -64,7 +64,7 @@ export const DarkGalleryModal: React.FC<DarkGalleryModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-slate-900 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="relative flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-slate-900 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div

@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import React, { useEffect, useState, useMemo, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { DateRangePicker, type RangeValue } from "@heroui/react";
 import { parseDate, type DateValue } from "@internationalized/date";
@@ -11,7 +10,6 @@ import {
   UserCheck,
   ChevronDown,
   Users,
-  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
@@ -19,6 +17,19 @@ import { ConfirmDeleteModal } from "./Modals";
 import { useReportStore } from "../store/useReportStore";
 import { FiscalizacaoItem } from "../types/report.types";
 import { getConcessionTheme, isPerformanceModeActive } from "../utils/concessionTheme";
+import {
+  useAnchoredDropdown,
+  AnchoredPortalMenu,
+  DropdownOptionItem,
+} from "./common/AnchoredDropdown";
+import {
+  formatNomeAbreviado,
+  getTodayIso,
+  isoToBr,
+  brToIso,
+  formatarPeriodoVistoria,
+  desmembrarPeriodoEmDatas,
+} from "../utils/fiscalizacaoDateUtils";
 
 interface FiscalizacaoFormProps {
   onOpenResponsaveisModal: () => void;
@@ -35,148 +46,6 @@ const pillFisc = (on: boolean) =>
       ? "text-white font-bold border border-transparent shadow-sm hover:border-[#001630]/60 hover:ring-2 hover:ring-[#001630]/25 hover:shadow-md"
       : "border border-[#bdd0e4] bg-white text-slate-700 hover:bg-[#f0f6fc] hover:border-[#001630]/60 hover:ring-2 hover:ring-[#001630]/15 font-semibold shadow-xs"
   }`;
-
-function formatNomeAbreviado(nomeCompleto: string, compactar: boolean): string {
-  if (!compactar) return nomeCompleto;
-  const partes = nomeCompleto.trim().split(/\s+/);
-  if (partes.length <= 1) return nomeCompleto;
-  const primeiro = partes[0];
-  const ultimo = partes[partes.length - 1];
-  return `${primeiro} ${ultimo.charAt(0)}.`;
-}
-
-/**
- * Gerencia abertura, fechamento (Escape) e coordenadas fixas para menus suspensos
- * ancorados abaixo de cards com overflow-hidden via React Portal.
- */
-function useAnchoredDropdown() {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-  const [rect, setRect] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
-
-  const updatePos = () => {
-    if (cardRef.current) {
-      const r = cardRef.current.getBoundingClientRect();
-      setRect({ top: r.bottom + 6, left: r.left, width: r.width });
-    }
-  };
-
-  const toggle = () => {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    updatePos();
-    setOpen(true);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("scroll", updatePos, true);
-    window.addEventListener("resize", updatePos);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("scroll", updatePos, true);
-      window.removeEventListener("resize", updatePos);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return { cardRef, open, setOpen, toggle, rect };
-}
-
-/**
- * Renderiza o container flutuante do dropdown via React Portal, alinhado abaixo do card pai.
- */
-function AnchoredPortalMenu({
-  dropdown,
-  children,
-}: {
-  dropdown: ReturnType<typeof useAnchoredDropdown>;
-  children: ReactNode;
-}) {
-  if (!dropdown.open || !dropdown.rect) return null;
-  return createPortal(
-    <>
-      <div
-        className="fixed inset-0 z-[9998]"
-        onClick={() => dropdown.setOpen(false)}
-      />
-      <div
-        style={{
-          position: "fixed",
-          top: dropdown.rect.top,
-          left: dropdown.rect.left,
-          width: dropdown.rect.width,
-          zIndex: 9999,
-        }}
-        className="max-h-64 overflow-y-auto rounded-2xl border border-border bg-white p-1.5 shadow-2xl"
-      >
-        <div className="flex flex-col gap-0.5">{children}</div>
-      </div>
-    </>,
-    document.body
-  );
-}
-
-/**
- * Item padronizado de opção com título, subtítulo opcional e checkmark animado na cor do tema.
- */
-function DropdownOptionItem({
-  title,
-  subtitle,
-  selected,
-  accentColor,
-  onClick,
-}: {
-  title: string;
-  subtitle?: string;
-  selected: boolean;
-  accentColor: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={selected ? { backgroundColor: `${accentColor}12` } : undefined}
-      className={`group w-full text-left flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-xs transition cursor-pointer ${
-        selected ? "hover:brightness-95" : "hover:bg-secondary/80"
-      }`}
-    >
-      <div className="flex flex-col min-w-0">
-        <span
-          className="font-semibold truncate transition-colors"
-          style={selected ? { color: accentColor } : undefined}
-        >
-          {title}
-        </span>
-        {subtitle && (
-          <span className="text-[11px] text-muted-foreground truncate">
-            {subtitle}
-          </span>
-        )}
-      </div>
-
-      {selected && (
-        <span
-          className="shrink-0 flex items-center justify-center animate-check-pop"
-          style={{ color: accentColor }}
-          aria-hidden="true"
-        >
-          <Check className="h-4 w-4 stroke-[2.75] animate-check-draw" />
-        </span>
-      )}
-    </button>
-  );
-}
 
 function Field({
   label,
@@ -198,79 +67,6 @@ function Field({
       {children}
     </div>
   );
-}
-
-function getTodayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function isoToBr(iso: string): string {
-  if (!iso) return "";
-  const parts = iso.split("-");
-  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : iso;
-}
-
-function brToIso(br: string): string {
-  if (!br || br.startsWith("=")) return getTodayIso();
-  const parts = br.split("/");
-  return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : getTodayIso();
-}
-
-function formatarPeriodoVistoria(inicioIso: string, fimIso: string): string {
-  if (!inicioIso) return "";
-  if (!fimIso || fimIso === inicioIso) {
-    return isoToBr(inicioIso);
-  }
-  const [y1, m1, d1] = inicioIso.split("-");
-  const [y2, m2, d2] = fimIso.split("-");
-  if (!y1 || !y2) return isoToBr(inicioIso);
-
-  if (y1 !== y2) {
-    return `${d1}/${m1}/${y1} a ${d2}/${m2}/${y2}`;
-  }
-  if (m1 !== m2) {
-    return `${d1}/${m1} a ${d2}/${m2}/${y2}`;
-  }
-  return `${d1} a ${d2}/${m2}/${y2}`;
-}
-
-function desmembrarPeriodoEmDatas(periodoStr: string, fallbackDataIso: string): { inicioIso: string; fimIso: string } {
-  if (!periodoStr || periodoStr.trim() === "" || periodoStr.startsWith("=")) {
-    return { inicioIso: fallbackDataIso, fimIso: fallbackDataIso };
-  }
-  const s = periodoStr.trim();
-  // 1. "DD a DD/MM/AAAA"
-  const m1 = s.match(/^(\d{1,2})\s*(?:a|à|-|e)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m1) {
-    const [, d1, d2, m, y] = m1;
-    const iso1 = `${y}-${m.padStart(2, "0")}-${d1.padStart(2, "0")}`;
-    const iso2 = `${y}-${m.padStart(2, "0")}-${d2.padStart(2, "0")}`;
-    return { inicioIso: iso1, fimIso: iso2 };
-  }
-  // 2. "DD/MM a DD/MM/AAAA"
-  const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\s*(?:a|à|-|e)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m2) {
-    const [, d1, m1Val, d2, m2Val, y] = m2;
-    const iso1 = `${y}-${m1Val.padStart(2, "0")}-${d1.padStart(2, "0")}`;
-    const iso2 = `${y}-${m2Val.padStart(2, "0")}-${d2.padStart(2, "0")}`;
-    return { inicioIso: iso1, fimIso: iso2 };
-  }
-  // 3. "DD/MM/AAAA a DD/MM/AAAA"
-  const m3 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(?:a|à|-|e)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m3) {
-    const [, d1, m1Val, y1, d2, m2Val, y2] = m3;
-    const iso1 = `${y1}-${m1Val.padStart(2, "0")}-${d1.padStart(2, "0")}`;
-    const iso2 = `${y2}-${m2Val.padStart(2, "0")}-${d2.padStart(2, "0")}`;
-    return { inicioIso: iso1, fimIso: iso2 };
-  }
-  // 4. "DD/MM/AAAA"
-  const m4 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m4) {
-    const [, d, m, y] = m4;
-    const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-    return { inicioIso: iso, fimIso: iso };
-  }
-  return { inicioIso: fallbackDataIso, fimIso: fallbackDataIso };
 }
 
 export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
@@ -722,9 +518,10 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
               syncToStore({ contrato: c });
             })
           }
-          className="text-[11px] font-medium text-muted-foreground hover:text-accent transition shrink-0"
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-accent transition shrink-0"
+          title="Gerenciar contratos"
         >
-          + Gerenciar
+          <Settings className="h-3 w-3" /> Gerenciar
         </button>
       ),
     });
@@ -999,10 +796,10 @@ export const FiscalizacaoForm: React.FC<FiscalizacaoFormProps> = ({
                 <button
                   type="button"
                   onClick={onOpenResponsaveisModal}
-                  className="font-medium text-muted-foreground hover:text-accent transition"
+                  className="inline-flex items-center gap-1 font-medium text-muted-foreground hover:text-accent transition"
                   title="Gerenciar equipe técnica"
                 >
-                  + Gerenciar
+                  <Settings className="h-3 w-3" /> Gerenciar
                 </button>
               </div>
             </div>

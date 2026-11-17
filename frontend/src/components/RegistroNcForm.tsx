@@ -1,18 +1,5 @@
-import React, { useEffect, useState, useMemo, type ReactNode } from "react";
-import {
-  ImagePlus,
-  AlertTriangle,
-  Eye,
-  Plus,
-  Link2,
-  Wand2,
-  ChevronRight,
-  ChevronDown,
-  Table2,
-  Sparkles,
-  Edit3,
-} from "lucide-react";
-import { RegistrosCadastradosPanel } from "./RegistrosCadastradosPanel";
+import React, { useEffect, useState, useMemo } from "react";
+import { ImagePlus, AlertTriangle, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "./Card";
 import { PhotoCarouselPanel } from "./PhotoCarouselPanel";
@@ -23,6 +10,9 @@ import {
 } from "../store/useReportStore";
 import { SituacaoNC, RegistroNcItem } from "../types/report.types";
 import { getConcessionTheme } from "../utils/concessionTheme";
+import { FiscalizacaoNcFields } from "./registro/FiscalizacaoNcFields";
+import { MonitoramentoNcFields } from "./registro/MonitoramentoNcFields";
+import { RegistroActionFooter } from "./registro/RegistroActionFooter";
 
 interface RegistroNcFormProps {
   dense?: boolean;
@@ -30,55 +20,6 @@ interface RegistroNcFormProps {
   onOpenRelacionarModal: (currentPhotoName?: string) => void;
   onOpenGalleryModal: () => void;
   onOpenEditModal?: (tab?: "fisc" | "nc") => void;
-}
-
-const DIRECOES_CRA = ["Direita", "Esquerda"] as const;
-const PISTAS_SUGESTOES = [
-  "Sul",
-  "Norte",
-  "Sentido Sul (Crescente)",
-  "Sentido Norte (Decrescente)",
-  "Ambos os sentidos",
-];
-
-const inputCls =
-  "w-full rounded-lg border border-input bg-secondary/60 px-3 py-2 text-sm text-foreground outline-none transition-all duration-200 hover:border-primary/50 hover:bg-secondary/90 hover:shadow-xs focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20";
-
-const btn = {
-  primary:
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-amber-500/20 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/30 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none",
-  secondary:
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-all duration-150 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none",
-};
-
-const pill = (on: boolean) =>
-  `rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all duration-150 ${on
-    ? "text-white shadow-xs"
-    : "border-border/80 bg-card text-foreground hover:border-slate-400 hover:bg-secondary/40 shadow-2xs"
-  }`;
-
-function Field({
-  label,
-  action,
-  className = "",
-  children,
-}: {
-  label: string;
-  action?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={`block space-y-1.5 ${className}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-blue">
-          {label}
-        </span>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
 }
 
 export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
@@ -99,7 +40,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     coordenadores,
     getActiveWorkspace,
     getNcOptionsForCurrent,
-    setActiveFiscalizacaoIndex,
     setPistaPersistida,
     setTrechoPersistido,
     addOrUpdateRegistroNc,
@@ -113,24 +53,19 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
   const optionsNc = getNcOptionsForCurrent();
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
 
-  // Tipo NC vs PA (disponível em Fiscalização para CRA, CRC e SOCICAM)
   const [tipo, setTipo] = useState<"NC" | "PA">("NC");
-  const [direcaoFaixa, setDirecaoFaixa] = useState<"Direita" | "Esquerda">(
-    "Direita"
-  );
+  const [direcaoFaixa, setDirecaoFaixa] = useState<"Direita" | "Esquerda">("Direita");
   const [codificacao, setCodificacao] = useState("");
   const [siglas, setSiglas] = useState<string[]>([]);
   const [fund, setFund] = useState("");
   const [det, setDet] = useState("");
 
-  // Campos de Monitoramento
   const [situacaoMon, setSituacaoMon] = useState<SituacaoNC>("Pendente");
   const [legendaFotoMon, setLegendaFotoMon] = useState("");
   const [posConcessionariaMon, setPosConcessionariaMon] = useState("");
   const [constatacaoMon, setConstatacaoMon] = useState("");
   const [analiseArpeMon, setAnaliseArpeMon] = useState("");
 
-  // Reseta tipo para NC caso entre em Monitoramento
   useEffect(() => {
     if (isMonitoring) {
       setTipo("NC");
@@ -142,11 +77,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
   const currentOldItem =
     isMonitoring && ws.oldPhotosToMatch.length > 0
       ? ws.oldPhotosToMatch[
-      Math.max(
-        0,
-        Math.min(ws.carouselIndex, ws.oldPhotosToMatch.length - 1)
-      )
-      ]
+          Math.max(0, Math.min(ws.carouselIndex, ws.oldPhotosToMatch.length - 1))
+        ]
       : null;
 
   // Hidrata os campos de auditoria apenas ao entrar em Monitoramento ou trocar a ocorrência anterior
@@ -156,9 +88,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       (r) => !r.is_relacionado && r.Identificação === currentOldItem.id_nc
     );
     setPosConcessionariaMon(saved?.Determinação || "");
-    setConstatacaoMon(
-      saved?.Observações || currentOldItem.constatacao || ""
-    );
+    setConstatacaoMon(saved?.Observações || currentOldItem.constatacao || "");
     setAnaliseArpeMon(saved?.["Análise ARPE"] || "");
     setLegendaFotoMon(saved?.["Legenda da Foto"] || "");
     setSituacaoMon(saved?.Situação || "Pendente");
@@ -180,22 +110,15 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
   }, [isMonitoring, ws.photos, selectedNewPhotoMon, setSelectedNewPhotoMon]);
 
   const fotos = ws.photos;
-  const fotoIdx = Math.max(
-    0,
-    Math.min(ws.carouselIndex, Math.max(0, fotos.length - 1))
-  );
+  const fotoIdx = Math.max(0, Math.min(ws.carouselIndex, Math.max(0, fotos.length - 1)));
   const activePhoto = fotos[fotoIdx] || null;
 
   const activeFiscIdx = Math.max(
     0,
-    Math.min(
-      ws.activeFiscalizacaoIndex,
-      Math.max(0, ws.fiscalizacoes.length - 1)
-    )
+    Math.min(ws.activeFiscalizacaoIndex, Math.max(0, ws.fiscalizacoes.length - 1))
   );
   const activeFisc = ws.fiscalizacoes[activeFiscIdx];
-  const dataBr =
-    activeFisc?.Data || new Date().toLocaleDateString("pt-BR");
+  const dataBr = activeFisc?.Data || new Date().toLocaleDateString("pt-BR");
   const ano = dataBr.split("/")[2] || String(new Date().getFullYear());
 
   const currentFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
@@ -207,7 +130,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     [ws.registrosNc, currentFiscId]
   );
 
-  // Sequencial baseado no maior sufixo numérico da fiscalização atual
   const maxSeqInFiscalizacao = useMemo(() => {
     let max = 0;
     for (const r of currentFiscRegs) {
@@ -241,25 +163,25 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
         local: existing.Local,
       };
     }
+    const prefix = isMonitoring ? "MON" : "FISC";
+    const generatedId = `${prefix}-${tipoRelatorio}-${ano}-001`;
     const defaultLocal =
       tipoRelatorio === "CRA"
         ? "Rota do Atlântico"
         : tipoRelatorio === "CRC"
-          ? "Sistema Viário do Paiva"
-          : locaisSocicam[5] || "TIP Recife";
-    const generatedId = `${isMonitoring ? "MON" : "FISC"
-      }-${tipoRelatorio}-${ano}-001`;
+        ? "Sistema Viário do Paiva"
+        : locaisSocicam[5] || "TIP Recife";
 
     upsertActiveFiscalizacao({
       "ID da Fiscalização": generatedId,
       Data: dataBr,
-      Hora: tipoRelatorio === "CRA" ? "09:30" : "",
+      Hora: tipoRelatorio === "CRA" ? "09:00" : "",
       Cidade:
         tipoRelatorio === "CRA"
           ? "Cabo de Santo Agostinho / Ipojuca"
           : tipoRelatorio === "SOCICAM"
-            ? defaultLocal
-            : "",
+          ? defaultLocal
+          : "",
       Local: defaultLocal,
       "Pessoal Responsável":
         responsaveis.map((r) => r.nome).join(", ") || "Equipe Técnica ARPE",
@@ -275,7 +197,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
     ? selectedNewPhotoMon || activePhoto?.name || ""
     : activePhoto?.name || "";
 
-  // Trava de Unicidade Fotográfica: verifica se a foto atual OU a foto anterior já foi cadastrada
   const registroExistenteComFoto = useMemo(() => {
     if (!targetPhotoName) return null;
     const nameLower = targetPhotoName.trim().toLowerCase();
@@ -330,17 +251,16 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
         !analiseArpeMon.trim()
       ) {
         toast.error(
-          `Preencha ${tipoRelatorio === "SOCICAM"
-            ? "Informação SOCICAM"
-            : `Posicionamento ${tipoRelatorio}`
+          `Preencha ${
+            tipoRelatorio === "SOCICAM"
+              ? "Informação SOCICAM"
+              : `Posicionamento ${tipoRelatorio}`
           }, Constatação e Análise ARPE.`
         );
         return;
       }
 
-      const { id: idVinculo, local: localVinculo } =
-        ensureFiscalizacaoHeader();
-
+      const { id: idVinculo, local: localVinculo } = ensureFiscalizacaoHeader();
       const identMon =
         currentOldItem?.id_nc ||
         codificacao.trim() ||
@@ -391,7 +311,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       return;
     }
 
-    // Validação Fiscalização
     if (siglas.length === 0 && !codificacao.trim()) {
       toast.error(
         "Selecione ao menos uma sigla/irregularidade ou preencha a codificação."
@@ -407,7 +326,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       const tipoRegistroStr = isPa ? "Ponto de Atenção" : "Não Conformidade";
       const fotoNum = fotoIdx + 1;
       const grpId = `grp_${idVinculo}_${fotoNum}_${Date.now()}`;
-      const defaultBase = tipoRelatorio === "SOCICAM" ? "SOCICAM" : "CRA.ST601.2794-2834";
+      const defaultBase =
+        tipoRelatorio === "SOCICAM" ? "SOCICAM" : "CRA.ST601.2794-2834";
       const baseRaw = codificacao.trim() || defaultBase;
       const baseLimpa = baseRaw.split("/")[0].trim() || baseRaw;
 
@@ -415,9 +335,12 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       const tempNcClone = [...ws.registrosNc];
 
       siglasParaCadastrar.forEach((s, idx) => {
-        const seqIdx = obterProximoSequencialCra(tempNcClone, idVinculo, tipoRegistroStr);
+        const seqIdx = obterProximoSequencialCra(
+          tempNcClone,
+          idVinculo,
+          tipoRegistroStr
+        );
         const codFormatado = calcularCodificacaoCra(baseLimpa, dataBr, seqIdx);
-        const descSigla = s;
         const obsSigla = (mapSiglas[s] || s).toLowerCase();
         const isUltima = idx === siglasParaCadastrar.length - 1;
 
@@ -427,8 +350,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           Terminal: localVinculo,
           Pista: tipoRelatorio === "CRA" ? ws.pistaPersistida.trim() : "",
           Trecho: tipoRelatorio === "CRA" ? codFormatado : "",
-          "Não Conformidade": isPa ? "" : descSigla,
-          "Ponto de Atenção": isPa ? descSigla : "",
+          "Não Conformidade": isPa ? "" : s,
+          "Ponto de Atenção": isPa ? s : "",
           Foto: targetPhotoName,
           "Foto Anterior": "",
           "Legenda Anterior": "",
@@ -449,7 +372,11 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       });
 
       toast.success(
-        `${isPa ? "Ponto de Atenção" : "Não Conformidade"} (${siglasParaCadastrar.length > 1 ? `${siglasParaCadastrar.length} itens` : baseLimpa}) adicionado(a)!`
+        `${isPa ? "Ponto de Atenção" : "Não Conformidade"} (${
+          siglasParaCadastrar.length > 1
+            ? `${siglasParaCadastrar.length} itens`
+            : baseLimpa
+        }) adicionado(a)!`
       );
       setSiglas([]);
       setCodificacao("");
@@ -458,16 +385,9 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       return;
     }
 
-    let codPadrao = "";
-    if (tipoRelatorio === "CRC") {
-      codPadrao = `CRC.SH015.0646+0648/${ano}.${seqStr}`;
-    } else {
-      codPadrao = `SOCICAM.${ano}.${seqStr}`;
-    }
-
+    const codPadrao = `CRC.SH015.0646+0648/${ano}.${seqStr}`;
     const identFinal = codificacao.trim() || codPadrao;
     const descStr = siglas.join(", ") || identFinal;
-
     const obsFinal = siglas.length
       ? siglas.map((s) => (mapSiglas[s] || s).toLowerCase()).join(", ")
       : descStr;
@@ -477,8 +397,8 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       "ID da Fiscalização": idVinculo,
       "Nº": nextNum,
       Terminal: localVinculo,
-      Pista: tipoRelatorio !== "SOCICAM" ? ws.pistaPersistida.trim() : "",
-      Trecho: tipoRelatorio !== "SOCICAM" ? ws.trechoPersistido.trim() : "",
+      Pista: ws.pistaPersistida.trim(),
+      Trecho: ws.trechoPersistido.trim(),
       "Não Conformidade": isPa ? "" : descStr,
       "Ponto de Atenção": isPa ? descStr : "",
       Foto: targetPhotoName,
@@ -496,9 +416,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
       is_relacionado: false,
     });
 
-    toast.success(
-      `Não Conformidade (${identFinal}) adicionada!`
-    );
+    toast.success(`Não Conformidade (${identFinal}) adicionada!`);
     setSiglas([]);
     setCodificacao("");
     setFund("");
@@ -518,7 +436,7 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           : "Registro de Não Conformidade ou Ponto de Atenção"
       }
     >
-      {/* Topo do Card 03: Seletor de Tipo/Situação + Seletor de ID vinculado */}
+      {/* Topo do Card 03: Seletor de Tipo/Situação */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         {!isMonitoring ? (
           <div className="inline-flex rounded-2xl border border-border bg-secondary/70 p-1.5 shadow-inner">
@@ -529,12 +447,13 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
                   key={t}
                   type="button"
                   onClick={() => setTipo(t)}
-                  className={`flex items-center gap-2.5 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 ${isSelected
+                  className={`flex items-center gap-2.5 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 ${
+                    isSelected
                       ? t === "NC"
                         ? "bg-nc-soft text-nc border border-nc/40 shadow-sm"
                         : "bg-amber-100 text-amber-800 border border-amber-400 shadow-sm"
                       : "text-muted-foreground hover:bg-card hover:text-foreground"
-                    }`}
+                  }`}
                 >
                   {t === "NC" ? (
                     <AlertTriangle className="h-4 w-4" />
@@ -550,67 +469,34 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           </div>
         ) : (
           <div className="inline-flex flex-wrap gap-1.5 rounded-2xl border border-border bg-secondary/70 p-1.5 shadow-inner">
-            {(
-              ["Pendente", "Parcialmente Sanada", "Sanada"] as SituacaoNC[]
-            ).map((sit) => {
-              const isSelected = situacaoMon === sit;
-              return (
-                <button
-                  key={sit}
-                  type="button"
-                  onClick={() => setSituacaoMon(sit)}
-                  className={`rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 ${isSelected
-                      ? sit === "Sanada"
-                        ? "bg-ok-soft text-ok border border-ok/40 shadow-sm"
-                        : sit === "Parcialmente Sanada"
+            {(["Pendente", "Parcialmente Sanada", "Sanada"] as SituacaoNC[]).map(
+              (sit) => {
+                const isSelected = situacaoMon === sit;
+                return (
+                  <button
+                    key={sit}
+                    type="button"
+                    onClick={() => setSituacaoMon(sit)}
+                    className={`rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 ${
+                      isSelected
+                        ? sit === "Sanada"
+                          ? "bg-ok-soft text-ok border border-ok/40 shadow-sm"
+                          : sit === "Parcialmente Sanada"
                           ? "bg-amber-100 text-amber-800 border border-amber-400 shadow-sm"
                           : "bg-nc-soft text-nc border border-nc/40 shadow-sm"
-                      : "text-muted-foreground hover:bg-card hover:text-foreground"
+                        : "text-muted-foreground hover:bg-card hover:text-foreground"
                     }`}
-                >
-                  {sit}
-                </button>
-              );
-            })}
+                  >
+                    {sit}
+                  </button>
+                );
+              }
+            )}
           </div>
         )}
-
-        {ws.fiscalizacoes.length > 1 ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-blue">
-              Vincular ao ID:
-            </span>
-            <select
-              value={activeFiscIdx}
-              onChange={(e) =>
-                setActiveFiscalizacaoIndex(Number(e.target.value))
-              }
-              className="rounded-lg border border-input bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground outline-none transition-all duration-200 hover:border-primary/50 hover:bg-secondary/90 hover:shadow-xs focus:border-ring"
-            >
-              {ws.fiscalizacoes.map((f, idx) => {
-                const destino = f.Cidade?.trim() || f.Local?.trim() || "";
-                return (
-                  <option key={`${f["ID da Fiscalização"]}_${idx}`} value={idx}>
-                    {f["ID da Fiscalização"] || `#${idx + 1}`}
-                    {destino ? ` — ${destino}` : ""}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        ) : activeFisc?.["ID da Fiscalização"] ? (
-          <span className="rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            Vinculado a:{" "}
-            <b className="text-foreground">
-              {activeFisc["ID da Fiscalização"]}
-              {(activeFisc.Cidade?.trim() || activeFisc.Local?.trim()) &&
-                ` — ${activeFisc.Cidade?.trim() || activeFisc.Local?.trim()}`}
-            </b>
-          </span>
-        ) : null}
       </div>
 
-      {/* Carrossel / Comparador Fotográfico + Campos (2 colunas no Modo Compacto) */}
+      {/* Carrossel + Campos */}
       <div
         className={
           dense
@@ -618,7 +504,6 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
             : "mt-8 space-y-8"
         }
       >
-        {/* Coluna Esquerda (Compacto): Apenas Carrossel Fotográfico (define a altura da linha) */}
         <div className={dense ? "xl:col-span-6" : ""}>
           <PhotoCarouselPanel
             selectedNewPhotoName={selectedNewPhotoMon}
@@ -627,566 +512,97 @@ export const RegistroNcForm: React.FC<RegistroNcFormProps> = ({
           />
         </div>
 
-        {/* Coluna Direita (Compacto): Container invisível com altura exatamente igual ao Carrossel */}
         <div className={dense ? "xl:col-span-6 xl:relative" : ""}>
           <div className={dense ? "xl:absolute xl:inset-0 flex flex-col" : "space-y-8"}>
             <div className={dense ? "xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1.5" : ""}>
               {!isMonitoring ? (
-                <div className={dense ? "xl:min-h-full flex flex-col justify-between gap-4" : "space-y-8"}>
-              {/* Localização Rodoviária e Codificação por Concessão (Fiscalização) */}
-              {tipoRelatorio === "CRA" && (
-            <div
-              className={`grid gap-6 sm:grid-cols-2 ${dense ? "" : "lg:grid-cols-4"
-                }`}
-            >
-              <Field label="Pista (persistente)">
-                <input
-                  list="pistas-sugestoes"
-                  className={inputCls}
-                  placeholder="Ex: Sul ou Norte"
-                  value={ws.pistaPersistida}
-                  onChange={(e) => setPistaPersistida(e.target.value)}
-                />
-                <datalist id="pistas-sugestoes">
-                  {PISTAS_SUGESTOES.map((p) => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
-              </Field>
-
-              <Field label="Trecho / Estaca (persistente)">
-                <input
-                  className={inputCls}
-                  placeholder="Ex: PE-009 · KM 24+500"
-                  value={ws.trechoPersistido}
-                  onChange={(e) => setTrechoPersistido(e.target.value)}
-                />
-              </Field>
-
-              <Field label="Direção / Faixa">
-                <div className="grid h-[38px] grid-cols-2 gap-1.5 rounded-lg border border-input bg-secondary/60 p-1">
-                  {DIRECOES_CRA.map((dir) => (
-                    <button
-                      key={dir}
-                      type="button"
-                      onClick={() => setDirecaoFaixa(dir)}
-                      className={`rounded-md text-xs font-semibold transition ${direcaoFaixa === dir
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                        }`}
-                    >
-                      {dir}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              <Field
-                label="Codificação"
-                action={
-                  <button
-                    type="button"
-                    onClick={sugerirCodificacao}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-accent transition"
-                    title="Gerar sugestão de código CRA"
-                  >
-                    <Wand2 className="h-3 w-3" /> Sugerir
-                  </button>
-                }
-              >
-                <input
-                  className={`${inputCls} font-mono text-xs`}
-                  placeholder={`CRA.ST601.2794-2834/${ano}.${seqStr}`}
-                  value={codificacao}
-                  onChange={(e) => setCodificacao(e.target.value)}
-                />
-              </Field>
-            </div>
-          )}
-
-          {tipoRelatorio === "CRC" && (
-            <div className="grid gap-6 sm:grid-cols-3">
-              <Field
-                label="Codificação"
-                action={
-                  <button
-                    type="button"
-                    onClick={sugerirCodificacao}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-accent transition"
-                    title="Gerar sugestão de código CRC"
-                  >
-                    <Wand2 className="h-3 w-3" /> Sugerir
-                  </button>
-                }
-              >
-                <input
-                  className={`${inputCls} font-mono text-xs`}
-                  placeholder={`CRC.SH015.0646+0648/${ano}.${seqStr}`}
-                  value={codificacao}
-                  onChange={(e) => setCodificacao(e.target.value)}
-                />
-              </Field>
-
-              <Field label="Pista (persistente)">
-                <input
-                  list="pistas-sugestoes-crc"
-                  className={inputCls}
-                  placeholder="Ex: Norte / Sul"
-                  value={ws.pistaPersistida}
-                  onChange={(e) => setPistaPersistida(e.target.value)}
-                />
-                <datalist id="pistas-sugestoes-crc">
-                  {PISTAS_SUGESTOES.map((p) => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
-              </Field>
-
-              <Field label="Trecho / KM (persistente)">
-                <input
-                  className={inputCls}
-                  placeholder="Ex: PE-024 · KM 04+200"
-                  value={ws.trechoPersistido}
-                  onChange={(e) => setTrechoPersistido(e.target.value)}
-                />
-              </Field>
-            </div>
-          )}
-              {/* Seleção de Siglas / Irregularidades */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-blue">
-                    {tipoRelatorio === "SOCICAM"
-                      ? "Irregularidades do Terminal (SOCICAM)"
-                      : `Patologias / Irregularidades (siglas ${tipoRelatorio})`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onOpenCustomNcModal((novaSigla) =>
-                        setSiglas((prev) =>
-                          prev.includes(novaSigla) ? prev : [...prev, novaSigla]
-                        )
+                <FiscalizacaoNcFields
+                  tipoRelatorio={tipoRelatorio}
+                  dense={dense}
+                  ano={ano}
+                  seqStr={seqStr}
+                  pistaPersistida={ws.pistaPersistida}
+                  trechoPersistido={ws.trechoPersistido}
+                  direcaoFaixa={direcaoFaixa}
+                  codificacao={codificacao}
+                  siglas={siglas}
+                  optionsNc={optionsNc}
+                  mapSiglas={mapSiglas}
+                  fund={fund}
+                  det={det}
+                  contratoPadrao={contratosPadrao[tipoRelatorio]}
+                  themePrimary={theme.primary}
+                  onChangePista={setPistaPersistida}
+                  onChangeTrecho={setTrechoPersistido}
+                  onChangeDirecao={setDirecaoFaixa}
+                  onChangeCodificacao={setCodificacao}
+                  onSugerirCodificacao={sugerirCodificacao}
+                  onToggleSigla={(s) =>
+                    setSiglas((x) =>
+                      x.includes(s) ? x.filter((y) => y !== s) : [...x, s]
+                    )
+                  }
+                  onOpenCustomNcModal={() =>
+                    onOpenCustomNcModal((novaSigla) =>
+                      setSiglas((prev) =>
+                        prev.includes(novaSigla) ? prev : [...prev, novaSigla]
                       )
-                    }
-                    className="text-[11px] font-medium text-muted-foreground hover:text-accent transition"
-                  >
-                    + Personalizar siglas
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {optionsNc.map((s) => {
-                    const d = mapSiglas[s] || s;
-                    const isSelected = siglas.includes(s);
-                    return (
-                      <button
-                        type="button"
-                        key={s}
-                        title={d}
-                        className={pill(isSelected)}
-                        style={
-                          isSelected
-                            ? {
-                              backgroundColor: theme.primary,
-                              borderColor: theme.primary,
-                            }
-                            : undefined
-                        }
-                        onClick={() =>
-                          setSiglas((x) =>
-                            x.includes(s)
-                              ? x.filter((y) => y !== s)
-                              : [...x, s]
-                          )
-                        }
-                      >
-                        {s}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {siglas.length > 0 && (
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">
-                      Selecionada(s):
-                    </span>
-                    {siglas.map((s) => (
-                      <span
-                        key={s}
-                        className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-secondary/60 px-2 py-0.5 font-mono text-[11px] text-foreground"
-                        title={mapSiglas[s] || s}
-                      >
-                        <b style={{ color: theme.primary }}>{s}</b>
-                        {mapSiglas[s] && mapSiglas[s] !== s && (
-                          <span className="font-sans text-muted-foreground">
-                            · {mapSiglas[s]}
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {tipoRelatorio === "SOCICAM" && (
-                <Field
-                  label="Codificação / Identificação (opcional)"
-                  action={
-                    <button
-                      type="button"
-                      onClick={sugerirCodificacao}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-accent transition"
-                    >
-                      <Wand2 className="h-3 w-3" /> Sugerir
-                    </button>
+                    )
                   }
-                >
-                  <input
-                    className={`${inputCls} font-mono text-xs`}
-                    placeholder="Deixe em branco para usar a irregularidade selecionada"
-                    value={codificacao}
-                    onChange={(e) => setCodificacao(e.target.value)}
-                  />
-                </Field>
-              )}
-
-
-              <div className={`grid sm:grid-cols-2 ${dense ? "gap-4 xl:flex-1" : "gap-6"}`}>
-                <Field label="Fundamento da Infração" className={dense ? "xl:flex xl:flex-col xl:h-full" : ""}>
-                  <textarea
-                    rows={2}
-                    className={`${inputCls} ${dense ? "xl:flex-1 xl:min-h-[76px]" : ""}`}
-                    placeholder={`Enquadramento contratual (${contratosPadrao[tipoRelatorio]})`}
-                    value={fund}
-                    onChange={(e) => setFund(e.target.value)}
-                  />
-                </Field>
-                <Field label="Determinação / Prazo" className={dense ? "xl:flex xl:flex-col xl:h-full" : ""}>
-                  <textarea
-                    rows={2}
-                    className={`${inputCls} ${dense ? "xl:flex-1 xl:min-h-[76px]" : ""}`}
-                    placeholder="Determinação e prazo para saneamento"
-                    value={det}
-                    onChange={(e) => setDet(e.target.value)}
-                  />
-                </Field>
-              </div>
-            </div>
-          ) : (
-            /* MODO MONITORAMENTO */
-            <div className={dense ? "xl:min-h-full flex flex-col justify-between gap-4" : "space-y-8"}>
-              {/* Caso não haja documento anterior carregado, permite informar identificação manual */}
-              {ws.oldPhotosToMatch.length === 0 && (
-                <div
-                  className={`grid gap-6 ${tipoRelatorio === "CRA"
-                      ? "sm:grid-cols-4"
-                      : tipoRelatorio === "CRC"
-                        ? "sm:grid-cols-3"
-                        : "sm:grid-cols-1"
-                    }`}
-                >
-                  <Field label="Codificação / NC Anterior">
-                    <input
-                      className={`${inputCls} font-mono text-xs`}
-                      placeholder={
-                        tipoRelatorio === "SOCICAM"
-                          ? "Ex: Vidraças quebradas na plataforma"
-                          : `Ex: ${tipoRelatorio}.ST601.2794-2834/2025.001`
-                      }
-                      value={codificacao}
-                      onChange={(e) => setCodificacao(e.target.value)}
-                    />
-                  </Field>
-
-                  {tipoRelatorio !== "SOCICAM" && (
-                    <>
-                      <Field label="Pista">
-                        <input
-                          className={inputCls}
-                          placeholder="Sul / Norte"
-                          value={ws.pistaPersistida}
-                          onChange={(e) => setPistaPersistida(e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Trecho">
-                        <input
-                          className={inputCls}
-                          placeholder="KM / Estaca"
-                          value={ws.trechoPersistido}
-                          onChange={(e) => setTrechoPersistido(e.target.value)}
-                        />
-                      </Field>
-                    </>
-                  )}
-
-                  {tipoRelatorio === "CRA" && (
-                    <Field label="Direção / Faixa">
-                      <div className="grid h-[38px] grid-cols-2 gap-1.5 rounded-lg border border-input bg-secondary/60 p-1">
-                        {DIRECOES_CRA.map((dir) => (
-                          <button
-                            key={dir}
-                            type="button"
-                            onClick={() => setDirecaoFaixa(dir)}
-                            className={`rounded-md text-xs font-semibold transition ${direcaoFaixa === dir
-                                ? "bg-primary text-primary-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground"
-                              }`}
-                          >
-                            {dir}
-                          </button>
-                        ))}
-                      </div>
-                    </Field>
-                  )}
-                </div>
-              )}
-
-              <Field label="Legenda da Foto Atual">
-                <input
-                  className={inputCls}
-                  placeholder="Descrição exibida abaixo da foto atual no relatório..."
-                  value={legendaFotoMon}
-                  onChange={(e) => setLegendaFotoMon(e.target.value)}
+                  onChangeFund={setFund}
+                  onChangeDet={setDet}
                 />
-              </Field>
-
-              <div className={`grid grid-cols-1 ${dense ? "gap-4 xl:flex xl:flex-1 xl:flex-col" : "gap-6"}`}>
-                <Field
-                  label={
-                    tipoRelatorio === "SOCICAM"
-                      ? "Informação SOCICAM *"
-                      : `Posicionamento ${tipoRelatorio} *`
-                  }
-                  className={dense ? "xl:flex xl:flex-col xl:flex-1" : ""}
-                >
-                  <textarea
-                    rows={3}
-                    className={`${inputCls} ${dense ? "xl:flex-1 xl:min-h-[68px]" : ""}`}
-                    placeholder="Manifestação informada pela concessionária"
-                    value={posConcessionariaMon}
-                    onChange={(e) => setPosConcessionariaMon(e.target.value)}
-                  />
-                </Field>
-                <Field label="Constatação em Campo *" className={dense ? "xl:flex xl:flex-col xl:flex-1" : ""}>
-                  <textarea
-                    rows={3}
-                    className={`${inputCls} ${dense ? "xl:flex-1 xl:min-h-[68px]" : ""}`}
-                    placeholder="Situação verificada pela equipe técnica da ARPE"
-                    value={constatacaoMon}
-                    onChange={(e) => setConstatacaoMon(e.target.value)}
-                  />
-                </Field>
-                <Field label="Análise ARPE *" className={dense ? "xl:flex xl:flex-col xl:flex-1" : ""}>
-                  <textarea
-                    rows={3}
-                    className={`${inputCls} ${dense ? "xl:flex-1 xl:min-h-[68px]" : ""}`}
-                    placeholder="Conclusão regulatória sobre o saneamento"
-                    value={analiseArpeMon}
-                    onChange={(e) => setAnaliseArpeMon(e.target.value)}
-                  />
-                </Field>
-              </div>
-            </div>
-          )}
+              ) : (
+                <MonitoramentoNcFields
+                  tipoRelatorio={tipoRelatorio}
+                  dense={dense}
+                  hasOldPhotos={ws.oldPhotosToMatch.length > 0}
+                  codificacao={codificacao}
+                  pistaPersistida={ws.pistaPersistida}
+                  trechoPersistido={ws.trechoPersistido}
+                  direcaoFaixa={direcaoFaixa}
+                  legendaFotoMon={legendaFotoMon}
+                  posConcessionariaMon={posConcessionariaMon}
+                  constatacaoMon={constatacaoMon}
+                  analiseArpeMon={analiseArpeMon}
+                  onChangeCodificacao={setCodificacao}
+                  onChangePista={setPistaPersistida}
+                  onChangeTrecho={setTrechoPersistido}
+                  onChangeDirecao={setDirecaoFaixa}
+                  onChangeLegenda={setLegendaFotoMon}
+                  onChangePosConcessionaria={setPosConcessionariaMon}
+                  onChangeConstatacao={setConstatacaoMon}
+                  onChangeAnaliseArpe={setAnaliseArpeMon}
+                />
+              )}
             </div>
 
-        {/* Botões de Ação: Adicionar + Janela de Relacionar Foto */}
-        <div className={dense ? "shrink-0 pt-4" : ""}>
-          <div className={dense ? "flex flex-wrap gap-3" : "mt-8 flex flex-wrap gap-3"}>
-          <button
-            type="button"
-            className="group relative inline-flex items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-amber-500/20 transition-all duration-150 hover:brightness-105 hover:shadow-lg hover:shadow-amber-500/30 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none flex-1"
-            disabled={!activePhoto || isFotoBloqueada}
-            onClick={addReg}
-          >
-            <div className="flex items-center gap-2.5">
-              <Plus className="h-4 w-4 stroke-[2.5]" />
-              <span>
-                {registroExistenteComFoto
-                  ? `Foto atual já cadastrada no Item #${registroExistenteComFoto["Nº"]}`
-                  : registroExistenteComFotoAnterior
-                    ? `Foto anterior já registrada no Item #${registroExistenteComFotoAnterior["Nº"]}`
-                    : isMonitoring
-                      ? "Salvar Auditoria no Relatório"
-                      : "Adicionar Registro ao Relatório"}
-              </span>
-            </div>
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/20 text-white transition-transform duration-200 group-hover:scale-110">
-              <ChevronRight className="h-4 w-4 stroke-[2.5]" />
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className={`${btn.secondary} py-3.5 px-5`}
-            disabled={!podeRelacionar || Boolean(registroExistenteComFoto)}
-            title={
-              registroExistenteComFoto
-                ? `Esta foto já possui cadastro próprio (Item #${registroExistenteComFoto["Nº"]}) e não pode ser relacionada como 2ª foto`
-                : podeRelacionar
-                  ? "Abrir janela para vincular uma 2ª foto a uma ocorrência já registrada (máx. 2 fotos por NC)"
-                  : "Cadastre ao menos uma ocorrência e envie fotos para habilitar o relacionamento"
-            }
-            onClick={() =>
-              onOpenRelacionarModal(
-                (isMonitoring ? selectedNewPhotoMon : activePhoto?.name) ||
-                activePhoto?.name
-              )
-            }
-          >
-            <Link2 className="h-4 w-4" /> Relacionar Foto...
-          </button>
-        </div>
-
-        {isFotoBloqueada && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-xs text-amber-950 shadow-xs animate-in fade-in duration-200">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white font-bold text-xs shadow-xs">
-                ✓
-              </div>
-              <div className="min-w-0">
-                <span className="font-bold">Foto bloqueada para novo cadastro: </span>
-                <span>
-                  Esta imagem já está vinculada ao <b>Item #{registroExistenteComFoto?.["Nº"]}</b> ({registroExistenteComFoto?.Identificação || "—"}).
-                </span>
-                <p className="text-[11px] text-amber-800 mt-0.5">
-                  Avance para outra foto no bloco 2 ou gerencie a ocorrência no Sumário abaixo se desejar alterá-la.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!activePhoto && (
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            Envie ao menos uma foto no bloco 02 para habilitar o registro.
-          </p>
-        )}
-
-        {currentFiscRegs.length === 0 && (
-          <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300/80 bg-amber-50/50 p-3 text-xs text-amber-900">
-            <Sparkles className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-            <span>Cadastre a primeira ocorrência para desbloquear o painel de emissão e exportação.</span>
-          </div>
-        )}
+            <RegistroActionFooter
+              dense={dense}
+              isMonitoring={isMonitoring}
+              hasActivePhoto={Boolean(activePhoto)}
+              isFotoBloqueada={isFotoBloqueada}
+              registroExistenteComFoto={registroExistenteComFoto}
+              registroExistenteComFotoAnterior={registroExistenteComFotoAnterior}
+              podeRelacionar={podeRelacionar}
+              currentFiscRegs={currentFiscRegs}
+              isRegistrosExpanded={isRegistrosExpanded}
+              themePrimary={theme.primary}
+              themeLightBg={theme.lightBg}
+              themeLightBorder={theme.lightBorder}
+              onAddReg={addReg}
+              onOpenRelacionar={() =>
+                onOpenRelacionarModal(
+                  (isMonitoring ? selectedNewPhotoMon : activePhoto?.name) ||
+                    activePhoto?.name
+                )
+              }
+              onToggleExpanded={() => setIsRegistrosExpanded((prev) => !prev)}
+              onOpenEditModal={onOpenEditModal}
+            />
           </div>
         </div>
       </div>
-    </div>
-
-      {/* Trigger do Sumário Retrátil que Abre para Baixo (Accordion) */ }
-  {
-    (() => {
-      const baseRegs = currentFiscRegs.filter((r) => !r.is_relacionado);
-      const sanadasCount = baseRegs.filter((r) => r.Situação === "Sanada").length;
-      const pendentesCount = baseRegs.filter((r) => !r.Situação || r.Situação === "Pendente").length;
-
-      return (
-        <div className="mt-5 border-t border-slate-200/90 pt-4">
-          <div className="overflow-hidden rounded-2xl border border-slate-300/90 bg-white shadow-md shadow-slate-900/5 transition-all duration-200">
-            <button
-              type="button"
-              onClick={() => setIsRegistrosExpanded((prev) => !prev)}
-              className={`group relative flex w-full items-center justify-between gap-4 p-4 text-left transition-colors duration-150 hover:bg-slate-50/80 ${isRegistrosExpanded
-                  ? "border-b border-slate-200 bg-white"
-                  : "bg-white"
-                }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-xs transition-transform duration-200 group-hover:scale-105"
-                  style={{
-                    backgroundColor: theme.lightBg,
-                    borderColor: theme.lightBorder,
-                    color: theme.primary,
-                  }}
-                >
-                  <Table2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900">
-                      {isMonitoring
-                        ? "Sumário de Auditoria e Ocorrências"
-                        : "Sumário de Registros Cadastrados"}
-                    </span>
-                    <span
-                      className="rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold shadow-xs"
-                      style={{
-                        backgroundColor: theme.lightBg,
-                        borderColor: theme.lightBorder,
-                        color: theme.primary,
-                      }}
-                    >
-                      {baseRegs.length} {baseRegs.length === 1 ? "achado" : "achados"}
-                    </span>
-                    {isMonitoring && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 font-semibold text-[#008763] bg-[#e6fbf4] border border-[#a7f3d0] px-2 py-0.5 rounded-full text-[10px]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#008763]" />
-                          {sanadasCount} saneada(s)
-                        </span>
-                        <span className="inline-flex items-center gap-1 font-semibold text-[#b45309] bg-[#fffbeb] border border-[#fde68a] px-2 py-0.5 rounded-full text-[10px]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#b45309]" />
-                          {pendentesCount} pendente(s)
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {isMonitoring
-                      ? `Clique para ${isRegistrosExpanded ? "recolher" : "abrir e gerenciar"} a tabela completa de ocorrências`
-                      : `Total de ${currentFiscRegs.length} foto(s) e ocorrências consolidadas neste relatório`}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                {currentFiscRegs.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenEditModal?.("nc");
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400 active:scale-[0.98] transition-all"
-                    title="Editar todas as ocorrências em lote"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" style={{ color: theme.primary }} />
-                    <span className="hidden sm:inline">Editar em Lote</span>
-                  </button>
-                )}
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 group-hover:text-slate-900 transition-colors">
-                  <span className="hidden md:inline">
-                    {isRegistrosExpanded ? "Recolher Sumário" : "Expandir Sumário"}
-                  </span>
-                  <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-transform duration-300 ${isRegistrosExpanded ? "rotate-180" : "rotate-0"
-                      }`}
-                  >
-                    <ChevronDown className="h-4 w-4 stroke-[2.5]" />
-                  </span>
-                </div>
-              </div>
-            </button>
-
-            {/* Painel acoplado diretamente com animação fluida de abertura (CSS Grid) */}
-            <div
-              className={`grid transition-all duration-300 ease-in-out ${isRegistrosExpanded
-                  ? "grid-rows-[1fr] opacity-100"
-                  : "grid-rows-[0fr] opacity-0 pointer-events-none"
-                }`}
-            >
-              <div className="overflow-hidden">
-                <RegistrosCadastradosPanel onOpenEditModal={onOpenEditModal || (() => { })} />
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    })()
-  }
-    </Card >
+    </Card>
   );
 };

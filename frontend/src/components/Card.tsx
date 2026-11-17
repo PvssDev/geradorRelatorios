@@ -27,10 +27,10 @@ export const Card: React.FC<CardProps> = ({
   return (
     <section
       id={`b${n}`}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-[#d2e2f3] bg-white shadow-sm scroll-mt-28 ${
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-[#d2e2f3] bg-white shadow-[0_12px_32px_-8px_rgba(7,29,54,0.18)] scroll-mt-28 ${
         isPerf
           ? ""
-          : "transition-all duration-300 ease-out hover:shadow-xl hover:shadow-[#071d36]/10 hover:border-slate-300 hover:-translate-y-0.5"
+          : "transition-all duration-300 ease-out hover:shadow-[0_20px_42px_-10px_rgba(7,29,54,0.26)] hover:border-slate-300 hover:-translate-y-0.5"
       } ${className}`}
     >
       <h2 className="flex shrink-0 items-center gap-3 bg-[#071d36] px-6 py-4 text-base font-bold text-white">
