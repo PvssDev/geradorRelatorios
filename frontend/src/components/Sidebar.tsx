@@ -189,10 +189,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         dirHandle,
         tipoRelatorio,
         categoriaRelatorio,
-        ws
+        ws,
+        useReportStore.getState().monitoringNewPhotoName
       );
       setPastaLocalStatus(true, dirHandle.name);
-      const extras = [`${res.totalFotos} fotos`, `${res.totalNcs} ocorrências`];
+      const extras = [
+        `${res.totalSessoes} relatório(s)`,
+        `${res.totalFotos} fotos`,
+        `${res.totalNcs} ocorrências`,
+      ];
       if (res.totalArquivos > 0) extras.push(`${res.totalArquivos} anexo(s)`);
       toast.success(
         `Estado salvo com sucesso em ${dirHandle.name}! (${extras.join(", ")})`

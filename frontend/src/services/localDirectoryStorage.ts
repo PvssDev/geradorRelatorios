@@ -23,11 +23,17 @@
 import {
   CategoriaRelatorio,
   FiscalizacaoItem,
+  MonitoramentoAnteriorItem,
+  MonitoramentoAnteriorMeta,
   RegistroNcItem,
   TipoRelatorio,
   UploadedPhotoItem,
 } from "../types/report.types";
-import { ModalityWorkspaceState } from "../store/useReportStore";
+import {
+  extractActiveSessionSnapshot,
+  InspectionSessionSnapshot,
+  ModalityWorkspaceState,
+} from "../store/useReportStore";
 
 export class PastaNaoEncontradaError extends Error {
   constructor(message: string) {
@@ -213,92 +219,79 @@ export async function solicitarPastaGeradorBD(
   return targetHandle;
 }
 
-/**
- * Salva o estado atual, fotos e arquivos anexos na estrutura padronizada da modalidade:
- * geradorBD/<modalidade>/estado/estado.json
- * geradorBD/<modalidade>/midia/fotos/
- * geradorBD/<modalidade>/midia/arquivos/
- * 
- * Reconciliação (Pruning):
- * - Fotos e arquivos removidos na UI são DELETADOS fisicamente do disco rígido.
- */
-export async function salvarEstadoEmGeradorBD(
-  dirHandle: FileSystemDirectoryHandle,
+function sanitizarNomePastaId(id: string): string {
+  const clean = (id || "").trim().replace(/[/\\:*?"<>|]/g, "_");
+  return clean || "SEM_ID";
+}
+
+interface SessionSaveEntry {
+  id: string;
+  pasta: string;
+  header: FiscalizacaoItem | null;
+  snapshot: InspectionSessionSnapshot;
+}
+
+async function salvarSessaoEmPasta(
+  sessionDirHandle: FileSystemDirectoryHandle,
   tipo: TipoRelatorio,
   categoria: CategoriaRelatorio,
-  workspace: ModalityWorkspaceState
-): Promise<{ totalFotos: number; totalNcs: number; totalArquivos: number }> {
-  const pastaModalidadeNome = obterPastaModalidade(tipo, categoria);
-
-  // 1. Cria ou acessa a pasta da modalidade (ex: cra_fiscalizacao)
-  const modHandle = await dirHandle.getDirectoryHandle(pastaModalidadeNome, {
-    create: true,
-  });
-
-  // 2. Cria subpastas: estado/ e midia/ (fotos/ e arquivos/)
-  const estadoHandle = await modHandle.getDirectoryHandle("estado", { create: true });
-  const midiaHandle = await modHandle.getDirectoryHandle("midia", { create: true });
+  pastaModalidadeNome: string,
+  entry: SessionSaveEntry
+): Promise<{ fotos: number; ncs: number; arquivos: number }> {
+  const estadoHandle = await sessionDirHandle.getDirectoryHandle("estado", { create: true });
+  const midiaHandle = await sessionDirHandle.getDirectoryHandle("midia", { create: true });
   const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", { create: true });
   const arquivosHandle = await midiaHandle.getDirectoryHandle("arquivos", { create: true });
 
-  // --------------------------------------------------------------------------
-  // RECONCILIAÇÃO DE ARQUIVOS ANEXOS (Exclui órfãos do disco)
-  // --------------------------------------------------------------------------
-  const nomesArquivosAtivos = new Set<string>();
-  if (workspace.documentoAnteriorFile) {
-    nomesArquivosAtivos.add(workspace.documentoAnteriorFile.name);
-  }
-  if (workspace.planilhaElegibilidadeFile) {
-    nomesArquivosAtivos.add(workspace.planilhaElegibilidadeFile.name);
-  }
+  const { snapshot } = entry;
 
+  // Pruning de anexos órfãos
+  const nomesArquivosAtivos = new Set<string>();
+  if (snapshot.documentoAnteriorFile) nomesArquivosAtivos.add(snapshot.documentoAnteriorFile.name);
+  if (snapshot.planilhaElegibilidadeFile) {
+    nomesArquivosAtivos.add(snapshot.planilhaElegibilidadeFile.name);
+  }
   try {
-    for await (const [nome, entry] of (arquivosHandle as any).entries()) {
-      if (entry.kind === "file" && !nomesArquivosAtivos.has(nome)) {
+    for await (const [nome, item] of (arquivosHandle as any).entries()) {
+      if (item.kind === "file" && !nomesArquivosAtivos.has(nome)) {
         try {
           await (arquivosHandle as any).removeEntry(nome);
-        } catch (errRemArq) {
-          console.warn(`Aviso ao remover anexo órfão ${nome}:`, errRemArq);
+        } catch {
+          // ignora erro pontual de remoção
         }
       }
     }
-  } catch (errScanArq) {
-    console.warn("Aviso ao escanear anexos:", errScanArq);
+  } catch {
+    // ignora erro de varredura
   }
 
-  // --------------------------------------------------------------------------
-  // RECONCILIAÇÃO DE FOTOS (Exclui fotos apagadas da UI do disco)
-  // --------------------------------------------------------------------------
-  const nomesFotosAtivas = new Set(workspace.photos.map((p) => p.name));
-
+  // Pruning de fotos órfãs
+  const nomesFotosAtivas = new Set(snapshot.photos.map((p) => p.name));
   try {
-    for await (const [nome, entry] of (fotosHandle as any).entries()) {
-      if (entry.kind === "file" && !nomesFotosAtivas.has(nome)) {
+    for await (const [nome, item] of (fotosHandle as any).entries()) {
+      if (item.kind === "file" && !nomesFotosAtivas.has(nome)) {
         try {
           await (fotosHandle as any).removeEntry(nome);
-        } catch (errRemFoto) {
-          console.warn(`Aviso ao remover foto órfã ${nome}:`, errRemFoto);
+        } catch {
+          // ignora erro pontual de remoção
         }
       }
     }
-  } catch (errScanFoto) {
-    console.warn("Aviso ao escanear fotos:", errScanFoto);
+  } catch {
+    // ignora erro de varredura
   }
 
-  // --------------------------------------------------------------------------
-  // GRAVAÇÃO DOS ARQUIVOS ATIVOS
-  // --------------------------------------------------------------------------
+  // Grava arquivos anexos ativos
   let totalArquivosSalvos = 0;
   const metaArquivos: Array<{ slot: string; nome: string; size: number; type: string }> = [];
 
-  // Salva Documento Anterior (se houver)
-  if (workspace.documentoAnteriorFile) {
+  if (snapshot.documentoAnteriorFile) {
     try {
-      const docFile = workspace.documentoAnteriorFile;
-      const fileHandle = await arquivosHandle.getFileHandle(docFile.name, { create: true });
-      const writable = await (fileHandle as any).createWritable();
-      await writable.write(docFile);
-      await writable.close();
+      const docFile = snapshot.documentoAnteriorFile;
+      const fh = await arquivosHandle.getFileHandle(docFile.name, { create: true });
+      const wr = await (fh as any).createWritable();
+      await wr.write(docFile);
+      await wr.close();
       totalArquivosSalvos++;
       metaArquivos.push({
         slot: "documentoAnterior",
@@ -306,19 +299,18 @@ export async function salvarEstadoEmGeradorBD(
         size: docFile.size,
         type: docFile.type,
       });
-    } catch (errDoc) {
-      console.warn("Erro ao salvar documento anterior:", errDoc);
+    } catch (err) {
+      console.warn("Erro ao salvar documento anterior:", err);
     }
   }
 
-  // Salva Planilha de Elegibilidade (se houver)
-  if (workspace.planilhaElegibilidadeFile) {
+  if (snapshot.planilhaElegibilidadeFile) {
     try {
-      const planFile = workspace.planilhaElegibilidadeFile;
-      const fileHandle = await arquivosHandle.getFileHandle(planFile.name, { create: true });
-      const writable = await (fileHandle as any).createWritable();
-      await writable.write(planFile);
-      await writable.close();
+      const planFile = snapshot.planilhaElegibilidadeFile;
+      const fh = await arquivosHandle.getFileHandle(planFile.name, { create: true });
+      const wr = await (fh as any).createWritable();
+      await wr.write(planFile);
+      await wr.close();
       totalArquivosSalvos++;
       metaArquivos.push({
         slot: "planilhaElegibilidade",
@@ -326,13 +318,13 @@ export async function salvarEstadoEmGeradorBD(
         size: planFile.size,
         type: planFile.type,
       });
-    } catch (errPlan) {
-      console.warn("Erro ao salvar planilha de elegibilidade:", errPlan);
+    } catch (err) {
+      console.warn("Erro ao salvar planilha de elegibilidade:", err);
     }
   }
 
-  // Salva fotos ativas em midia/fotos/
-  for (const photo of workspace.photos) {
+  // Grava fotos ativas
+  for (const photo of snapshot.photos) {
     try {
       let blob: Blob | null = null;
       if (photo.file) {
@@ -341,34 +333,35 @@ export async function salvarEstadoEmGeradorBD(
         const res = await fetch(photo.previewUrl);
         blob = await res.blob();
       }
-
       if (blob) {
-        const photoFileHandle = await fotosHandle.getFileHandle(photo.name, {
-          create: true,
-        });
-        const photoWritable = await (photoFileHandle as any).createWritable();
-        await photoWritable.write(blob);
-        await photoWritable.close();
+        const fh = await fotosHandle.getFileHandle(photo.name, { create: true });
+        const wr = await (fh as any).createWritable();
+        await wr.write(blob);
+        await wr.close();
       }
-    } catch (errFoto) {
-      console.warn(`Aviso ao gravar foto local ${photo.name}:`, errFoto);
+    } catch (err) {
+      console.warn(`Aviso ao gravar foto local ${photo.name}:`, err);
     }
   }
 
-  // 3. Monta o payload completo e salva em estado/estado.json
   const payload = {
+    versao: 2,
     tipo_relatorio: tipo,
     categoria_relatorio: categoria,
     modalidade: pastaModalidadeNome,
+    id_sessao: entry.id,
     salvo_em: new Date().toISOString(),
-    temp_fiscalizacoes: workspace.fiscalizacoes,
-    temp_nc: workspace.registrosNc,
-    pista_persistida: workspace.pistaPersistida,
-    trecho_persistido: workspace.trechoPersistido,
-    sort_option: workspace.sortOption,
-    carousel_index: workspace.carouselIndex,
+    cabecalho: entry.header,
+    temp_nc: snapshot.registrosNc,
+    pista_persistida: snapshot.pistaPersistida,
+    trecho_persistido: snapshot.trechoPersistido,
+    sort_option: snapshot.sortOption,
+    carousel_index: snapshot.carouselIndex,
+    monitoring_new_photo_name: snapshot.monitoringNewPhotoName,
+    documento_anterior_meta: snapshot.documentoAnteriorMeta,
+    old_photos_to_match: snapshot.oldPhotosToMatch,
     meta_arquivos: metaArquivos,
-    meta_fotos: workspace.photos.map((p) => ({
+    meta_fotos: snapshot.photos.map((p) => ({
       id: p.id,
       name: p.name,
       uploadOrder: p.uploadOrder,
@@ -382,23 +375,260 @@ export async function salvarEstadoEmGeradorBD(
   await writableStream.write(JSON.stringify(payload, null, 2));
   await writableStream.close();
 
-  await salvarHandleIndexedDB(dirHandle);
-
   return {
-    totalFotos: workspace.photos.length,
-    totalNcs: workspace.registrosNc.length,
-    totalArquivos: totalArquivosSalvos,
+    fotos: snapshot.photos.length,
+    ncs: snapshot.registrosNc.length,
+    arquivos: totalArquivosSalvos,
   };
 }
 
 /**
- * Carrega o estado, fotos e arquivos da modalidade a partir da estrutura padronizada:
- * geradorBD/<modalidade>/estado/estado.json
- * geradorBD/<modalidade>/midia/fotos/
- * geradorBD/<modalidade>/midia/arquivos/
- * 
- * Reconciliação na leitura:
- * - Restaura estritamente as fotos e arquivos declarados em estado.json.
+ * Salva todos os IDs (Fiscalizações ou Monitoramentos) na nova estrutura hierárquica:
+ * geradorBD/<modalidade>/index.json
+ * geradorBD/<modalidade>/<id_sanitizado>/estado/estado.json
+ * geradorBD/<modalidade>/<id_sanitizado>/midia/{fotos,arquivos}
+ */
+export async function salvarEstadoEmGeradorBD(
+  dirHandle: FileSystemDirectoryHandle,
+  tipo: TipoRelatorio,
+  categoria: CategoriaRelatorio,
+  workspace: ModalityWorkspaceState,
+  monitoringNewPhotoName = ""
+): Promise<{ totalSessoes: number; totalFotos: number; totalNcs: number; totalArquivos: number }> {
+  const pastaModalidadeNome = obterPastaModalidade(tipo, categoria);
+  const modHandle = await dirHandle.getDirectoryHandle(pastaModalidadeNome, {
+    create: true,
+  });
+
+  // Monta mapa completo de sessões (sincronizando a sessão ativa atual)
+  const activeFisc = workspace.fiscalizacoes[workspace.activeFiscalizacaoIndex];
+  const activeId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
+  const activeSnapshot = extractActiveSessionSnapshot(workspace, monitoringNewPhotoName);
+
+  const sessionsMap: Record<string, InspectionSessionSnapshot> = {
+    ...(workspace.sessionsById || {}),
+  };
+  if (activeId) {
+    sessionsMap[activeId] = activeSnapshot;
+  }
+
+  const entries: SessionSaveEntry[] = [];
+  const usedFolders = new Set<string>();
+
+  const buildUniqueFolder = (id: string) => {
+    const base = sanitizarNomePastaId(id);
+    let folder = base;
+    let n = 1;
+    while (usedFolders.has(folder.toLowerCase())) {
+      folder = `${base}(${n++})`;
+    }
+    usedFolders.add(folder.toLowerCase());
+    return folder;
+  };
+
+  if (workspace.fiscalizacoes.length > 0) {
+    for (let i = 0; i < workspace.fiscalizacoes.length; i++) {
+      const f = workspace.fiscalizacoes[i];
+      const fid = f["ID da Fiscalização"]?.trim() || `SEM_ID_${i + 1}`;
+      const snap =
+        (i === workspace.activeFiscalizacaoIndex ? activeSnapshot : sessionsMap[fid]) || {
+          registrosNc: [],
+          photos: [],
+          sortOption: "Nome (A-Z / 0-9)",
+          carouselIndex: 0,
+          monitoringNewPhotoName: "",
+          pistaPersistida: "",
+          trechoPersistido: "",
+          documentoAnteriorFile: null,
+          documentoAnteriorMeta: null,
+          planilhaElegibilidadeFile: null,
+          oldPhotosToMatch: [],
+          relatoriosGerados: [],
+        };
+      entries.push({
+        id: fid,
+        pasta: buildUniqueFolder(fid),
+        header: f,
+        snapshot: snap,
+      });
+    }
+  } else if (
+    activeSnapshot.photos.length > 0 ||
+    activeSnapshot.registrosNc.length > 0 ||
+    activeSnapshot.documentoAnteriorFile ||
+    activeSnapshot.planilhaElegibilidadeFile
+  ) {
+    entries.push({
+      id: "RASCUNHO",
+      pasta: buildUniqueFolder("RASCUNHO"),
+      header: null,
+      snapshot: activeSnapshot,
+    });
+  }
+
+  // Pruning de pastas antigas / excluídas e pastas legadas raiz (estado/ e midia/)
+  const activeFolderNames = new Set(entries.map((e) => e.pasta));
+  try {
+    for await (const [nome, item] of (modHandle as any).entries()) {
+      if (item.kind === "directory" && !activeFolderNames.has(nome)) {
+        try {
+          await (modHandle as any).removeEntry(nome, { recursive: true });
+        } catch (errRem) {
+          console.warn(`Aviso ao remover pasta antiga ${nome}:`, errRem);
+        }
+      }
+    }
+  } catch (errScan) {
+    console.warn("Aviso ao limpar subpastas da modalidade:", errScan);
+  }
+
+  let totalFotos = 0;
+  let totalNcs = 0;
+  let totalArquivos = 0;
+
+  for (const entry of entries) {
+    const sessDirHandle = await modHandle.getDirectoryHandle(entry.pasta, { create: true });
+    const res = await salvarSessaoEmPasta(
+      sessDirHandle,
+      tipo,
+      categoria,
+      pastaModalidadeNome,
+      entry
+    );
+    totalFotos += res.fotos;
+    totalNcs += res.ncs;
+    totalArquivos += res.arquivos;
+  }
+
+  // Grava index.json na raiz da modalidade
+  const indexPayload = {
+    versao: 2,
+    tipo_relatorio: tipo,
+    categoria_relatorio: categoria,
+    modalidade: pastaModalidadeNome,
+    salvo_em: new Date().toISOString(),
+    active_fiscalizacao_index: workspace.activeFiscalizacaoIndex,
+    sessoes: entries.map((e) => ({ id: e.id, pasta: e.pasta })),
+  };
+  const indexHandle = await modHandle.getFileHandle("index.json", { create: true });
+  const indexStream = await (indexHandle as any).createWritable();
+  await indexStream.write(JSON.stringify(indexPayload, null, 2));
+  await indexStream.close();
+
+  await salvarHandleIndexedDB(dirHandle);
+
+  return {
+    totalSessoes: entries.length,
+    totalFotos,
+    totalNcs,
+    totalArquivos,
+  };
+}
+
+async function lerMidiasDePasta(
+  rootHandle: FileSystemDirectoryHandle,
+  payload: any
+): Promise<{
+  photos: UploadedPhotoItem[];
+  documentoAnteriorFile: File | null;
+  planilhaElegibilidadeFile: File | null;
+}> {
+  const fotosRestauradas: UploadedPhotoItem[] = [];
+  try {
+    const midiaHandle = await rootHandle.getDirectoryHandle("midia", { create: false });
+    const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", { create: false });
+
+    if (Array.isArray(payload.meta_fotos) && payload.meta_fotos.length > 0) {
+      for (const meta of payload.meta_fotos) {
+        if (!meta.name) continue;
+        try {
+          const entryFileHandle = await fotosHandle.getFileHandle(meta.name, { create: false });
+          const entryFile = await entryFileHandle.getFile();
+          fotosRestauradas.push({
+            id: meta.id || `foto-${Date.now()}-${meta.uploadOrder || 0}`,
+            name: entryFile.name,
+            file: entryFile,
+            previewUrl: URL.createObjectURL(entryFile),
+            uploadOrder:
+              typeof meta.uploadOrder === "number" ? meta.uploadOrder : fotosRestauradas.length,
+          });
+        } catch {
+          console.warn(`Foto salva no metadado não encontrada fisicamente: ${meta.name}`);
+        }
+      }
+    } else {
+      let order = 0;
+      for await (const [, entry] of (fotosHandle as any).entries()) {
+        if (entry.kind === "file") {
+          try {
+            const entryFile = await (entry as FileSystemFileHandle).getFile();
+            fotosRestauradas.push({
+              id: `foto-${Date.now()}-${order}`,
+              name: entryFile.name,
+              file: entryFile,
+              previewUrl: URL.createObjectURL(entryFile),
+              uploadOrder: order++,
+            });
+          } catch {
+            // ignora erro pontual
+          }
+        }
+      }
+    }
+  } catch {
+    // midia/fotos vazia
+  }
+
+  let documentoAnteriorFile: File | null = null;
+  let planilhaElegibilidadeFile: File | null = null;
+  try {
+    const midiaHandle = await rootHandle.getDirectoryHandle("midia", { create: false });
+    const arquivosHandle = await midiaHandle.getDirectoryHandle("arquivos", { create: false });
+    const metaArquivos: Array<{ slot: string; nome: string }> = payload.meta_arquivos || [];
+
+    if (metaArquivos.length > 0) {
+      for (const meta of metaArquivos) {
+        if (!meta.nome) continue;
+        try {
+          const arqFileHandle = await arquivosHandle.getFileHandle(meta.nome, { create: false });
+          const arqFile = await arqFileHandle.getFile();
+          if (meta.slot === "documentoAnterior") documentoAnteriorFile = arqFile;
+          else if (meta.slot === "planilhaElegibilidade") planilhaElegibilidadeFile = arqFile;
+        } catch {
+          console.warn(`Anexo declarado não encontrado fisicamente: ${meta.nome}`);
+        }
+      }
+    } else {
+      for await (const [name, entry] of (arquivosHandle as any).entries()) {
+        if (entry.kind === "file") {
+          try {
+            const arqFile = await (entry as FileSystemFileHandle).getFile();
+            if (name.endsWith(".docx") || name.endsWith(".pdf")) {
+              if (!documentoAnteriorFile) documentoAnteriorFile = arqFile;
+            } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+              if (!planilhaElegibilidadeFile) planilhaElegibilidadeFile = arqFile;
+            }
+          } catch {
+            // ignora
+          }
+        }
+      }
+    }
+  } catch {
+    // midia/arquivos vazia
+  }
+
+  return {
+    photos: fotosRestauradas,
+    documentoAnteriorFile,
+    planilhaElegibilidadeFile,
+  };
+}
+
+/**
+ * Carrega o estado da modalidade a partir da nova estrutura por ID
+ * (geradorBD/<modalidade>/index.json + <id_sanitizado>/{estado,midia}),
+ * com fallback automático para o formato legado (geradorBD/<modalidade>/estado/estado.json).
  */
 export async function carregarEstadoDeGeradorBD(
   dirHandle: FileSystemDirectoryHandle,
@@ -406,12 +636,16 @@ export async function carregarEstadoDeGeradorBD(
   categoria: CategoriaRelatorio
 ): Promise<{
   fiscalizacoes: FiscalizacaoItem[];
+  activeFiscalizacaoIndex: number;
+  sessionsById?: Record<string, InspectionSessionSnapshot>;
   registrosNc: RegistroNcItem[];
   photos: UploadedPhotoItem[];
   pistaPersistida: string;
   trechoPersistido: string;
   documentoAnteriorFile: File | null;
+  documentoAnteriorMeta?: MonitoramentoAnteriorMeta | null;
   planilhaElegibilidadeFile: File | null;
+  oldPhotosToMatch?: MonitoramentoAnteriorItem[];
 }> {
   const pastaModalidadeNome = obterPastaModalidade(tipo, categoria);
 
@@ -424,14 +658,93 @@ export async function carregarEstadoDeGeradorBD(
     );
   }
 
-  // 1. Carrega estado/estado.json (ou fallback para formato legado)
+  // 1. Tenta carregar formato v2 (index.json + subpastas por ID)
+  try {
+    const indexHandle = await modHandle.getFileHandle("index.json", { create: false });
+    const indexFile = await indexHandle.getFile();
+    const indexData = JSON.parse(await indexFile.text());
+    const sessList: Array<{ id: string; pasta: string }> = Array.isArray(indexData.sessoes)
+      ? indexData.sessoes
+      : [];
+
+    const fiscalizacoes: FiscalizacaoItem[] = [];
+    const sessionsById: Record<string, InspectionSessionSnapshot> = {};
+
+    for (const item of sessList) {
+      if (!item.pasta) continue;
+      try {
+        const sessHandle = await modHandle.getDirectoryHandle(item.pasta, { create: false });
+        const estadoHandle = await sessHandle.getDirectoryHandle("estado", { create: false });
+        const estadoFile = await (
+          await estadoHandle.getFileHandle("estado.json", { create: false })
+        ).getFile();
+        const payload = JSON.parse(await estadoFile.text());
+        const midias = await lerMidiasDePasta(sessHandle, payload);
+
+        if (payload.cabecalho) {
+          fiscalizacoes.push(payload.cabecalho);
+        }
+
+        const sessId = (payload.id_sessao || item.id || "").trim();
+        if (sessId) {
+          sessionsById[sessId] = {
+            registrosNc: payload.temp_nc || [],
+            photos: midias.photos,
+            sortOption: payload.sort_option || "Nome (A-Z / 0-9)",
+            carouselIndex: typeof payload.carousel_index === "number" ? payload.carousel_index : 0,
+            monitoringNewPhotoName: payload.monitoring_new_photo_name || "",
+            pistaPersistida: payload.pista_persistida || "",
+            trechoPersistido: payload.trecho_persistido || "",
+            documentoAnteriorFile: midias.documentoAnteriorFile,
+            documentoAnteriorMeta: payload.documento_anterior_meta || null,
+            planilhaElegibilidadeFile: midias.planilhaElegibilidadeFile,
+            oldPhotosToMatch: payload.old_photos_to_match || [],
+            relatoriosGerados: [],
+          };
+        }
+      } catch (errSess) {
+        console.warn(`Aviso ao carregar sessão ${item.pasta}:`, errSess);
+      }
+    }
+
+    const activeIdx = Math.max(
+      0,
+      Math.min(
+        typeof indexData.active_fiscalizacao_index === "number"
+          ? indexData.active_fiscalizacao_index
+          : 0,
+        Math.max(0, fiscalizacoes.length - 1)
+      )
+    );
+    const activeId = fiscalizacoes[activeIdx]?.["ID da Fiscalização"]?.trim() || "RASCUNHO";
+    const activeSnap = sessionsById[activeId];
+
+    await salvarHandleIndexedDB(dirHandle);
+
+    return {
+      fiscalizacoes,
+      activeFiscalizacaoIndex: activeIdx,
+      sessionsById,
+      registrosNc: activeSnap?.registrosNc || [],
+      photos: activeSnap?.photos || [],
+      pistaPersistida: activeSnap?.pistaPersistida || "",
+      trechoPersistido: activeSnap?.trechoPersistido || "",
+      documentoAnteriorFile: activeSnap?.documentoAnteriorFile || null,
+      documentoAnteriorMeta: activeSnap?.documentoAnteriorMeta || null,
+      planilhaElegibilidadeFile: activeSnap?.planilhaElegibilidadeFile || null,
+      oldPhotosToMatch: activeSnap?.oldPhotosToMatch || [],
+    };
+  } catch {
+    // Segue para fallback legado
+  }
+
+  // 2. Fallback legado: geradorBD/<modalidade>/estado/estado.json
   let payload: any = null;
   try {
     const estadoHandle = await modHandle.getDirectoryHandle("estado", { create: false });
     const fileHandle = await estadoHandle.getFileHandle("estado.json", { create: false });
     const file = await fileHandle.getFile();
-    const text = await file.text();
-    payload = JSON.parse(text);
+    payload = JSON.parse(await file.text());
   } catch {
     try {
       const legacyJsonName = `${pastaModalidadeNome}.json`;
@@ -440,124 +753,28 @@ export async function carregarEstadoDeGeradorBD(
       payload = JSON.parse(await legacyFile.text());
     } catch {
       throw new Error(
-        `O arquivo "estado/estado.json" não foi localizado dentro de "${pastaModalidadeNome}".`
+        `O arquivo "index.json" ou "estado/estado.json" não foi localizado dentro de "${pastaModalidadeNome}".`
       );
     }
   }
 
   const fiscalizacoes: FiscalizacaoItem[] =
     payload.temp_fiscalizacoes || payload.fiscalizacoes || [];
-  const registrosNc: RegistroNcItem[] =
-    payload.temp_nc || payload.registrosNc || [];
+  const registrosNc: RegistroNcItem[] = payload.temp_nc || payload.registrosNc || [];
   const pistaPersistida: string = payload.pista_persistida || "";
   const trechoPersistido: string = payload.trecho_persistido || "";
-
-  // 2. Restaura Fotos de midia/fotos/ respeitando meta_fotos (fonte da verdade)
-  const fotosRestauradas: UploadedPhotoItem[] = [];
-  try {
-    const midiaHandle = await modHandle.getDirectoryHandle("midia", { create: false });
-    const fotosHandle = await midiaHandle.getDirectoryHandle("fotos", { create: false });
-
-    if (Array.isArray(payload.meta_fotos) && payload.meta_fotos.length > 0) {
-      // Carrega exatamente as fotos salvas no metadado
-      for (const meta of payload.meta_fotos) {
-        if (!meta.name) continue;
-        try {
-          const entryFileHandle = await fotosHandle.getFileHandle(meta.name, { create: false });
-          const entryFile = await entryFileHandle.getFile();
-          const previewUrl = URL.createObjectURL(entryFile);
-          fotosRestauradas.push({
-            id: meta.id || `foto-${Date.now()}-${meta.uploadOrder || 0}`,
-            name: entryFile.name,
-            file: entryFile,
-            previewUrl,
-            uploadOrder: typeof meta.uploadOrder === "number" ? meta.uploadOrder : fotosRestauradas.length,
-          });
-        } catch (errFotoFaltante) {
-          console.warn(`Foto salva no metadado não encontrada fisicamente: ${meta.name}`);
-        }
-      }
-    } else {
-      // Fallback para varredura física se meta_fotos não existir (legado)
-      let order = 0;
-      for await (const [name, entry] of (fotosHandle as any).entries()) {
-        if (entry.kind === "file") {
-          try {
-            const entryFile = await (entry as FileSystemFileHandle).getFile();
-            const previewUrl = URL.createObjectURL(entryFile);
-            fotosRestauradas.push({
-              id: `foto-${Date.now()}-${order}`,
-              name: entryFile.name,
-              file: entryFile,
-              previewUrl,
-              uploadOrder: order++,
-            });
-          } catch (errFoto) {
-            console.warn(`Erro ao ler arquivo de foto ${name}:`, errFoto);
-          }
-        }
-      }
-    }
-  } catch {
-    // Midia/fotos ainda não existe ou vazia
-  }
-
-  // 3. Restaura Arquivos Anexos de midia/arquivos/ respeitando meta_arquivos
-  let documentoAnteriorFile: File | null = null;
-  let planilhaElegibilidadeFile: File | null = null;
-
-  try {
-    const midiaHandle = await modHandle.getDirectoryHandle("midia", { create: false });
-    const arquivosHandle = await midiaHandle.getDirectoryHandle("arquivos", { create: false });
-
-    const metaArquivos: Array<{ slot: string; nome: string }> = payload.meta_arquivos || [];
-
-    if (metaArquivos.length > 0) {
-      for (const meta of metaArquivos) {
-        if (!meta.nome) continue;
-        try {
-          const arqFileHandle = await arquivosHandle.getFileHandle(meta.nome, { create: false });
-          const arqFile = await arqFileHandle.getFile();
-
-          if (meta.slot === "documentoAnterior") {
-            documentoAnteriorFile = arqFile;
-          } else if (meta.slot === "planilhaElegibilidade") {
-            planilhaElegibilidadeFile = arqFile;
-          }
-        } catch (errArqFaltante) {
-          console.warn(`Anexo declarado não encontrado fisicamente: ${meta.nome}`);
-        }
-      }
-    } else {
-      // Fallback legado por extensão
-      for await (const [name, entry] of (arquivosHandle as any).entries()) {
-        if (entry.kind === "file") {
-          try {
-            const arqFile = await (entry as FileSystemFileHandle).getFile();
-            if (name.endsWith(".docx") || name.endsWith(".pdf")) {
-              if (!documentoAnteriorFile) documentoAnteriorFile = arqFile;
-            } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
-              if (!planilhaElegibilidadeFile) planilhaElegibilidadeFile = arqFile;
-            }
-          } catch (errArq) {
-            console.warn(`Erro ao ler anexo ${name}:`, errArq);
-          }
-        }
-      }
-    }
-  } catch {
-    // Midia/arquivos ainda não existe ou vazia
-  }
+  const midiasLegado = await lerMidiasDePasta(modHandle, payload);
 
   await salvarHandleIndexedDB(dirHandle);
 
   return {
     fiscalizacoes,
+    activeFiscalizacaoIndex: 0,
     registrosNc,
-    photos: fotosRestauradas,
+    photos: midiasLegado.photos,
     pistaPersistida,
     trechoPersistido,
-    documentoAnteriorFile,
-    planilhaElegibilidadeFile,
+    documentoAnteriorFile: midiasLegado.documentoAnteriorFile,
+    planilhaElegibilidadeFile: midiasLegado.planilhaElegibilidadeFile,
   };
 }

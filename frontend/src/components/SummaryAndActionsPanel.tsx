@@ -339,13 +339,16 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
 
       {confirmReset && (() => {
         const totalRelatorios = ws.fiscalizacoes.length;
-        const totalRegistros = ws.registrosNc.length;
+        const activeId = ws.fiscalizacoes[ws.activeFiscalizacaoIndex]?.["ID da Fiscalização"]?.trim() || "";
+        const inactiveSessions = Object.entries(ws.sessionsById || {}).filter(
+          ([id]) => id !== activeId
+        );
+        const totalRegistros =
+          ws.registrosNc.length +
+          inactiveSessions.reduce((acc, [, s]) => acc + (s?.registrosNc?.length || 0), 0);
         const totalFotos =
           ws.photos.length +
-          Object.values(ws.photosByFiscalizacao || {}).reduce(
-            (acc, list) => acc + (list?.length || 0),
-            0
-          );
+          inactiveSessions.reduce((acc, [, s]) => acc + (s?.photos?.length || 0), 0);
 
         return (
           <ConfirmDeleteModal

@@ -17,12 +17,28 @@ import {
 } from "../types/report.types";
 import { compararNomesNatural } from "../services/naturalSort";
 
+export interface InspectionSessionSnapshot {
+  registrosNc: RegistroNcItem[];
+  photos: UploadedPhotoItem[];
+  sortOption: SortOption;
+  carouselIndex: number;
+  monitoringNewPhotoName: string;
+  pistaPersistida: string;
+  trechoPersistido: string;
+  documentoAnteriorFile: File | null;
+  documentoAnteriorMeta: MonitoramentoAnteriorMeta | null;
+  planilhaElegibilidadeFile: File | null;
+  oldPhotosToMatch: MonitoramentoAnteriorItem[];
+  relatoriosGerados: RelatorioGeradoItem[];
+}
+
 export interface ModalityWorkspaceState {
   fiscalizacoes: FiscalizacaoItem[];
   activeFiscalizacaoIndex: number;
   registrosNc: RegistroNcItem[];
   photos: UploadedPhotoItem[];
   photosByFiscalizacao: Record<string, UploadedPhotoItem[]>;
+  sessionsById: Record<string, InspectionSessionSnapshot>;
   sortOption: SortOption;
   carouselIndex: number;
   pistaPersistida: string;
@@ -32,6 +48,83 @@ export interface ModalityWorkspaceState {
   planilhaElegibilidadeFile: File | null;
   oldPhotosToMatch: MonitoramentoAnteriorItem[];
   relatoriosGerados: RelatorioGeradoItem[];
+}
+
+function createEmptySessionSnapshot(): InspectionSessionSnapshot {
+  return {
+    registrosNc: [],
+    photos: [],
+    sortOption: "Nome (A-Z / 0-9)",
+    carouselIndex: 0,
+    monitoringNewPhotoName: "",
+    pistaPersistida: "",
+    trechoPersistido: "",
+    documentoAnteriorFile: null,
+    documentoAnteriorMeta: null,
+    planilhaElegibilidadeFile: null,
+    oldPhotosToMatch: [],
+    relatoriosGerados: [],
+  };
+}
+
+export function extractActiveSessionSnapshot(
+  ws: ModalityWorkspaceState,
+  monitoringNewPhotoName = ""
+): InspectionSessionSnapshot {
+  return {
+    registrosNc: ws.registrosNc,
+    photos: ws.photos,
+    sortOption: ws.sortOption,
+    carouselIndex: ws.carouselIndex,
+    monitoringNewPhotoName,
+    pistaPersistida: ws.pistaPersistida,
+    trechoPersistido: ws.trechoPersistido,
+    documentoAnteriorFile: ws.documentoAnteriorFile,
+    documentoAnteriorMeta: ws.documentoAnteriorMeta,
+    planilhaElegibilidadeFile: ws.planilhaElegibilidadeFile,
+    oldPhotosToMatch: ws.oldPhotosToMatch,
+    relatoriosGerados: ws.relatoriosGerados,
+  };
+}
+
+function syncCurrentSessionIntoMap(
+  ws: ModalityWorkspaceState,
+  monitoringNewPhotoName: string
+): {
+  sessionsById: Record<string, InspectionSessionSnapshot>;
+  photosByFiscalizacao: Record<string, UploadedPhotoItem[]>;
+} {
+  const nextSessions = { ...(ws.sessionsById || {}) };
+  const nextPhotosCache = { ...(ws.photosByFiscalizacao || {}) };
+  const currentFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
+  const currentId = currentFisc?.["ID da Fiscalização"]?.trim() || "";
+  if (currentId) {
+    nextSessions[currentId] = extractActiveSessionSnapshot(ws, monitoringNewPhotoName);
+    nextPhotosCache[currentId] = ws.photos;
+  }
+  return { sessionsById: nextSessions, photosByFiscalizacao: nextPhotosCache };
+}
+
+function applySessionSnapshot(
+  snapshot?: InspectionSessionSnapshot
+): Omit<
+  ModalityWorkspaceState,
+  "fiscalizacoes" | "activeFiscalizacaoIndex" | "photosByFiscalizacao" | "sessionsById"
+> {
+  const s = snapshot || createEmptySessionSnapshot();
+  return {
+    registrosNc: s.registrosNc,
+    photos: s.photos,
+    sortOption: s.sortOption,
+    carouselIndex: s.carouselIndex,
+    pistaPersistida: s.pistaPersistida,
+    trechoPersistido: s.trechoPersistido,
+    documentoAnteriorFile: s.documentoAnteriorFile,
+    documentoAnteriorMeta: s.documentoAnteriorMeta,
+    planilhaElegibilidadeFile: s.planilhaElegibilidadeFile,
+    oldPhotosToMatch: s.oldPhotosToMatch,
+    relatoriosGerados: s.relatoriosGerados,
+  };
 }
 
 /**
@@ -59,18 +152,9 @@ function createEmptyWorkspace(): ModalityWorkspaceState {
   return {
     fiscalizacoes: [],
     activeFiscalizacaoIndex: 0,
-    registrosNc: [],
-    photos: [],
     photosByFiscalizacao: {},
-    sortOption: "Nome (A-Z / 0-9)",
-    carouselIndex: 0,
-    pistaPersistida: "",
-    trechoPersistido: "",
-    documentoAnteriorFile: null,
-    documentoAnteriorMeta: null,
-    planilhaElegibilidadeFile: null,
-    oldPhotosToMatch: [],
-    relatoriosGerados: [],
+    sessionsById: {},
+    ...createEmptySessionSnapshot(),
   };
 }
 
@@ -304,12 +388,16 @@ interface ReportStore {
     categoria: CategoriaRelatorio,
     dados: {
       fiscalizacoes: FiscalizacaoItem[];
+      activeFiscalizacaoIndex?: number;
+      sessionsById?: Record<string, InspectionSessionSnapshot>;
       registrosNc: RegistroNcItem[];
       photos: UploadedPhotoItem[];
       pistaPersistida?: string;
       trechoPersistido?: string;
       documentoAnteriorFile?: File | null;
+      documentoAnteriorMeta?: MonitoramentoAnteriorMeta | null;
       planilhaElegibilidadeFile?: File | null;
+      oldPhotosToMatch?: MonitoramentoAnteriorItem[];
     }
   ) => void;
 }
@@ -836,32 +924,31 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const key = getStateKey(state.tipoRelatorio, state.categoriaRelatorio);
       const ws = state.workspaces[key];
       const safeIdx = Math.max(0, Math.min(idx, Math.max(0, ws.fiscalizacoes.length - 1)));
-      if (safeIdx === ws.activeFiscalizacaoIndex && ws.photos.length > 0) {
+      if (safeIdx === ws.activeFiscalizacaoIndex) {
         return state;
       }
 
-      // Salva as fotos da fiscalização atual no cache
-      const currentOldFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
-      const currentOldId = currentOldFisc?.["ID da Fiscalização"]?.trim() || "";
-      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
-      if (currentOldId) {
-        updatedCache[currentOldId] = ws.photos;
-      }
+      // Salva integralmente o estado da sessão atual (fotos, NCs, arquivos de monitoramento, etc.)
+      const { sessionsById, photosByFiscalizacao } = syncCurrentSessionIntoMap(
+        ws,
+        state.monitoringNewPhotoName
+      );
 
-      // Restaura as fotos da nova fiscalização
+      // Restaura integralmente o estado da nova fiscalização/monitoramento
       const newFisc = ws.fiscalizacoes[safeIdx];
       const newId = newFisc?.["ID da Fiscalização"]?.trim() || "";
-      const restoredPhotos = newId && updatedCache[newId] ? updatedCache[newId] : [];
+      const targetSnapshot = (newId && sessionsById[newId]) || createEmptySessionSnapshot();
 
       return {
+        monitoringNewPhotoName: targetSnapshot.monitoringNewPhotoName || "",
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             activeFiscalizacaoIndex: safeIdx,
-            photosByFiscalizacao: updatedCache,
-            photos: restoredPhotos,
-            carouselIndex: 0,
+            photosByFiscalizacao,
+            sessionsById,
+            ...applySessionSnapshot(targetSnapshot),
           },
         },
       };
@@ -885,28 +972,27 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       };
     }
 
-    // Salva fotos da fiscalização anterior no cache
-    const currentOldFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
-    const currentOldId = currentOldFisc?.["ID da Fiscalização"]?.trim() || "";
-    const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
-    if (currentOldId) {
-      updatedCache[currentOldId] = ws.photos;
-    }
-    // A nova fiscalização inicia com fotos vazias []
-    updatedCache[cleanId] = [];
+    // Salva integralmente o estado da sessão anterior no cache antes de zerar para a nova
+    const { sessionsById, photosByFiscalizacao } = syncCurrentSessionIntoMap(
+      ws,
+      state.monitoringNewPhotoName
+    );
+    const emptySnapshot = createEmptySessionSnapshot();
+    sessionsById[cleanId] = emptySnapshot;
+    photosByFiscalizacao[cleanId] = [];
 
     const nextFisc = [...ws.fiscalizacoes, { ...item, "ID da Fiscalização": cleanId }];
     set({
+      monitoringNewPhotoName: "",
       workspaces: {
         ...state.workspaces,
         [key]: {
           ...ws,
           fiscalizacoes: nextFisc,
           activeFiscalizacaoIndex: nextFisc.length - 1,
-          photosByFiscalizacao: updatedCache,
-          photos: [],
-          carouselIndex: 0,
-          relatoriosGerados: [],
+          photosByFiscalizacao,
+          sessionsById,
+          ...applySessionSnapshot(emptySnapshot),
         },
       },
     });
@@ -920,7 +1006,11 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       if (ws.fiscalizacoes.length === 0) {
         const id = item["ID da Fiscalização"]?.trim() || "";
         const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
-        if (id) updatedCache[id] = ws.photos;
+        const updatedSessions = { ...(ws.sessionsById || {}) };
+        if (id) {
+          updatedCache[id] = ws.photos;
+          updatedSessions[id] = extractActiveSessionSnapshot(ws, state.monitoringNewPhotoName);
+        }
         return {
           workspaces: {
             ...state.workspaces,
@@ -928,6 +1018,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
               ...ws,
               fiscalizacoes: [item],
               photosByFiscalizacao: updatedCache,
+              sessionsById: updatedSessions,
               activeFiscalizacaoIndex: 0,
             },
           },
@@ -952,11 +1043,21 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       }
 
       const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
-      if (oldId && oldId !== newId && updatedCache[oldId]) {
-        updatedCache[newId] = updatedCache[oldId];
-        delete updatedCache[oldId];
-      } else if (newId && !updatedCache[newId]) {
-        updatedCache[newId] = ws.photos;
+      const updatedSessions = { ...(ws.sessionsById || {}) };
+      if (oldId && oldId !== newId) {
+        if (updatedCache[oldId]) {
+          updatedCache[newId] = updatedCache[oldId];
+          delete updatedCache[oldId];
+        }
+        if (updatedSessions[oldId]) {
+          updatedSessions[newId] = updatedSessions[oldId];
+          delete updatedSessions[oldId];
+        }
+      } else if (newId) {
+        if (!updatedCache[newId]) updatedCache[newId] = ws.photos;
+        if (!updatedSessions[newId]) {
+          updatedSessions[newId] = extractActiveSessionSnapshot(ws, state.monitoringNewPhotoName);
+        }
       }
 
       const nextFisc = ws.fiscalizacoes.map((f, idx) => (idx === targetIdx ? item : f));
@@ -965,6 +1066,12 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           ? { ...nc, "ID da Fiscalização": newId, Terminal: item.Local }
           : nc
       );
+      if (newId && updatedSessions[newId]) {
+        updatedSessions[newId] = {
+          ...updatedSessions[newId],
+          registrosNc: nextNc,
+        };
+      }
       return {
         workspaces: {
           ...state.workspaces,
@@ -973,6 +1080,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
             fiscalizacoes: nextFisc,
             registrosNc: nextNc,
             photosByFiscalizacao: updatedCache,
+            sessionsById: updatedSessions,
           },
         },
       };
@@ -999,9 +1107,23 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     }
 
     const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
-    if (oldId && oldId !== newId && updatedCache[oldId]) {
-      updatedCache[newId] = updatedCache[oldId];
-      delete updatedCache[oldId];
+    const updatedSessions = { ...(ws.sessionsById || {}) };
+    if (oldId && oldId !== newId) {
+      if (updatedCache[oldId]) {
+        updatedCache[newId] = updatedCache[oldId];
+        delete updatedCache[oldId];
+      }
+      if (updatedSessions[oldId]) {
+        updatedSessions[newId] = {
+          ...updatedSessions[oldId],
+          registrosNc: updatedSessions[oldId].registrosNc.map((nc) =>
+            nc["ID da Fiscalização"] === oldId
+              ? { ...nc, "ID da Fiscalização": newId, Terminal: updated.Local }
+              : nc
+          ),
+        };
+        delete updatedSessions[oldId];
+      }
     }
 
     const cleanUpdated = { ...updated, "ID da Fiscalização": newId };
@@ -1022,6 +1144,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           fiscalizacoes: nextFisc,
           registrosNc: nextNc,
           photosByFiscalizacao: updatedCache,
+          sessionsById: updatedSessions,
           relatoriosGerados: [],
         },
       },
@@ -1035,17 +1158,27 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       const ws = state.workspaces[key];
       const idSet = new Set(ids);
 
+      const { sessionsById, photosByFiscalizacao } = syncCurrentSessionIntoMap(
+        ws,
+        state.monitoringNewPhotoName
+      );
+
       const activeFisc = ws.fiscalizacoes[ws.activeFiscalizacaoIndex];
       const activeFiscId = activeFisc?.["ID da Fiscalização"]?.trim() || "";
-      if (activeFiscId && idSet.has(activeFiscId)) {
-        ws.photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-      }
+      const deletingActive = Boolean(activeFiscId && idSet.has(activeFiscId));
 
-      const updatedCache = { ...(ws.photosByFiscalizacao || {}) };
       ids.forEach((id) => {
-        if (updatedCache[id]) {
-          updatedCache[id].forEach((p) => URL.revokeObjectURL(p.previewUrl));
-          delete updatedCache[id];
+        if (photosByFiscalizacao[id]) {
+          photosByFiscalizacao[id].forEach((p) => {
+            if (p.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(p.previewUrl);
+          });
+          delete photosByFiscalizacao[id];
+        }
+        if (sessionsById[id]) {
+          sessionsById[id].photos.forEach((p) => {
+            if (p.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(p.previewUrl);
+          });
+          delete sessionsById[id];
         }
       });
 
@@ -1055,19 +1188,22 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         Math.min(ws.activeFiscalizacaoIndex, Math.max(0, nextFisc.length - 1))
       );
       const nextActiveId = nextFisc[safeIdx]?.["ID da Fiscalização"]?.trim() || "";
-      const restoredPhotos = nextActiveId && updatedCache[nextActiveId] ? updatedCache[nextActiveId] : [];
+      const restoredSnapshot =
+        (nextActiveId && sessionsById[nextActiveId]) || createEmptySessionSnapshot();
 
       return {
+        monitoringNewPhotoName: deletingActive
+          ? restoredSnapshot.monitoringNewPhotoName || ""
+          : state.monitoringNewPhotoName,
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             fiscalizacoes: nextFisc,
             activeFiscalizacaoIndex: safeIdx,
-            photosByFiscalizacao: updatedCache,
-            photos: restoredPhotos,
-            carouselIndex: 0,
-            registrosNc: ws.registrosNc.filter((nc) => !idSet.has(nc["ID da Fiscalização"])),
+            photosByFiscalizacao,
+            sessionsById,
+            ...(deletingActive ? applySessionSnapshot(restoredSnapshot) : {}),
             relatoriosGerados: [],
           },
         },
@@ -1770,8 +1906,16 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           });
         });
       }
+      if (ws.sessionsById) {
+        Object.values(ws.sessionsById).forEach((sess) => {
+          sess.photos.forEach((p) => {
+            if (p.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(p.previewUrl);
+          });
+        });
+      }
 
       return {
+        monitoringNewPhotoName: "",
         workspaces: {
           ...state.workspaces,
           [key]: createEmptyWorkspace(),
@@ -1803,21 +1947,71 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           URL.revokeObjectURL(p.previewUrl);
         }
       });
+
+      const nextSessions: Record<string, InspectionSessionSnapshot> = {
+        ...(dados.sessionsById || {}),
+      };
+      const nextPhotosCache: Record<string, UploadedPhotoItem[]> = {};
+
+      if (dados.sessionsById) {
+        for (const [id, sess] of Object.entries(dados.sessionsById)) {
+          nextPhotosCache[id] = sess.photos || [];
+        }
+      } else if (dados.fiscalizacoes.length > 0) {
+        // Fallback legado: particiona registrosNc por ID da Fiscalização
+        for (const f of dados.fiscalizacoes) {
+          const fid = f["ID da Fiscalização"]?.trim() || "";
+          if (!fid) continue;
+          const isFirst = fid === dados.fiscalizacoes[0]["ID da Fiscalização"]?.trim();
+          nextSessions[fid] = {
+            ...createEmptySessionSnapshot(),
+            registrosNc: dados.registrosNc.filter(
+              (nc) => (nc["ID da Fiscalização"] || "").trim() === fid
+            ),
+            photos: isFirst ? dados.photos : [],
+            pistaPersistida: dados.pistaPersistida || "",
+            trechoPersistido: dados.trechoPersistido || "",
+            documentoAnteriorFile: isFirst ? dados.documentoAnteriorFile ?? null : null,
+            documentoAnteriorMeta: isFirst ? dados.documentoAnteriorMeta ?? null : null,
+            planilhaElegibilidadeFile: isFirst ? dados.planilhaElegibilidadeFile ?? null : null,
+            oldPhotosToMatch: isFirst ? dados.oldPhotosToMatch || [] : [],
+          };
+          nextPhotosCache[fid] = nextSessions[fid].photos;
+        }
+      }
+
+      const activeIdx = Math.max(
+        0,
+        Math.min(
+          dados.activeFiscalizacaoIndex ?? 0,
+          Math.max(0, dados.fiscalizacoes.length - 1)
+        )
+      );
+      const activeId = dados.fiscalizacoes[activeIdx]?.["ID da Fiscalização"]?.trim() || "";
+      const activeSnapshot: InspectionSessionSnapshot =
+        (activeId && nextSessions[activeId]) || {
+          ...createEmptySessionSnapshot(),
+          registrosNc: dados.registrosNc,
+          photos: dados.photos,
+          pistaPersistida: dados.pistaPersistida || "",
+          trechoPersistido: dados.trechoPersistido || "",
+          documentoAnteriorFile: dados.documentoAnteriorFile ?? null,
+          documentoAnteriorMeta: dados.documentoAnteriorMeta ?? null,
+          planilhaElegibilidadeFile: dados.planilhaElegibilidadeFile ?? null,
+          oldPhotosToMatch: dados.oldPhotosToMatch || [],
+        };
+
       return {
+        monitoringNewPhotoName: activeSnapshot.monitoringNewPhotoName || "",
         workspaces: {
           ...state.workspaces,
           [key]: {
             ...ws,
             fiscalizacoes: dados.fiscalizacoes,
-            activeFiscalizacaoIndex: 0,
-            registrosNc: dados.registrosNc,
-            photos: dados.photos,
-            carouselIndex: 0,
-            pistaPersistida: dados.pistaPersistida || "",
-            trechoPersistido: dados.trechoPersistido || "",
-            documentoAnteriorFile: dados.documentoAnteriorFile ?? ws.documentoAnteriorFile,
-            planilhaElegibilidadeFile: dados.planilhaElegibilidadeFile ?? ws.planilhaElegibilidadeFile,
-            relatoriosGerados: [],
+            activeFiscalizacaoIndex: activeIdx,
+            photosByFiscalizacao: nextPhotosCache,
+            sessionsById: nextSessions,
+            ...applySessionSnapshot(activeSnapshot),
           },
         },
       };
