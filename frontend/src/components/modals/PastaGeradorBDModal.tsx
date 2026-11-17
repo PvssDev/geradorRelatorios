@@ -22,7 +22,7 @@ export const PastaGeradorBDModal: React.FC<PastaGeradorBDModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-b from-navy to-[#0F1E38] p-6 text-white shadow-2xl">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-gradient-to-b from-navy to-[#0F1E38] p-6 text-white shadow-2xl">
         {/* Botão fechar */}
         <button
           type="button"
