@@ -4,6 +4,7 @@ import {
   CloudUpload,
   Building2,
   ImagePlus,
+  BarChart3,
   Rocket,
   Wand2,
   ChevronLeft,
@@ -40,11 +41,19 @@ interface SidebarProps {
   onTogglePerformanceMode: (p: boolean) => void;
 }
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { n: 1, label: "Dados Gerais", icon: Building2 },
   { n: 2, label: "Upload de Mídia", icon: CloudUpload },
   { n: 3, label: "Ocorrências", icon: ImagePlus },
   { n: 4, label: "Emissão", icon: Rocket },
+];
+
+const SOCICAM_MON_NAV_ITEMS = [
+  { n: 1, label: "Dados Gerais", icon: Building2 },
+  { n: 2, label: "Upload de Mídia", icon: CloudUpload },
+  { n: 3, label: "Ocorrências", icon: ImagePlus },
+  { n: 4, label: "Recomendação Geral", icon: BarChart3 },
+  { n: 5, label: "Emissão", icon: Rocket },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -100,9 +109,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
   const hasRelatorios = ws.relatoriosGerados.length > 0;
 
-  // Maior etapa desbloqueada (1 a 4), alinhada exatamente aos blocos #b1-#b4 de App.tsx
+  const isSocicamMonitoramento =
+    tipoRelatorio === "SOCICAM" && categoriaRelatorio === "Monitoramento";
+  const navItems = isSocicamMonitoramento ? SOCICAM_MON_NAV_ITEMS : BASE_NAV_ITEMS;
+  const totalSteps = navItems.length;
+
+  // Maior etapa desbloqueada (1 a 4 ou 1 a 5), alinhada exatamente aos blocos de App.tsx
   let maxUnlockedStep = 1;
-  if (hasFiscalizacao && canOpenRegistro && hasRegistros) maxUnlockedStep = 4;
+  if (hasFiscalizacao && canOpenRegistro && hasRegistros) maxUnlockedStep = totalSteps;
   else if (hasFiscalizacao && canOpenRegistro) maxUnlockedStep = 3;
   else if (hasFiscalizacao) maxUnlockedStep = 2;
 
@@ -509,10 +523,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
             <nav className="space-y-1.5">
-              {NAV_ITEMS.map(({ n, label, icon: Icon }) => {
+              {navItems.map(({ n, label, icon: Icon }) => {
                 const unlocked = n <= maxUnlockedStep;
                 const cur = n === selectedStep;
-                const done = n < maxUnlockedStep || (n === 4 && hasRelatorios);
+                const done = n < maxUnlockedStep || (n === totalSteps && hasRelatorios);
                 return (
                   <a
                     key={n}

@@ -371,5 +371,5 @@ class CrcReport(BaseReport, IReportContract):
             id_fisc = raw_id or mes_ano
         return [
             f"RELATÓRIO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL PROC ADM Nº {id_fisc} - CTR",
-            "SEI Nº xxxxxxxx-xxx"
+            "SEI Nº XXXXXXXXXXXX"
         ]

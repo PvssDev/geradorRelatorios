@@ -24,6 +24,7 @@ import { RelatorioGeradoItem } from "../types/report.types";
 
 interface SummaryAndActionsPanelProps {
   onOpenEditModal?: (tab?: "fisc" | "nc") => void;
+  stepNumber?: number;
 }
 
 const btn = {
@@ -54,7 +55,9 @@ function downloadBase64Docx(item: RelatorioGeradoItem) {
   document.body.removeChild(a);
 }
 
-export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () => {
+export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = ({
+  stepNumber = 4,
+}) => {
   const {
     tipoRelatorio,
     categoriaRelatorio,
@@ -207,7 +210,7 @@ export const SummaryAndActionsPanel: React.FC<SummaryAndActionsPanelProps> = () 
   return (
     <>
       <Card
-        n={4}
+        n={stepNumber}
         icon={<Rocket className="h-5 w-5" />}
         title="Emissão e Exportação"
       >

@@ -81,6 +81,117 @@ def normalizar_nome_terminal_curto(local_val: Any) -> str:
     return f"Terminal de {l_str}"
 
 
+def normalizar_nome_terminal_passageiros_municipio(local_val: Any) -> str:
+    """
+    Formata a designação do terminal para a conclusão do Relatório de Monitoramento da SOCICAM
+    no padrão 'Terminal Rodoviário de Passageiros do/de [município]'.
+    Exemplos:
+    - 'TIP' / 'Recife' / 'Terminal Rodoviário de Passageiros do Recife (TIP)' -> 'Terminal Rodoviário de Passageiros do Recife'
+    - 'Caruaru' / 'Terminal Rodoviário de Caruaru' -> 'Terminal Rodoviário de Passageiros de Caruaru'
+    - 'Garanhuns' -> 'Terminal Rodoviário de Passageiros de Garanhuns'
+    - 'Petrolina' -> 'Terminal Rodoviário de Passageiros de Petrolina'
+    """
+    if not local_val or pd.isna(local_val):
+        return "Terminal Rodoviário de Passageiros do Recife"
+
+    l_str = str(local_val).strip()
+    if not l_str or l_str.lower() in ("nan", "none", "=local="):
+        return "Terminal Rodoviário de Passageiros do Recife"
+
+    # Remove sufixos entre parênteses como (TIP) ou (PE)
+    l_sem_parenteses = re.sub(r"\s*\([^)]*\)", "", l_str).strip()
+    l_upper = l_sem_parenteses.upper()
+
+    if l_upper in ("TIP", "RECIFE", "TIP RECIFE") or "RECIFE" in l_upper:
+        return "Terminal Rodoviário de Passageiros do Recife"
+    if "CARUARU" in l_upper:
+        return "Terminal Rodoviário de Passageiros de Caruaru"
+    if "GARANHUNS" in l_upper:
+        return "Terminal Rodoviário de Passageiros de Garanhuns"
+    if "PETROLINA" in l_upper:
+        return "Terminal Rodoviário de Passageiros de Petrolina"
+    if "SERRA TALHADA" in l_upper:
+        return "Terminal Rodoviário de Passageiros de Serra Talhada"
+    if "ARCOVERDE" in l_upper:
+        return "Terminal Rodoviário de Passageiros de Arcoverde"
+
+    l_lower = l_sem_parenteses.lower()
+    if l_lower.startswith("terminal rodoviário de passageiros "):
+        resto = l_sem_parenteses[len("Terminal Rodoviário de Passageiros "):].strip()
+        return f"Terminal Rodoviário de Passageiros {resto}"
+    if l_lower.startswith("terminal rodoviário de "):
+        mun = l_sem_parenteses[len("Terminal Rodoviário de "):].strip()
+        return f"Terminal Rodoviário de Passageiros de {mun}"
+    if l_lower.startswith("terminal rodoviário do "):
+        mun = l_sem_parenteses[len("Terminal Rodoviário do "):].strip()
+        return f"Terminal Rodoviário de Passageiros do {mun}"
+    if l_lower.startswith("terminal de "):
+        mun = l_sem_parenteses[len("Terminal de "):].strip()
+        return f"Terminal Rodoviário de Passageiros de {mun}"
+    if l_lower.startswith("terminal do "):
+        mun = l_sem_parenteses[len("Terminal do "):].strip()
+        return f"Terminal Rodoviário de Passageiros do {mun}"
+
+    return f"Terminal Rodoviário de Passageiros de {l_sem_parenteses}"
+
+
+def calcular_estatisticas_monitoramento_socicam(
+    nc_df: Optional[pd.DataFrame],
+    id_fisc: Optional[str] = None,
+    total_fallback: int = 0,
+    qtd_anterior: Optional[int] = None,
+) -> Tuple[int, int]:
+    """
+    Calcula (qtd_analisadas, qtd_pendentes) para a conclusão do SOCICAM Monitoramento.
+    - qtd_analisadas: total de NCs pendentes avaliadas neste monitoramento (usa qtd_anterior quando maior, ou total de NCs reais do monitoramento).
+    - qtd_pendentes: total de NCs cuja Situação permanece 'Pendente' ou 'Parcialmente Sanada' (não 'Sanada').
+    """
+    if nc_df is None or not isinstance(nc_df, pd.DataFrame) or nc_df.empty:
+        analisadas = qtd_anterior if (qtd_anterior and qtd_anterior > 0) else max(0, int(total_fallback or 0))
+        return analisadas, max(0, int(total_fallback or 0))
+
+    df = nc_df
+    if id_fisc and "ID da Fiscalização" in df.columns:
+        id_fisc_str = str(id_fisc).strip()
+        if id_fisc_str:
+            mask_id = df["ID da Fiscalização"].astype(str).str.strip() == id_fisc_str
+            df_filtered = df[mask_id]
+            if not df_filtered.empty:
+                df = df_filtered
+
+    # Ignora fotos extras relacionadas à mesma NC se a flag existir
+    if "is_relacionado" in df.columns:
+        mask_rel = df["is_relacionado"].apply(
+            lambda v: str(v).strip().lower() in ("true", "1") if not isinstance(v, bool) else v
+        )
+        df_principal = df[~mask_rel]
+        if not df_principal.empty:
+            df = df_principal
+
+    col_nc = next((c for c in df.columns if str(c).strip().lower() in ("não conformidade", "nao conformidade")), None)
+    if col_nc:
+        ncs_reais = df[df[col_nc].fillna("").astype(str).str.strip() != ""]
+    else:
+        ncs_reais = df
+
+    total_reais = len(ncs_reais)
+    if total_reais == 0:
+        analisadas = qtd_anterior if (qtd_anterior and qtd_anterior > 0) else max(0, int(total_fallback or 0))
+        return analisadas, max(0, int(total_fallback or 0))
+
+    qtd_analisadas = max(total_reais, int(qtd_anterior)) if (qtd_anterior and qtd_anterior > 0) else total_reais
+
+    col_sit = next((c for c in ncs_reais.columns if str(c).strip().lower() in ("situação", "situacao")), None)
+    if col_sit:
+        situacoes = ncs_reais[col_sit].fillna("Pendente").astype(str).str.strip().str.lower()
+        qtd_sanadas = int((situacoes == "sanada").sum())
+        qtd_pendentes = max(0, total_reais - qtd_sanadas)
+    else:
+        qtd_pendentes = total_reais
+
+    return qtd_analisadas, qtd_pendentes
+
+
 def formatar_titulo_apendice_unico_socicam(local_val: Any) -> str:
     """
     Retorna o título padronizado do Apêndice Único da SOCICAM Fiscalização

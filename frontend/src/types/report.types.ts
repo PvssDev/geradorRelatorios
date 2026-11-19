@@ -32,6 +32,7 @@ export interface FiscalizacaoItem {
   Coordenador: string;
   Contrato: string;
   Período: string;
+  "Recomendações à SOCICAM"?: string;
   "Relatório Gerado": boolean;
 }
 

@@ -688,7 +688,15 @@ def gerar_secao_finalizacao(doc: Document, row, total_ncs, nc_df=None, fotos_dir
             doc.add_paragraph()  # Espaço
             adicionar_titulo_secao(doc, f"{num_str}. CONCLUSÕES E RECOMENDAÇÕES")
             doc.add_paragraph()  # Pula linha abaixo do título
-            for runs in report_config.get_conclusions_monitoramento_paragraphs(total_ncs, data_extenso):
+            try:
+                concl_paragraphs = report_config.get_conclusions_monitoramento_paragraphs(
+                    total_ncs, data_extenso, row=row, nc_df=nc_df
+                )
+            except TypeError:
+                concl_paragraphs = report_config.get_conclusions_monitoramento_paragraphs(
+                    total_ncs, data_extenso
+                )
+            for runs in concl_paragraphs:
                 resolved_runs = []
                 for text, bold, italic, color_rgb in runs:
                     resolved_text = text.replace("{ano}", ano).replace("{ano_anterior}", str(int(ano) - 1))

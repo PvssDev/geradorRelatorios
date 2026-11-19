@@ -75,8 +75,8 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
         n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         return (
             "COORDENADORIA DE TRANSPORTES E RODOVIAS\n"
-            f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO\n"
-            "DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}"
+            f"RELATÓRIO DO {n_curr_str} MONITORAMENTO\n"
+            "PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}"
         )
 
     @property
@@ -106,7 +106,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
         n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         return [
             f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}",
-            f"SEI Nº {self.processo_sei_prev}"
+            "SEI Nº XXXXXXXXXXXX"
         ]
 
     def get_objective_paragraphs(self, row: Any) -> List[Any]:
@@ -148,11 +148,12 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
             return p
 
         # Cabeçalho Superior
+        id_mon = self._resolver_id_monitoramento(row, self.ctr_num)
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("COORDENADORIA DE TRANSPORTES E RODOVIAS", bold=True, size_pt=12, space_after=4)
-        add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO", bold=True, size_pt=12, space_after=4)
-        add_cover_p(f"DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {self.ctr_num}", bold=True, size_pt=12, space_after=12)
+        add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO", bold=True, size_pt=12, space_after=4)
+        add_cover_p(f"PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_mon}", bold=True, size_pt=12, space_after=12)
 
         # Imagem da Capa
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -175,7 +176,7 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
         add_cover_p("CONTRATO DE CONCESSÃO PARA A EXPLORAÇÃO DO COMPLEXO", bold=True, size_pt=11, space_after=4)
         add_cover_p("VIÁRIO E LOGÍSTICO DE SUAPE – EXPRESS WAY - CT Nº 043/2011", bold=True, size_pt=11, space_after=6)
         add_cover_p("", bold=False, size_pt=11, space_after=6)
-        add_cover_p(f"PROCESSO SEI Nº {self.processo_sei_prev}", bold=True, size_pt=11, space_after=6)
+        add_cover_p("PROCESSO SEI Nº XXXXXXXXXXXX", bold=True, size_pt=11, space_after=6)
         add_cover_p("", bold=False, size_pt=11, space_after=6)
         add_cover_p("Recife, data da assinatura eletrônica", bold=False, size_pt=11, space_after=0)
 
@@ -360,16 +361,16 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
                     analise_arpe = str(nc_row.get("Análise ARPE", "")).strip()
                     situacao = str(nc_row.get("Situação", "Pendente")).strip()
 
-                    if ident and not ident.lower().startswith("foto"):
-                        add_p(ident, bold=True)
-
-                    add_label_text("NÃO CONFORMIDADE: ", nc_desc if nc_desc else "A ser preenchido.")
-                    add_label_text("POSICIONAMENTO CRA: ", determinacao if determinacao else "A ser preenchido.")
-                    add_label_text("CONSTATAÇÃO: ", observacoes if observacoes else "A ser preenchido.")
-
-                    texto_analise = analise_arpe if analise_arpe else (f"Não Conformidade {situacao.title()}." if situacao else "A ser preenchido.")
-                    add_label_text("ANÁLISE ARPE: ", texto_analise)
-                    doc.add_paragraph()
+                    self._renderizar_bloco_nc_monitoramento(
+                        doc=doc,
+                        ident=ident,
+                        nc_desc=nc_desc,
+                        label_concessionaria="Posicionamento CRA: ",
+                        determinacao=determinacao,
+                        observacoes=observacoes,
+                        situacao=situacao,
+                        analise_arpe=analise_arpe,
+                    )
 
         # 4. RESUMO DA SITUAÇÃO
         adicionar_titulo_secao(doc, f"4. RESUMO DA SITUAÇÃO DAS NÃO CONFORMIDADES MONITORADAS ({mes_ano_cap})")
@@ -430,7 +431,13 @@ class CraMonitoramentoReport(BaseMonitoramentoMixin, CraReport, IReportContract)
     def finalizacao_sections_config(self) -> Dict[str, str]:
         return {"5": "conclusoes_monitoramento"}
 
-    def get_conclusions_monitoramento_paragraphs(self, total_ncs: int, data_extenso: str) -> List[Any]:
+    def get_conclusions_monitoramento_paragraphs(
+        self,
+        total_ncs: int,
+        data_extenso: str,
+        row: Any = None,
+        nc_df: Any = None,
+    ) -> List[Any]:
         n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         ctr_num = getattr(self, "ctr_num", "07/2025")
         return get_cra_monitoramento_conclusions_paragraphs(n_curr_str, ctr_num, data_extenso)

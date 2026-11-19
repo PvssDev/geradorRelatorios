@@ -6,6 +6,7 @@ import { useClickOutside } from "./hooks/useClickOutside";
 import { FiscalizacaoForm } from "./components/FiscalizacaoForm";
 import { UploadPanel } from "./components/UploadPanel";
 import { RegistroNcForm } from "./components/RegistroNcForm";
+import { RecomendacaoGeralPanel } from "./components/RecomendacaoGeralPanel";
 import { SummaryAndActionsPanel } from "./components/SummaryAndActionsPanel";
 import {
   ContratosManagerModal,
@@ -281,7 +282,22 @@ const AppContent: React.FC = () => {
             </div>
           )}
 
-          {/* 04 · Emissão e Exportação do Relatório */}
+          {/* 04 · Recomendação Geral (SOCICAM Monitoramento) */}
+          {tipoRelatorio === "SOCICAM" &&
+            categoriaRelatorio === "Monitoramento" &&
+            hasFiscalizacao &&
+            canOpenRegistro &&
+            hasRegistros && (
+              <div
+                className={`animate-reveal w-full min-w-0 ${
+                  dense ? "xl:col-span-2" : ""
+                }`}
+              >
+                <RecomendacaoGeralPanel />
+              </div>
+            )}
+
+          {/* 04 / 05 · Emissão e Exportação do Relatório */}
           {hasFiscalizacao && canOpenRegistro && hasRegistros && (
             <div
               className={`animate-reveal w-full min-w-0 ${
@@ -289,6 +305,12 @@ const AppContent: React.FC = () => {
               }`}
             >
               <SummaryAndActionsPanel
+                stepNumber={
+                  tipoRelatorio === "SOCICAM" &&
+                  categoriaRelatorio === "Monitoramento"
+                    ? 5
+                    : 4
+                }
                 onOpenEditModal={(tab = "nc") => {
                   setEditModalTab(tab);
                   setShowEditModal(true);

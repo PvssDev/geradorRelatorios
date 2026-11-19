@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+PROCESSO_SEI_PLACEHOLDER = "XXXXXXXXXXXX"
+
 class BaseReport(ABC):
     @property
     @abstractmethod
@@ -360,6 +362,101 @@ class BaseMonitoramentoMixin:
                                             .replace("Fiscalizados", "Monitorados")
                                             .replace("fiscalizadora", "monitoradora"))
         }
+
+    def _resolver_id_monitoramento(self, row, fallback: str = "") -> str:
+        """Extrai o ID do monitoramento informado na linha de cabeçalho, com fallback seguro."""
+        raw_id = ""
+        if row is not None:
+            if hasattr(row, "get"):
+                val = row.get("ID da Fiscalização", "")
+                raw_id = "" if val is None else str(val).strip()
+            elif isinstance(row, dict) or hasattr(row, "__getitem__"):
+                try:
+                    val = row["ID da Fiscalização"]
+                    raw_id = "" if val is None else str(val).strip()
+                except (KeyError, IndexError, TypeError):
+                    raw_id = ""
+        if raw_id and raw_id.lower() not in ("nan", "none"):
+            return raw_id
+        return fallback
+
+    def _renderizar_bloco_nc_monitoramento(
+        self,
+        doc,
+        ident: str,
+        nc_desc: str,
+        label_concessionaria: str,
+        determinacao: str,
+        observacoes: str,
+        situacao: str,
+        analise_arpe: str,
+    ) -> None:
+        """Renderiza um bloco padronizado de NC na Seção 3 do Monitoramento sem subitem 3.X por NC."""
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        def _add_p(text: str, bold: bool = False, space_after: int = 6):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p.paragraph_format.space_after = Pt(space_after)
+            p.paragraph_format.line_spacing = 1.15
+            run = p.add_run(text)
+            run.font.name = "Aptos"
+            run.font.size = Pt(11)
+            run.bold = bold
+            return p
+
+        def _add_label_text(label: str, text: str):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p.paragraph_format.space_after = Pt(4)
+            p.paragraph_format.line_spacing = 1.15
+            run_l = p.add_run(label)
+            run_l.bold = True
+            run_l.font.name = "Aptos"
+            run_l.font.size = Pt(11)
+            run_t = p.add_run(text)
+            run_t.font.name = "Aptos"
+            run_t.font.size = Pt(11)
+            return p
+
+        ident_val = (ident or "").strip()
+        desc_val = (nc_desc or "").strip()
+        has_valid_ident = bool(ident_val) and not ident_val.lower().startswith("foto")
+
+        if has_valid_ident and desc_val and desc_val.lower() != ident_val.lower():
+            header_text = f"{ident_val} {desc_val}"
+        elif has_valid_ident:
+            header_text = ident_val
+        elif desc_val:
+            header_text = desc_val
+        else:
+            header_text = "Não Conformidade"
+
+        _add_p(header_text, bold=True)
+        _add_label_text(
+            label_concessionaria,
+            determinacao.strip() if determinacao and determinacao.strip() else "A ser preenchido.",
+        )
+        _add_label_text(
+            "Constatação: ",
+            observacoes.strip() if observacoes and observacoes.strip() else "A ser preenchido.",
+        )
+
+        sit_val = (situacao or "").strip()
+        analise_val = (analise_arpe or "").strip()
+        if analise_val:
+            if sit_val and not analise_val.lower().startswith("não conformidade") and not analise_val.lower().startswith("nao conformidade"):
+                texto_analise = f"Não conformidade {sit_val}. {analise_val}"
+            else:
+                texto_analise = analise_val
+        elif sit_val:
+            texto_analise = f"Não conformidade {sit_val}."
+        else:
+            texto_analise = "A ser preenchido."
+
+        _add_label_text("Análise da ARPE: ", texto_analise)
+        doc.add_paragraph()
 
     def get_post_metodologia_extra_paragraphs(self, row, data_extenso, total_achados) -> tuple:
         title, paragraphs = super().get_post_metodologia_extra_paragraphs(row, data_extenso, total_achados)
