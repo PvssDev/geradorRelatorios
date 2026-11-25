@@ -41,6 +41,8 @@ from core.rules.cra_rules import normalizar_registros_cra_para_relatorio
 from services.data_service import gerar_planilha_excel_buffer
 from services.image_service import comprimir_imagem_para_word
 from services.monitoramento_service import processar_documento_monitoramento_anterior
+from server.routers.auth_router import router as auth_router
+from server.routers.sync_router import router as sync_router
 
 BASE_NC_OPTIONS = [
     "FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB",
@@ -69,13 +71,40 @@ app = FastAPI(
     version="2.0.0",
 )
 
+DEFAULT_DEV_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://localhost:19006",
+]
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
+ALLOWED_ORIGINS = (
+    [o.strip() for o in _raw_origins.split(",") if o.strip() and o.strip() != "*"]
+    if _raw_origins
+    else DEFAULT_DEV_ORIGINS
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
+
+
+@app.middleware("http")
+async def add_owasp_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+app.include_router(auth_router)
+app.include_router(sync_router)
 
 
 def _sincronizar_map_siglas_global(
