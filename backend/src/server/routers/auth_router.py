@@ -22,11 +22,13 @@ from core.rules.auth_sync_rules import (
     validar_formato_usuario,
 )
 from server.auth_sync_schemas import (
+    AdminResetSenhaRequestSchema,
     DecidirSolicitacaoRequestSchema,
     LoginRequestSchema,
     PerfilPublicoSchema,
     SolicitacaoItemResponseSchema,
     SolicitarAcessoRequestSchema,
+    UsuarioGerenciavelSchema,
 )
 from services.supabase_gateway import HttpSupabaseGateway, SupabaseGatewayError, get_supabase_gateway
 
@@ -360,5 +362,85 @@ def decidir_solicitacao(
         return {"ok": True, "status": payload.decisao}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+def require_adm_perfil(
+    caller: Dict[str, Any] = Depends(get_authenticated_perfil),
+) -> Dict[str, Any]:
+    if caller.get("role") != "adm":
+        raise HTTPException(status_code=403, detail="Acesso restrito ao Administrador (ADM).")
+    return caller
+
+
+@router.get("/admin/usuarios", response_model=List[UsuarioGerenciavelSchema])
+def listar_usuarios_gerenciaveis(
+    _adm: Dict[str, Any] = Depends(require_adm_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    try:
+        rows = gateway.list_perfis_gerenciaveis()
+        return [
+            UsuarioGerenciavelSchema(
+                id=str(r["id"]),
+                usuario=str(r["usuario"]),
+                nome_completo=str(r["nome_completo"]),
+                role=r["role"],
+                ativo=bool(r["ativo"]),
+                criado_em=str(r.get("criado_em", "")),
+            )
+            for r in rows
+        ]
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.post("/admin/usuarios/{user_id}/reset-senha")
+def admin_redefinir_senha_usuario(
+    user_id: str,
+    payload: AdminResetSenhaRequestSchema,
+    request: Request,
+    adm: Dict[str, Any] = Depends(require_adm_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    ip = _client_ip(request)
+    try:
+        reauth = gateway.sign_in_password(
+            montar_email_sintetico(str(adm["usuario"])),
+            payload.senha_confirmacao,
+        )
+        if not reauth:
+            gateway.insert_audit_log(
+                ator_id=str(adm["id"]),
+                acao="ADM_RESET_SENHA_REAUTH_FALHA",
+                alvo=user_id,
+                ip=ip,
+            )
+            raise HTTPException(status_code=401, detail="Senha de confirmação do ADM incorreta.")
+
+        alvo = gateway.get_perfil_by_id(user_id)
+        if not alvo:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        if alvo.get("role") == "adm":
+            raise HTTPException(
+                status_code=403,
+                detail="Contas ADM não podem ter senha alterada por esta rota.",
+            )
+
+        erro_senha = validar_forca_senha(payload.nova_senha, role=str(alvo["role"]))
+        if erro_senha:
+            raise HTTPException(status_code=422, detail=erro_senha)
+
+        gateway.admin_update_user_password(user_id, payload.nova_senha)
+        gateway.update_perfil_lockout(user_id, 0, None)
+        gateway.insert_audit_log(
+            ator_id=str(adm["id"]),
+            acao="ADM_RESET_SENHA_USUARIO",
+            alvo=str(alvo["usuario"]),
+            ip=ip,
+            detalhes={"role_alvo": alvo["role"]},
+        )
+        return {"ok": True, "usuario": alvo["usuario"]}
     except SupabaseGatewayError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))

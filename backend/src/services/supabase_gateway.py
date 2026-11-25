@@ -132,6 +132,33 @@ class HttpSupabaseGateway:
             raise SupabaseGatewayError("Resposta inválida do provedor de autenticação.", 502)
         return str(user_id)
 
+    def admin_update_user_password(self, user_id: str, nova_senha: str) -> None:
+        self._require_configured()
+        res = httpx.put(
+            f"{self.base_url}/auth/v1/admin/users/{user_id}",
+            headers=self._admin_headers(),
+            json={"password": nova_senha},
+            timeout=10.0,
+        )
+        if res.status_code not in (200, 204):
+            raise SupabaseGatewayError("Não foi possível atualizar a senha do usuário no Auth.", 400)
+
+    def list_perfis_gerenciaveis(self) -> List[Dict[str, Any]]:
+        self._require_configured()
+        res = httpx.get(
+            f"{self.base_url}/rest/v1/perfis",
+            headers=self._admin_headers(),
+            params={
+                "role": "in.(coordenador,analista)",
+                "select": "id,usuario,nome_completo,role,ativo,criado_em",
+                "order": "role.desc,nome_completo.asc",
+            },
+            timeout=8.0,
+        )
+        if res.status_code != 200:
+            raise SupabaseGatewayError("Erro ao listar coordenadores e analistas.", 502)
+        return res.json()
+
     def get_perfil_by_usuario(self, usuario: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
         res = httpx.get(
