@@ -143,6 +143,33 @@ class HttpSupabaseGateway:
         if res.status_code not in (200, 204):
             raise SupabaseGatewayError("Não foi possível atualizar a senha do usuário no Auth.", 400)
 
+    def admin_delete_user(self, user_id: str) -> None:
+        self._require_configured()
+        res = httpx.delete(
+            f"{self.base_url}/auth/v1/admin/users/{user_id}",
+            headers=self._admin_headers(),
+            timeout=10.0,
+        )
+        if res.status_code not in (200, 204):
+            raise SupabaseGatewayError(
+                "Não foi possível excluir a conta (o usuário pode possuir vistorias ou registros de auditoria vinculados; desative a conta em Editar).",
+                409,
+            )
+
+    def update_perfil_admin(self, user_id: str, fields: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_configured()
+        res = httpx.patch(
+            f"{self.base_url}/rest/v1/perfis",
+            headers=self._admin_headers(prefer="return=representation"),
+            params={"id": f"eq.{user_id}"},
+            json=fields,
+            timeout=8.0,
+        )
+        if res.status_code not in (200, 204):
+            raise SupabaseGatewayError("Não foi possível atualizar os dados do usuário.", 400)
+        rows = res.json() if res.content else []
+        return rows[0] if rows else {"id": user_id, **fields}
+
     def list_perfis_gerenciaveis(self) -> List[Dict[str, Any]]:
         self._require_configured()
         res = httpx.get(
