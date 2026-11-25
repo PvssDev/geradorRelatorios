@@ -11,6 +11,7 @@ from typing import Any, Deque, Dict, List, Optional
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 
 from core.rules.auth_sync_rules import (
+    agregar_telemetria_acessos,
     calcular_estado_pos_falha_login,
     criptografar_senha_temporaria,
     descriptografar_senha_temporaria,
@@ -408,6 +409,25 @@ def _obter_alvo_nao_adm(user_id: str, gateway: HttpSupabaseGateway) -> Dict[str,
             detail="Contas ADM não podem ser alteradas ou excluídas por esta rota.",
         )
     return alvo
+
+
+@router.get("/admin/telemetria")
+def obter_telemetria_adm(
+    _adm: Dict[str, Any] = Depends(require_adm_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    try:
+        perfis = gateway.list_perfis_gerenciaveis()
+        equipe_ativa = sum(1 for p in perfis if p.get("ativo"))
+        pendentes = len(gateway.list_solicitacoes_pendentes())
+        logs = gateway.list_audit_logs_recentes(dias=7)
+        return agregar_telemetria_acessos(
+            logs=logs,
+            total_equipe_ativa=equipe_ativa,
+            solicitacoes_pendentes=pendentes,
+        )
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
 
 @router.get("/admin/usuarios", response_model=List[UsuarioGerenciavelSchema])

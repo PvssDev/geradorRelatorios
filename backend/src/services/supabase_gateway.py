@@ -6,7 +6,7 @@ permitindo injeção de dependência limpa nos testes BDD (SOLID - DIP).
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import httpx
 
@@ -367,6 +367,24 @@ class HttpSupabaseGateway:
             )
         except httpx.HTTPError:
             pass
+
+    def list_audit_logs_recentes(self, dias: int = 7) -> List[Dict[str, Any]]:
+        self._require_configured()
+        desde = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
+        res = httpx.get(
+            f"{self.base_url}/rest/v1/audit_logs",
+            headers=self._admin_headers(),
+            params={
+                "criado_em": f"gte.{desde}",
+                "select": "acao,alvo,detalhes,criado_em",
+                "order": "criado_em.desc",
+                "limit": "200",
+            },
+            timeout=8.0,
+        )
+        if res.status_code != 200:
+            raise SupabaseGatewayError("Erro ao consultar telemetria de auditoria.", 502)
+        return res.json()
 
     def _normalize_storage_url(self, raw_path: str) -> str:
         if raw_path.startswith("http://") or raw_path.startswith("https://"):
