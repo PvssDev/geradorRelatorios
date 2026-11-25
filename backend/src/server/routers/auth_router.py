@@ -22,6 +22,9 @@ from core.rules.auth_sync_rules import (
     validar_formato_usuario,
 )
 from server.auth_sync_schemas import (
+    AdminAtualizarUsuarioRequestSchema,
+    AdminCriarUsuarioRequestSchema,
+    AdminDeletarUsuarioRequestSchema,
     AdminResetSenhaRequestSchema,
     DecidirSolicitacaoRequestSchema,
     LoginRequestSchema,
@@ -374,6 +377,39 @@ def require_adm_perfil(
     return caller
 
 
+def _reconfirmar_senha_adm(
+    adm: Dict[str, Any],
+    senha_confirmacao: str,
+    alvo: str,
+    ip: str,
+    gateway: HttpSupabaseGateway,
+) -> None:
+    reauth = gateway.sign_in_password(
+        montar_email_sintetico(str(adm["usuario"])),
+        senha_confirmacao,
+    )
+    if not reauth:
+        gateway.insert_audit_log(
+            ator_id=str(adm["id"]),
+            acao="ADM_RECONFIRMACAO_SENHA_FALHA",
+            alvo=alvo,
+            ip=ip,
+        )
+        raise HTTPException(status_code=401, detail="Senha de confirmação do ADM incorreta.")
+
+
+def _obter_alvo_nao_adm(user_id: str, gateway: HttpSupabaseGateway) -> Dict[str, Any]:
+    alvo = gateway.get_perfil_by_id(user_id)
+    if not alvo:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    if alvo.get("role") == "adm":
+        raise HTTPException(
+            status_code=403,
+            detail="Contas ADM não podem ser alteradas ou excluídas por esta rota.",
+        )
+    return alvo
+
+
 @router.get("/admin/usuarios", response_model=List[UsuarioGerenciavelSchema])
 def listar_usuarios_gerenciaveis(
     _adm: Dict[str, Any] = Depends(require_adm_perfil),
@@ -396,6 +432,121 @@ def listar_usuarios_gerenciaveis(
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
 
+@router.post("/admin/usuarios", status_code=201)
+def admin_criar_usuario(
+    payload: AdminCriarUsuarioRequestSchema,
+    request: Request,
+    adm: Dict[str, Any] = Depends(require_adm_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    ip = _client_ip(request)
+    nome = payload.nome_completo.strip()
+    usuario = normalizar_usuario(payload.usuario)
+    if len(nome) < 3:
+        raise HTTPException(status_code=422, detail="Informe o nome completo.")
+    if not validar_formato_usuario(usuario):
+        raise HTTPException(
+            status_code=422,
+            detail="Usuário deve ter 3 a 32 caracteres (letras minúsculas, números, . _ -).",
+        )
+    erro_senha = validar_forca_senha(payload.senha, role=payload.role)
+    if erro_senha:
+        raise HTTPException(status_code=422, detail=erro_senha)
+
+    try:
+        _reconfirmar_senha_adm(adm, payload.senha_confirmacao, usuario, ip, gateway)
+        if gateway.get_perfil_by_usuario(usuario):
+            raise HTTPException(status_code=409, detail="Este nome de usuário já está em uso.")
+
+        novo_uid = gateway.admin_create_user(montar_email_sintetico(usuario), payload.senha)
+        perfil = gateway.insert_perfil(
+            user_id=novo_uid,
+            usuario=usuario,
+            nome_completo=nome,
+            role=payload.role,
+        )
+        gateway.insert_audit_log(
+            ator_id=str(adm["id"]),
+            acao="ADM_CRIAR_USUARIO",
+            alvo=usuario,
+            ip=ip,
+            detalhes={"role": payload.role},
+        )
+        return {"ok": True, "usuario": _serializar_perfil_publico(perfil)}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.put("/admin/usuarios/{user_id}")
+def admin_atualizar_usuario(
+    user_id: str,
+    payload: AdminAtualizarUsuarioRequestSchema,
+    request: Request,
+    adm: Dict[str, Any] = Depends(require_adm_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    ip = _client_ip(request)
+    nome = payload.nome_completo.strip()
+    if len(nome) < 3:
+        raise HTTPException(status_code=422, detail="Informe o nome completo.")
+    if payload.nova_senha:
+        erro_senha = validar_forca_senha(payload.nova_senha, role=payload.role)
+        if erro_senha:
+            raise HTTPException(status_code=422, detail=erro_senha)
+
+    try:
+        _reconfirmar_senha_adm(adm, payload.senha_confirmacao, user_id, ip, gateway)
+        alvo = _obter_alvo_nao_adm(user_id, gateway)
+
+        atualizado = gateway.update_perfil_admin(
+            user_id,
+            {"nome_completo": nome, "role": payload.role, "ativo": payload.ativo},
+        )
+        if payload.nova_senha:
+            gateway.admin_update_user_password(user_id, payload.nova_senha)
+            gateway.update_perfil_lockout(user_id, 0, None)
+
+        gateway.insert_audit_log(
+            ator_id=str(adm["id"]),
+            acao="ADM_EDITAR_USUARIO",
+            alvo=str(alvo["usuario"]),
+            ip=ip,
+            detalhes={
+                "role": payload.role,
+                "ativo": payload.ativo,
+                "senha_alterada": bool(payload.nova_senha),
+            },
+        )
+        return {"ok": True, "usuario": _serializar_perfil_publico({**alvo, **atualizado})}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.post("/admin/usuarios/{user_id}/deletar")
+def admin_deletar_usuario(
+    user_id: str,
+    payload: AdminDeletarUsuarioRequestSchema,
+    request: Request,
+    adm: Dict[str, Any] = Depends(require_adm_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    ip = _client_ip(request)
+    try:
+        _reconfirmar_senha_adm(adm, payload.senha_confirmacao, user_id, ip, gateway)
+        alvo = _obter_alvo_nao_adm(user_id, gateway)
+        gateway.admin_delete_user(user_id)
+        gateway.insert_audit_log(
+            ator_id=str(adm["id"]),
+            acao="ADM_DELETAR_USUARIO",
+            alvo=str(alvo["usuario"]),
+            ip=ip,
+            detalhes={"role_alvo": alvo["role"]},
+        )
+        return {"ok": True, "usuario": alvo["usuario"]}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
 @router.post("/admin/usuarios/{user_id}/reset-senha")
 def admin_redefinir_senha_usuario(
     user_id: str,
@@ -406,27 +557,8 @@ def admin_redefinir_senha_usuario(
 ):
     ip = _client_ip(request)
     try:
-        reauth = gateway.sign_in_password(
-            montar_email_sintetico(str(adm["usuario"])),
-            payload.senha_confirmacao,
-        )
-        if not reauth:
-            gateway.insert_audit_log(
-                ator_id=str(adm["id"]),
-                acao="ADM_RESET_SENHA_REAUTH_FALHA",
-                alvo=user_id,
-                ip=ip,
-            )
-            raise HTTPException(status_code=401, detail="Senha de confirmação do ADM incorreta.")
-
-        alvo = gateway.get_perfil_by_id(user_id)
-        if not alvo:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-        if alvo.get("role") == "adm":
-            raise HTTPException(
-                status_code=403,
-                detail="Contas ADM não podem ter senha alterada por esta rota.",
-            )
+        _reconfirmar_senha_adm(adm, payload.senha_confirmacao, user_id, ip, gateway)
+        alvo = _obter_alvo_nao_adm(user_id, gateway)
 
         erro_senha = validar_forca_senha(payload.nova_senha, role=str(alvo["role"]))
         if erro_senha:

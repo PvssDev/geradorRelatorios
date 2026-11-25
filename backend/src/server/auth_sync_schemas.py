@@ -68,6 +68,26 @@ class AdminResetSenhaRequestSchema(StrictBaseModel):
     senha_confirmacao: str = Field(..., min_length=6, max_length=128)
 
 
+class AdminCriarUsuarioRequestSchema(StrictBaseModel):
+    nome_completo: str = Field(..., min_length=3, max_length=120)
+    usuario: str = Field(..., min_length=3, max_length=32)
+    role: RequestableRoleLiteral
+    senha: str = Field(..., min_length=10, max_length=128)
+    senha_confirmacao: str = Field(..., min_length=6, max_length=128)
+
+
+class AdminAtualizarUsuarioRequestSchema(StrictBaseModel):
+    nome_completo: str = Field(..., min_length=3, max_length=120)
+    role: RequestableRoleLiteral
+    ativo: bool = True
+    nova_senha: Optional[str] = Field(default=None, max_length=128)
+    senha_confirmacao: str = Field(..., min_length=6, max_length=128)
+
+
+class AdminDeletarUsuarioRequestSchema(StrictBaseModel):
+    senha_confirmacao: str = Field(..., min_length=6, max_length=128)
+
+
 class PresignUploadRequestSchema(StrictBaseModel):
     vistoria_id: str = Field(..., min_length=3, max_length=80)
     nome_arquivo: str = Field(..., min_length=5, max_length=120)
