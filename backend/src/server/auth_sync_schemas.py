@@ -54,6 +54,20 @@ class DecidirSolicitacaoRequestSchema(StrictBaseModel):
     senha_confirmacao: Optional[str] = Field(default=None, max_length=128)
 
 
+class UsuarioGerenciavelSchema(StrictBaseModel):
+    id: str
+    usuario: str
+    nome_completo: str
+    role: RequestableRoleLiteral
+    ativo: bool
+    criado_em: str
+
+
+class AdminResetSenhaRequestSchema(StrictBaseModel):
+    nova_senha: str = Field(..., min_length=10, max_length=128)
+    senha_confirmacao: str = Field(..., min_length=6, max_length=128)
+
+
 class PresignUploadRequestSchema(StrictBaseModel):
     vistoria_id: str = Field(..., min_length=3, max_length=80)
     nome_arquivo: str = Field(..., min_length=5, max_length=120)
