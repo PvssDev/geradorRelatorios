@@ -55,6 +55,10 @@ class HttpSupabaseGateway:
         self.anon_key = (anon_key or os.environ.get("SUPABASE_ANON_KEY", "")).strip()
         self.service_role_key = (service_role_key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")).strip()
         self.storage_bucket = (storage_bucket or os.environ.get("STORAGE_BUCKET", "vistorias-temp")).strip()
+        self._client = httpx.Client(
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+            timeout=10.0,
+        )
 
     def is_configured(self) -> bool:
         return bool(self.base_url and self.anon_key and self.service_role_key)
@@ -86,7 +90,7 @@ class HttpSupabaseGateway:
 
     def sign_in_password(self, email_sintetico: str, senha: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/auth/v1/token?grant_type=password",
             headers={"apikey": self.anon_key, "Content-Type": "application/json"},
             json={"email": email_sintetico, "password": senha},
@@ -100,7 +104,7 @@ class HttpSupabaseGateway:
         self._require_configured()
         if not refresh_token:
             return None
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/auth/v1/token?grant_type=refresh_token",
             headers={"apikey": self.anon_key, "Content-Type": "application/json"},
             json={"refresh_token": refresh_token},
@@ -114,7 +118,7 @@ class HttpSupabaseGateway:
         self._require_configured()
         if not access_token:
             return None
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/auth/v1/user",
             headers={
                 "apikey": self.anon_key,
@@ -129,7 +133,7 @@ class HttpSupabaseGateway:
 
     def admin_create_user(self, email_sintetico: str, senha: str) -> str:
         self._require_configured()
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/auth/v1/admin/users",
             headers=self._admin_headers(),
             json={
@@ -148,7 +152,7 @@ class HttpSupabaseGateway:
 
     def admin_update_user_password(self, user_id: str, nova_senha: str) -> None:
         self._require_configured()
-        res = httpx.put(
+        res = self._client.put(
             f"{self.base_url}/auth/v1/admin/users/{user_id}",
             headers=self._admin_headers(),
             json={"password": nova_senha},
@@ -159,7 +163,7 @@ class HttpSupabaseGateway:
 
     def admin_delete_user(self, user_id: str) -> None:
         self._require_configured()
-        res = httpx.delete(
+        res = self._client.delete(
             f"{self.base_url}/auth/v1/admin/users/{user_id}",
             headers=self._admin_headers(),
             timeout=10.0,
@@ -172,7 +176,7 @@ class HttpSupabaseGateway:
 
     def update_perfil_admin(self, user_id: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         self._require_configured()
-        res = httpx.patch(
+        res = self._client.patch(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(prefer="return=representation"),
             params={"id": f"eq.{user_id}"},
@@ -186,7 +190,7 @@ class HttpSupabaseGateway:
 
     def list_perfis_gerenciaveis(self) -> List[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(),
             params={
@@ -202,7 +206,7 @@ class HttpSupabaseGateway:
 
     def get_perfil_by_usuario(self, usuario: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(),
             params={
@@ -219,7 +223,7 @@ class HttpSupabaseGateway:
 
     def get_perfil_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(),
             params={
@@ -241,7 +245,7 @@ class HttpSupabaseGateway:
         bloqueado_ate: Optional[str],
     ) -> None:
         self._require_configured()
-        httpx.patch(
+        self._client.patch(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(),
             params={"id": f"eq.{user_id}"},
@@ -251,7 +255,7 @@ class HttpSupabaseGateway:
 
     def insert_perfil(self, user_id: str, usuario: str, nome_completo: str, role: str) -> Dict[str, Any]:
         self._require_configured()
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(prefer="return=representation"),
             json={
@@ -270,7 +274,7 @@ class HttpSupabaseGateway:
 
     def get_solicitacao_by_usuario(self, usuario: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/solicitacoes_acesso",
             headers=self._admin_headers(),
             params={"usuario": f"eq.{usuario}", "select": "id,usuario,status", "limit": "1"},
@@ -283,7 +287,7 @@ class HttpSupabaseGateway:
 
     def get_solicitacao_by_id(self, sol_id: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/solicitacoes_acesso",
             headers=self._admin_headers(),
             params={
@@ -306,7 +310,7 @@ class HttpSupabaseGateway:
         senha_hash_temp: str,
     ) -> Dict[str, Any]:
         self._require_configured()
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/rest/v1/solicitacoes_acesso",
             headers=self._admin_headers(prefer="return=representation"),
             json={
@@ -325,7 +329,7 @@ class HttpSupabaseGateway:
 
     def list_solicitacoes_pendentes(self) -> List[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/solicitacoes_acesso",
             headers=self._admin_headers(),
             params={
@@ -341,7 +345,7 @@ class HttpSupabaseGateway:
 
     def finalize_solicitacao(self, sol_id: str, status: str, decidido_por: str) -> None:
         self._require_configured()
-        res = httpx.patch(
+        res = self._client.patch(
             f"{self.base_url}/rest/v1/solicitacoes_acesso",
             headers=self._admin_headers(),
             params={"id": f"eq.{sol_id}"},
@@ -367,7 +371,7 @@ class HttpSupabaseGateway:
         if not self.is_configured():
             return
         try:
-            httpx.post(
+            self._client.post(
                 f"{self.base_url}/rest/v1/audit_logs",
                 headers=self._admin_headers(),
                 json={
@@ -384,7 +388,7 @@ class HttpSupabaseGateway:
 
     def list_audit_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/audit_logs",
             headers=self._admin_headers(),
             params={
@@ -409,7 +413,7 @@ class HttpSupabaseGateway:
 
     def create_presigned_upload_url(self, storage_key: str) -> str:
         self._require_configured()
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/storage/v1/object/upload/sign/{self.storage_bucket}/{storage_key}",
             headers=self._admin_headers(),
             json={},
@@ -425,7 +429,7 @@ class HttpSupabaseGateway:
 
     def create_presigned_download_url(self, storage_key: str, expires_in: int = PRESIGN_EXPIRES_SECONDS) -> str:
         self._require_configured()
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/storage/v1/object/sign/{self.storage_bucket}/{storage_key}",
             headers=self._admin_headers(),
             json={"expiresIn": min(expires_in, PRESIGN_EXPIRES_SECONDS)},
@@ -441,7 +445,7 @@ class HttpSupabaseGateway:
 
     def upsert_vistoria_transito(self, record: Dict[str, Any]) -> Dict[str, Any]:
         self._require_configured()
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/rest/v1/vistorias_transito",
             headers=self._admin_headers(prefer="resolution=merge-duplicates,return=representation"),
             json=record,
@@ -456,7 +460,7 @@ class HttpSupabaseGateway:
         self._require_configured()
         if not fotos:
             return
-        res = httpx.post(
+        res = self._client.post(
             f"{self.base_url}/rest/v1/vistorias_fotos_temp",
             headers=self._admin_headers(prefer="resolution=merge-duplicates"),
             json=fotos,
@@ -467,39 +471,65 @@ class HttpSupabaseGateway:
 
     def list_vistorias_transito(self, autor_id_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         self._require_configured()
+        base_select = "id,id_fiscalizacao,autor_id,concessao,modalidade,status_handoff,payload_json,total_fotos,atualizado_em"
         params: Dict[str, str] = {
             "status_handoff": "in.(aguardando_web,em_revisao)",
-            "select": "id,id_fiscalizacao,autor_id,concessao,modalidade,status_handoff,payload_json,total_fotos,atualizado_em",
+            "select": f"{base_select},perfis(usuario,nome_completo,role)",
             "order": "atualizado_em.desc",
         }
         if autor_id_filter:
             params["autor_id"] = f"eq.{autor_id_filter}"
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/vistorias_transito",
             headers=self._admin_headers(),
             params=params,
             timeout=10.0,
         )
+        used_join = res.status_code == 200
+        if not used_join:
+            params["select"] = base_select
+            res = self._client.get(
+                f"{self.base_url}/rest/v1/vistorias_transito",
+                headers=self._admin_headers(),
+                params=params,
+                timeout=10.0,
+            )
         if res.status_code != 200:
             raise SupabaseGatewayError("Erro ao listar vistorias sincronizadas.", 502)
         rows = res.json()
         if not rows:
             return rows
 
-        perfis_res = httpx.get(
-            f"{self.base_url}/rest/v1/perfis",
-            headers=self._admin_headers(),
-            params={"select": "id,usuario,nome_completo,role"},
-            timeout=8.0,
-        )
+        if used_join:
+            for row in rows:
+                perfil_emb = row.pop("perfis", None)
+                if isinstance(perfil_emb, list):
+                    perfil_emb = perfil_emb[0] if perfil_emb else {}
+                info_autor = perfil_emb if isinstance(perfil_emb, dict) else {}
+                row["autor_usuario"] = str(info_autor.get("usuario", ""))
+                row["autor_nome"] = str(info_autor.get("nome_completo", ""))
+                row["autor_role"] = str(info_autor.get("role", "analista"))
+            return rows
+
+        autor_ids = sorted({str(r.get("autor_id", "")) for r in rows if r.get("autor_id")})
         mapa_perfis: Dict[str, Dict[str, str]] = {}
-        if perfis_res.status_code == 200:
-            for p in perfis_res.json():
-                mapa_perfis[str(p["id"])] = {
-                    "usuario": str(p.get("usuario", "")),
-                    "nome_completo": str(p.get("nome_completo", "")),
-                    "role": str(p.get("role", "analista")),
-                }
+        if autor_ids:
+            perfis_res = self._client.get(
+                f"{self.base_url}/rest/v1/perfis",
+                headers=self._admin_headers(),
+                params={
+                    "id": f"in.({','.join(autor_ids)})",
+                    "select": "id,usuario,nome_completo,role",
+                },
+                timeout=8.0,
+            )
+            if perfis_res.status_code == 200:
+                for p in perfis_res.json():
+                    mapa_perfis[str(p["id"])] = {
+                        "usuario": str(p.get("usuario", "")),
+                        "nome_completo": str(p.get("nome_completo", "")),
+                        "role": str(p.get("role", "analista")),
+                    }
 
         for row in rows:
             info_autor = mapa_perfis.get(str(row.get("autor_id", "")), {})
@@ -510,7 +540,7 @@ class HttpSupabaseGateway:
 
     def update_vistoria_autor(self, vistoria_id: str, novo_autor_id: str) -> None:
         self._require_configured()
-        res = httpx.patch(
+        res = self._client.patch(
             f"{self.base_url}/rest/v1/vistorias_transito",
             headers=self._admin_headers(),
             params={"id": f"eq.{vistoria_id}"},
@@ -528,7 +558,7 @@ class HttpSupabaseGateway:
         for key in storage_keys:
             if not key:
                 continue
-            httpx.delete(
+            self._client.delete(
                 f"{self.base_url}/storage/v1/object/{self.storage_bucket}/{key}",
                 headers=self._admin_headers(),
                 timeout=8.0,
@@ -536,7 +566,7 @@ class HttpSupabaseGateway:
 
     def delete_vistoria_transito(self, vistoria_id: str) -> None:
         self._require_configured()
-        res = httpx.delete(
+        res = self._client.delete(
             f"{self.base_url}/rest/v1/vistorias_transito",
             headers=self._admin_headers(),
             params={"id": f"eq.{vistoria_id}"},
@@ -547,7 +577,7 @@ class HttpSupabaseGateway:
 
     def get_vistoria_transito(self, vistoria_id: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/vistorias_transito",
             headers=self._admin_headers(),
             params={
@@ -564,7 +594,7 @@ class HttpSupabaseGateway:
 
     def list_fotos_temp_by_vistoria(self, vistoria_id: str) -> List[Dict[str, Any]]:
         self._require_configured()
-        res = httpx.get(
+        res = self._client.get(
             f"{self.base_url}/rest/v1/vistorias_fotos_temp",
             headers=self._admin_headers(),
             params={
