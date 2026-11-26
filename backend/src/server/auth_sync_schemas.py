@@ -60,6 +60,25 @@ class UsuarioGerenciavelSchema(StrictBaseModel):
     nome_completo: str
     role: RequestableRoleLiteral
     ativo: bool
+    bloqueado: bool = False
+    criado_em: str
+
+
+class RefreshRequestSchema(StrictBaseModel):
+    refresh_token: Optional[str] = Field(default=None, max_length=4096)
+
+
+class AdminConfirmacaoRequestSchema(StrictBaseModel):
+    senha_confirmacao: str = Field(..., min_length=6, max_length=128)
+
+
+class AuditLogItemSchema(StrictBaseModel):
+    id: str
+    ator_id: Optional[str] = None
+    acao: str
+    alvo: Optional[str] = None
+    ip: Optional[str] = None
+    detalhes: Dict[str, Any] = Field(default_factory=dict)
     criado_em: str
 
 
@@ -116,3 +135,7 @@ class VistoriaSyncRequestSchema(StrictBaseModel):
     modalidade: ModalidadeLiteral
     payload_json: Dict[str, Any]
     fotos: List[FotoTempSyncSchema] = Field(default_factory=list)
+
+
+class AtribuirVistoriaRequestSchema(StrictBaseModel):
+    novo_autor_id: str = Field(..., min_length=3, max_length=80)

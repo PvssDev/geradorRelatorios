@@ -12,15 +12,17 @@ from core.rules.auth_sync_rules import (
     PRESIGN_EXPIRES_SECONDS,
     gerar_storage_key_segura,
     pode_aprovar_acessos,
+    resolver_nome_unico_vistoria,
     validar_payload_vistoria_seis_estados,
     validar_presign_upload,
 )
 from server.auth_sync_schemas import (
+    AtribuirVistoriaRequestSchema,
     PresignUploadRequestSchema,
     PresignUploadResponseSchema,
     VistoriaSyncRequestSchema,
 )
-from server.routers.auth_router import get_authenticated_perfil
+from server.dependencies.auth_deps import get_authenticated_perfil
 from services.supabase_gateway import HttpSupabaseGateway, SupabaseGatewayError, get_supabase_gateway
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
@@ -102,15 +104,43 @@ def sincronizar_vistoria_finalizada(
             raise HTTPException(status_code=403, detail="Sem permissão para sobrescrever esta vistoria.")
 
         autor_id = str(existente["autor_id"]) if existente else str(caller["id"])
+        todas_nuvem = gateway.list_vistorias_transito()
+        nomes_outros = [
+            str(item.get("id_fiscalizacao", ""))
+            for item in todas_nuvem
+            if str(item.get("id")) != payload.id
+        ]
+        id_fiscalizacao_final = resolver_nome_unico_vistoria(
+            payload.id_fiscalizacao,
+            nomes_outros,
+        )
+
+        payload_json_ajustado = dict(payload.payload_json)
+        if id_fiscalizacao_final != payload.id_fiscalizacao:
+            fisc_dict = payload_json_ajustado.get("fiscalizacao")
+            if isinstance(fisc_dict, dict):
+                payload_json_ajustado["fiscalizacao"] = {
+                    **fisc_dict,
+                    "ID da Fiscalização": id_fiscalizacao_final,
+                }
+            recs = payload_json_ajustado.get("registros_nc")
+            if isinstance(recs, list):
+                payload_json_ajustado["registros_nc"] = [
+                    {**r, "ID da Fiscalização": id_fiscalizacao_final}
+                    if isinstance(r, dict)
+                    else r
+                    for r in recs
+                ]
+
         saved = gateway.upsert_vistoria_transito(
             {
                 "id": payload.id,
-                "id_fiscalizacao": payload.id_fiscalizacao,
+                "id_fiscalizacao": id_fiscalizacao_final,
                 "autor_id": autor_id,
                 "concessao": payload.concessao,
                 "modalidade": payload.modalidade,
                 "status_handoff": "aguardando_web",
-                "payload_json": payload.payload_json,
+                "payload_json": payload_json_ajustado,
                 "total_fotos": len(payload.fotos),
                 "atualizado_em": datetime.now(timezone.utc).isoformat(),
             }
@@ -139,10 +169,16 @@ def sincronizar_vistoria_finalizada(
             detalhes={
                 "concessao": payload.concessao,
                 "modalidade": payload.modalidade,
+                "id_fiscalizacao": id_fiscalizacao_final,
                 "total_fotos": len(payload.fotos),
             },
         )
-        return {"ok": True, "vistoria_id": saved.get("id", payload.id), "total_fotos": len(payload.fotos)}
+        return {
+            "ok": True,
+            "vistoria_id": saved.get("id", payload.id),
+            "id_fiscalizacao": id_fiscalizacao_final,
+            "total_fotos": len(payload.fotos),
+        }
     except SupabaseGatewayError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
@@ -153,9 +189,135 @@ def listar_vistorias_sincronizadas(
     gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
 ):
     try:
-        autor_filter = None if pode_aprovar_acessos(caller["role"]) else str(caller["id"])
-        rows = gateway.list_vistorias_transito(autor_id_filter=autor_filter)
+        rows = gateway.list_vistorias_transito()
         return {"vistorias": rows}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.delete("/vistorias/{vistoria_id}")
+def remover_vistoria_sincronizada(
+    vistoria_id: str,
+    request: Request,
+    caller: Dict[str, Any] = Depends(get_authenticated_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    try:
+        vistoria = gateway.get_vistoria_transito(vistoria_id)
+        if not vistoria:
+            return {"ok": True, "removida": False}
+        is_adm = caller["role"] == "adm"
+        is_owner = str(vistoria.get("autor_id")) == str(caller["id"])
+        if not is_adm and not is_owner:
+            raise HTTPException(status_code=403, detail="Apenas o autor ou o ADM pode remover esta vistoria da nuvem.")
+
+        fotos = gateway.list_fotos_temp_by_vistoria(vistoria_id)
+        storage_keys = [str(f.get("storage_key", "")) for f in fotos if f.get("storage_key")]
+        if storage_keys:
+            gateway.delete_storage_objects(storage_keys)
+
+        gateway.delete_vistoria_transito(vistoria_id)
+        gateway.insert_audit_log(
+            ator_id=str(caller["id"]),
+            acao="VISTORIA_REMOVIDA_NUVEM",
+            alvo=vistoria_id,
+            ip=_client_ip(request),
+            detalhes={"fotos_removidas": len(storage_keys)},
+        )
+        return {"ok": True, "removida": True, "fotos_removidas": len(storage_keys)}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.post("/vistorias/{vistoria_id}/puxar")
+def puxar_vistoria_da_nuvem(
+    vistoria_id: str,
+    request: Request,
+    caller: Dict[str, Any] = Depends(get_authenticated_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    try:
+        vistoria = gateway.get_vistoria_transito(vistoria_id)
+        if not vistoria:
+            raise HTTPException(status_code=404, detail="Vistoria não encontrada na nuvem.")
+
+        autor_atual = gateway.get_perfil_by_id(str(vistoria.get("autor_id")))
+        autor_role = str(autor_atual.get("role", "analista")) if autor_atual else "analista"
+        is_owner = str(vistoria.get("autor_id")) == str(caller["id"])
+        pode_puxar = (
+            caller["role"] == "adm"
+            or is_owner
+            or (caller["role"] == "coordenador" and autor_role in ("analista", "coordenador"))
+        )
+        if not pode_puxar:
+            raise HTTPException(status_code=403, detail="Sem permissão para puxar esta vistoria.")
+
+        if not is_owner:
+            gateway.update_vistoria_autor(vistoria_id, str(caller["id"]))
+            vistoria["autor_id"] = str(caller["id"])
+
+        fotos = gateway.list_fotos_temp_by_vistoria(vistoria_id)
+        fotos_urls = [
+            {
+                "id": f["id"],
+                "nome_arquivo": f["nome_arquivo"],
+                "ocorrencia_numero": f.get("ocorrencia_numero"),
+                "tamanho_kb": f["tamanho_kb"],
+                "download_url": gateway.create_presigned_download_url(
+                    str(f["storage_key"]),
+                    expires_in=PRESIGN_EXPIRES_SECONDS,
+                ),
+            }
+            for f in fotos
+        ]
+        gateway.insert_audit_log(
+            ator_id=str(caller["id"]),
+            acao="VISTORIA_PUXADA_NUVEM",
+            alvo=vistoria_id,
+            ip=_client_ip(request),
+            detalhes={"autor_anterior_role": autor_role},
+        )
+        return {"vistoria": vistoria, "fotos": fotos_urls}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.patch("/vistorias/{vistoria_id}/atribuir")
+def redirecionar_vistoria_adm(
+    vistoria_id: str,
+    payload: AtribuirVistoriaRequestSchema,
+    request: Request,
+    caller: Dict[str, Any] = Depends(get_authenticated_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    if caller["role"] != "adm":
+        raise HTTPException(status_code=403, detail="Apenas o ADM pode redirecionar vistorias.")
+
+    try:
+        vistoria = gateway.get_vistoria_transito(vistoria_id)
+        if not vistoria:
+            raise HTTPException(status_code=404, detail="Vistoria não encontrada.")
+
+        novo_autor = gateway.get_perfil_by_id(payload.novo_autor_id)
+        if not novo_autor or not novo_autor.get("ativo"):
+            raise HTTPException(status_code=404, detail="Usuário destino inativo ou não encontrado.")
+
+        gateway.update_vistoria_autor(vistoria_id, str(novo_autor["id"]))
+        gateway.insert_audit_log(
+            ator_id=str(caller["id"]),
+            acao="VISTORIA_REDIRECIONADA",
+            alvo=vistoria_id,
+            ip=_client_ip(request),
+            detalhes={"novo_autor_id": str(novo_autor["id"]), "novo_autor_usuario": novo_autor.get("usuario")},
+        )
+        return {
+            "ok": True,
+            "vistoria_id": vistoria_id,
+            "autor_id": str(novo_autor["id"]),
+            "autor_usuario": str(novo_autor.get("usuario", "")),
+            "autor_nome": str(novo_autor.get("nome_completo", "")),
+            "autor_role": str(novo_autor.get("role", "analista")),
+        }
     except SupabaseGatewayError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
