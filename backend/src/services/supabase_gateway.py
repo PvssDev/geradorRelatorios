@@ -96,6 +96,20 @@ class HttpSupabaseGateway:
             return None
         return res.json()
 
+    def refresh_session(self, refresh_token: str) -> Optional[Dict[str, Any]]:
+        self._require_configured()
+        if not refresh_token:
+            return None
+        res = httpx.post(
+            f"{self.base_url}/auth/v1/token?grant_type=refresh_token",
+            headers={"apikey": self.anon_key, "Content-Type": "application/json"},
+            json={"refresh_token": refresh_token},
+            timeout=10.0,
+        )
+        if res.status_code != 200:
+            return None
+        return res.json()
+
     def get_user_id_from_token(self, access_token: str) -> Optional[str]:
         self._require_configured()
         if not access_token:
@@ -177,7 +191,7 @@ class HttpSupabaseGateway:
             headers=self._admin_headers(),
             params={
                 "role": "in.(coordenador,analista)",
-                "select": "id,usuario,nome_completo,role,ativo,criado_em",
+                "select": "id,usuario,nome_completo,role,ativo,bloqueado_ate,criado_em",
                 "order": "role.desc,nome_completo.asc",
             },
             timeout=8.0,
@@ -368,6 +382,22 @@ class HttpSupabaseGateway:
         except httpx.HTTPError:
             pass
 
+    def list_audit_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
+        self._require_configured()
+        res = httpx.get(
+            f"{self.base_url}/rest/v1/audit_logs",
+            headers=self._admin_headers(),
+            params={
+                "select": "id,ator_id,acao,alvo,ip,detalhes,criado_em",
+                "order": "criado_em.desc",
+                "limit": str(int(limit)),
+            },
+            timeout=8.0,
+        )
+        if res.status_code != 200:
+            raise SupabaseGatewayError("Erro ao consultar trilha de auditoria.", 502)
+        return res.json()
+
     def _normalize_storage_url(self, raw_path: str) -> str:
         if raw_path.startswith("http://") or raw_path.startswith("https://"):
             return raw_path
@@ -452,7 +482,68 @@ class HttpSupabaseGateway:
         )
         if res.status_code != 200:
             raise SupabaseGatewayError("Erro ao listar vistorias sincronizadas.", 502)
-        return res.json()
+        rows = res.json()
+        if not rows:
+            return rows
+
+        perfis_res = httpx.get(
+            f"{self.base_url}/rest/v1/perfis",
+            headers=self._admin_headers(),
+            params={"select": "id,usuario,nome_completo,role"},
+            timeout=8.0,
+        )
+        mapa_perfis: Dict[str, Dict[str, str]] = {}
+        if perfis_res.status_code == 200:
+            for p in perfis_res.json():
+                mapa_perfis[str(p["id"])] = {
+                    "usuario": str(p.get("usuario", "")),
+                    "nome_completo": str(p.get("nome_completo", "")),
+                    "role": str(p.get("role", "analista")),
+                }
+
+        for row in rows:
+            info_autor = mapa_perfis.get(str(row.get("autor_id", "")), {})
+            row["autor_usuario"] = info_autor.get("usuario", "")
+            row["autor_nome"] = info_autor.get("nome_completo", "")
+            row["autor_role"] = info_autor.get("role", "analista")
+        return rows
+
+    def update_vistoria_autor(self, vistoria_id: str, novo_autor_id: str) -> None:
+        self._require_configured()
+        res = httpx.patch(
+            f"{self.base_url}/rest/v1/vistorias_transito",
+            headers=self._admin_headers(),
+            params={"id": f"eq.{vistoria_id}"},
+            json={
+                "autor_id": novo_autor_id,
+                "atualizado_em": datetime.now(timezone.utc).isoformat(),
+            },
+            timeout=8.0,
+        )
+        if res.status_code not in (200, 204):
+            raise SupabaseGatewayError("Falha ao redirecionar autoria da vistoria.", 502)
+
+    def delete_storage_objects(self, storage_keys: List[str]) -> None:
+        self._require_configured()
+        for key in storage_keys:
+            if not key:
+                continue
+            httpx.delete(
+                f"{self.base_url}/storage/v1/object/{self.storage_bucket}/{key}",
+                headers=self._admin_headers(),
+                timeout=8.0,
+            )
+
+    def delete_vistoria_transito(self, vistoria_id: str) -> None:
+        self._require_configured()
+        res = httpx.delete(
+            f"{self.base_url}/rest/v1/vistorias_transito",
+            headers=self._admin_headers(),
+            params={"id": f"eq.{vistoria_id}"},
+            timeout=8.0,
+        )
+        if res.status_code not in (200, 204):
+            raise SupabaseGatewayError("Falha ao remover vistoria da nuvem.", 502)
 
     def get_vistoria_transito(self, vistoria_id: str) -> Optional[Dict[str, Any]]:
         self._require_configured()

@@ -188,3 +188,18 @@ def validar_payload_vistoria_seis_estados(
                 if str(item.get(campo, "")).strip():
                     return "Violação de domínio SOCICAM: ocorrências não podem conter Pista ou Faixa."
     return None
+
+
+def resolver_nome_unico_vistoria(nome_desejado: str, nomes_existentes: List[str]) -> str:
+    """Resolve conflitos de nome na nuvem aplicando sufixo incremental (1), (2)..."""
+    base = (nome_desejado or "").strip() or "VISTORIA"
+    ocupados = {n.strip().casefold() for n in nomes_existentes if n and n.strip()}
+    if base.casefold() not in ocupados:
+        return base
+
+    indice = 1
+    while True:
+        candidato = f"{base} ({indice})"
+        if candidato.casefold() not in ocupados:
+            return candidato
+        indice += 1
