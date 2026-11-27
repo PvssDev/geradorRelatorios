@@ -6,42 +6,38 @@ import {
   ImagePlus,
   BarChart3,
   Rocket,
-  Wand2,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  MoreVertical,
-  Save,
-  FolderOpen,
-  HardDrive,
-  RefreshCw,
-  Palette,
-  Zap,
   LogOut,
   UserCheck,
+  FileText,
+  ClipboardList,
+  LayoutDashboard,
+  Table2,
+  AtSign,
+  Shield,
+  ShieldCheck,
+  Briefcase,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../store/useReportStore";
 import { useAuthStore } from "../store/useAuthStore";
-import {
-  solicitarPastaGeradorBD,
-  salvarEstadoEmGeradorBD,
-  carregarEstadoDeGeradorBD,
-  verificarStatusConexaoPasta,
-  PastaNaoEncontradaError,
-} from "../services/localDirectoryStorage";
-import { PastaGeradorBDModal } from "./modals/PastaGeradorBDModal";
+import { UserAvatar } from "./auth/UserAvatar";
+import { obterLabelPerfil } from "../utils/avatarUtils";
 import { getConcessionTheme } from "../utils/concessionTheme";
 import logoIcone from "../assets/logo/logo_icone.png";
+
+export type SidebarTab = "relatorio" | "vistorias" | "painel" | "quadro";
 
 interface SidebarProps {
   expanded: boolean;
   onToggleExpand: () => void;
   onNavigate?: () => void;
-  dense: boolean;
-  onToggleDense: (d: boolean) => void;
   performanceMode: boolean;
-  onTogglePerformanceMode: (p: boolean) => void;
+  activeTab: SidebarTab;
+  onSelectTab: (tab: SidebarTab) => void;
 }
 
 const BASE_NAV_ITEMS = [
@@ -63,43 +59,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   expanded,
   onToggleExpand,
   onNavigate,
-  dense,
-  onToggleDense,
   performanceMode,
-  onTogglePerformanceMode,
+  activeTab,
+  onSelectTab,
 }) => {
   const {
     tipoRelatorio,
     categoriaRelatorio,
     getActiveWorkspace,
-    executarAutoPreenchimento,
-    importarEstadoModalidade,
-    pastaLocalConectada,
-    nomePastaLocal,
-    setPastaLocalStatus,
   } = useReportStore();
   const perfil = useAuthStore((s) => s.perfil);
   const logout = useAuthStore((s) => s.logout);
   const ws = getActiveWorkspace();
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showFolderModal, setShowFolderModal] = useState(false);
-  const [modalErrorMessage, setModalErrorMessage] = useState("");
-  const [lastPendingAction, setLastPendingAction] = useState<"salvar" | "carregar" | "trocar" | null>(null);
-  const [storageOpen, setStorageOpen] = useState(false);
-  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [perfilOpen, setPerfilOpen] = useState(false);
+  const relatorioOpen = activeTab === "relatorio";
 
   const totalFotos = ws.photos.length;
-  const ncsCount = ws.registrosNc.filter(
-    (r) => (r["Não Conformidade"] || "").trim() !== ""
-  ).length;
-  const pasCount = ws.registrosNc.length - ncsCount;
 
   const hasFiscalizacao = Boolean(
     ws.fiscalizacoes?.length &&
-      ws.fiscalizacoes.some((f) => Boolean(f["ID da Fiscalização"]?.trim()))
+    ws.fiscalizacoes.some((f) => Boolean(f["ID da Fiscalização"]?.trim()))
   );
   const activeFiscId =
     ws.fiscalizacoes[ws.activeFiscalizacaoIndex]?.["ID da Fiscalização"]?.trim() || "";
@@ -135,8 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     if (!expanded) {
-      setStorageOpen(false);
-      setQuickActionsOpen(false);
+      setPerfilOpen(false);
     }
   }, [expanded]);
 
@@ -181,596 +161,394 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [maxUnlockedStep]);
 
-  // Identificação automática da pasta geradorBD na entrada do site
-  useEffect(() => {
-    verificarStatusConexaoPasta().then(({ conectado, nomePasta }) => {
-      setPastaLocalStatus(conectado, nomePasta);
-    });
-  }, [setPastaLocalStatus]);
-
-  const handleDemo = () => {
-    executarAutoPreenchimento();
-    toast.success("Dados preenchidos automaticamente!");
-    if (onNavigate) onNavigate();
-  };
-
-  /* ------------------------------------------------------------------------ */
-  /* AÇÕES DE PERSISTÊNCIA LOCAL (PASTA geradorBD)                            */
-  /* ------------------------------------------------------------------------ */
-  const handleSalvar = async () => {
-    if (isSaving || isLoading) return;
-    setIsSaving(true);
-    setLastPendingAction("salvar");
-
-    try {
-      const dirHandle = await solicitarPastaGeradorBD(false);
-      const res = await salvarEstadoEmGeradorBD(
-        dirHandle,
-        tipoRelatorio,
-        categoriaRelatorio,
-        ws,
-        useReportStore.getState().monitoringNewPhotoName
-      );
-      setPastaLocalStatus(true, dirHandle.name);
-      const extras = [
-        `${res.totalSessoes} relatório(s)`,
-        `${res.totalFotos} fotos`,
-        `${res.totalNcs} ocorrências`,
-      ];
-      if (res.totalArquivos > 0) extras.push(`${res.totalArquivos} anexo(s)`);
-      toast.success(
-        `Estado salvo com sucesso em ${dirHandle.name}! (${extras.join(", ")})`
-      );
-    } catch (err: any) {
-      if (err.name === "AbortError") return;
-      if (err instanceof PastaNaoEncontradaError) {
-        setPastaLocalStatus(false);
-        setModalErrorMessage(err.message);
-        setShowFolderModal(true);
-        return;
-      }
-      toast.error(`Falha ao salvar na pasta geradorBD: ${err.message || err}`);
-      verificarStatusConexaoPasta().then(({ conectado, nomePasta }) => {
-        setPastaLocalStatus(conectado, nomePasta);
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCarregar = async () => {
-    if (isSaving || isLoading) return;
-    setIsLoading(true);
-    setLastPendingAction("carregar");
-
-    try {
-      const dirHandle = await solicitarPastaGeradorBD(false);
-      const dados = await carregarEstadoDeGeradorBD(
-        dirHandle,
-        tipoRelatorio,
-        categoriaRelatorio
-      );
-
-      importarEstadoModalidade(tipoRelatorio, categoriaRelatorio, dados);
-      setPastaLocalStatus(true, dirHandle.name);
-      const extras = [];
-      if (dados.photos.length > 0) extras.push(`${dados.photos.length} fotos`);
-      if (dados.documentoAnteriorFile) extras.push(`documento anterior`);
-      if (dados.planilhaElegibilidadeFile) extras.push(`planilha`);
-      const det = extras.length > 0 ? ` (${extras.join(", ")})` : "";
-      toast.success(
-        `Dados de ${tipoRelatorio} - ${categoriaRelatorio} carregados!${det}`
-      );
-      if (onNavigate) onNavigate();
-    } catch (err: any) {
-      if (err.name === "AbortError") return;
-      if (err instanceof PastaNaoEncontradaError) {
-        setPastaLocalStatus(false);
-        setModalErrorMessage(err.message);
-        setShowFolderModal(true);
-        return;
-      }
-      toast.error(`Falha ao carregar de geradorBD: ${err.message || err}`);
-      verificarStatusConexaoPasta().then(({ conectado, nomePasta }) => {
-        setPastaLocalStatus(conectado, nomePasta);
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleTrocarPasta = async () => {
-    setLastPendingAction("trocar");
-    try {
-      const dirHandle = await solicitarPastaGeradorBD(true);
-      setPastaLocalStatus(true, dirHandle.name);
-      toast.success(`Pasta vinculada com sucesso: ${dirHandle.name}`);
-    } catch (err: any) {
-      if (err.name === "AbortError") return;
-      if (err instanceof PastaNaoEncontradaError) {
-        setPastaLocalStatus(false);
-        setModalErrorMessage(err.message);
-        setShowFolderModal(true);
-        return;
-      }
-      toast.error(`Erro ao vincular pasta: ${err.message || err}`);
-    }
-  };
-
-  const handleRetryPendingAction = () => {
-    if (lastPendingAction === "salvar") {
-      handleSalvar();
-    } else if (lastPendingAction === "carregar") {
-      handleCarregar();
-    } else {
-      handleTrocarPasta();
-    }
-  };
+  const focusRotaFechada = !expanded && relatorioOpen;
 
   return (
-    <>
       <aside
-        className={`no-scrollbar flex h-full shrink-0 flex-col justify-between overflow-x-hidden overflow-y-auto border-r border-white/10 bg-navy-gradient p-4 text-sidebar-foreground shadow-2xl select-none transition-[width] duration-300 ease-out ${
-          expanded ? "w-72" : "w-[76px]"
-        }`}
+        className={`no-scrollbar flex h-full shrink-0 flex-col justify-between overflow-x-hidden overflow-y-auto border-r border-white/10 bg-navy-gradient p-4 text-sidebar-foreground shadow-2xl select-none transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${expanded ? "w-72" : focusRotaFechada ? "w-[92px]" : "w-[76px]"
+          }`}
       >
         <div className="space-y-4">
-          {/* 1. Topo: Marca ARPE + Recolher */}
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              className="group flex min-w-0 items-center text-left transition hover:opacity-95"
-              title={expanded ? "Recolher menu lateral" : "Expandir menu lateral"}
-              aria-label={expanded ? "Recolher menu lateral" : "Expandir menu lateral"}
-            >
-              <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/[0.06] p-1.5 ring-1 ring-white/10 transition group-hover:bg-white/10">
+          {/* 1. Topo: Marca ARPE (oculta quando recolhido; sem círculo em volta) + Recolher */}
+          {expanded && (
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                className="group flex min-w-0 items-center text-left transition hover:opacity-95"
+                title="Recolher menu lateral"
+                aria-label="Recolher menu lateral"
+              >
                 <img
                   src={logoIcone}
                   alt="ARPE"
-                  className="h-full w-full object-contain"
+                  className="h-9 w-9 shrink-0 object-contain"
                 />
-              </div>
 
-              <div
-                className={`overflow-hidden whitespace-nowrap transition-all duration-200 ${
-                  expanded
-                    ? "ml-2.5 max-w-[165px] opacity-100"
-                    : "ml-0 max-w-0 opacity-0 pointer-events-none"
-                }`}
-              >
-                <div className="text-base font-extrabold tracking-wider text-white leading-none">
-                  ARPE
-                </div>
-                <div className="mt-0.5 text-[9.5px] font-medium tracking-tight text-slate-300/80 leading-tight">
-                  Agência de Regulação de PE
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              title="Recolher menu lateral"
-              aria-label="Recolher menu lateral"
-              className={`grid h-8 shrink-0 place-items-center rounded-xl bg-sidebar-accent text-sidebar-foreground/70 hover:bg-sidebar-primary hover:text-white transition-all duration-200 overflow-hidden ${
-                expanded ? "w-8 opacity-100" : "w-0 opacity-0 pointer-events-none"
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* 2. Identidade da Modalidade (visível apenas com o menu expandido) */}
-          <div
-            className={`grid w-full transition-all duration-300 ease-out ${
-              expanded
-                ? "grid-rows-[1fr] opacity-100"
-                : "grid-rows-[0fr] opacity-0 pointer-events-none !mt-0"
-            }`}
-          >
-            <div className="overflow-hidden">
-              <div className="flex flex-col items-center text-center">
-                <div
-                  className={`grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 border-accent/45 bg-sidebar-accent/90 font-extrabold text-white shadow-inner ${
-                    tipoRelatorio === "SOCICAM"
-                      ? "text-[8.5px] tracking-tight"
-                      : "text-[11px] tracking-wider"
-                  }`}
-                  title={`${tipoRelatorio} · ${categoriaRelatorio}`}
-                >
-                  {tipoRelatorio}
-                </div>
-
-                <div className="mt-2 text-xs font-bold text-white whitespace-nowrap">
-                  {tipoRelatorio} · {categoriaRelatorio}
-                </div>
-                <div className="mt-2.5 grid w-full grid-cols-3 gap-1.5">
-                  {[
-                    ["Fotos", totalFotos],
-                    ["NCs", ncsCount],
-                    ["PAs", pasCount],
-                  ].map(([l, v]) => (
-                    <div
-                      key={String(l)}
-                      className="rounded-xl bg-sidebar-accent/90 py-1.5 px-1 border border-white/5"
-                    >
-                      <div className="text-sm font-bold text-white">{v}</div>
-                      <div className="text-[10px] text-sidebar-foreground/60">{l}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Armazenamento Local (sempre na mesma posição acima da navegação) */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden transition-colors shadow-sm">
-            <button
-              type="button"
-              onClick={() => {
-                if (!expanded) {
-                  onToggleExpand();
-                  setStorageOpen(true);
-                } else {
-                  setStorageOpen(!storageOpen);
-                }
-              }}
-              className="flex w-full items-center text-left hover:bg-white/5 transition"
-              title={
-                pastaLocalConectada
-                  ? `geradorBD conectado (${nomePastaLocal || "ativo"})`
-                  : "Armazenamento Local (geradorBD)"
-              }
-              aria-label="Armazenamento Local geradorBD"
-            >
-              <div className="relative grid h-11 w-11 shrink-0 place-items-center text-white/90">
-                <HardDrive className="h-4 w-4" />
-                <span
-                  className={`absolute top-2 right-2 h-2 w-2 rounded-full transition-colors ${
-                    pastaLocalConectada
-                      ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
-                      : "bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.8)]"
-                  }`}
-                />
-              </div>
-
-              <div
-                className={`flex flex-1 items-center justify-between overflow-hidden whitespace-nowrap transition-all duration-200 ${
-                  expanded
-                    ? "pr-3 opacity-100"
-                    : "max-w-0 opacity-0 pointer-events-none"
-                }`}
-              >
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-white">
-                    Armazenamento Local
+                <div className="ml-2.5 overflow-hidden whitespace-nowrap">
+                  <div className="text-base font-extrabold tracking-wider text-white leading-none">
+                    ARPE
                   </div>
-                  <div className="text-[10px] text-sidebar-foreground/60">
-                    {pastaLocalConectada ? "geradorBD conectado" : "Pasta não vinculada"}
+                  <div className="mt-0.5 text-[9.5px] font-medium tracking-tight text-slate-300/80 leading-tight">
+                    Agência de Regulação de PE
                   </div>
                 </div>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-white/60 transition-transform duration-300 ${
-                    storageOpen ? "rotate-180 text-white" : ""
-                  }`}
-                />
-              </div>
-            </button>
-
-            {/* Sanfona Salvar / Carregar */}
-            <div
-              className={`grid transition-all duration-300 ease-in-out ${
-                expanded && storageOpen
-                  ? "grid-rows-[1fr] opacity-100 p-3 pt-0"
-                  : "grid-rows-[0fr] opacity-0 p-0 pointer-events-none"
-              }`}
-            >
-              <div className="overflow-hidden">
-                <div className="pt-2.5 border-t border-white/10 space-y-2.5">
-                  <div className="flex items-center justify-between text-[10px] text-white/70">
-                    <span className="flex items-center gap-1.5 truncate">
-                      <span
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                          pastaLocalConectada ? "bg-emerald-500" : "bg-amber-500"
-                        }`}
-                      />
-                      <span className="truncate">
-                        {pastaLocalConectada
-                          ? `Conectado a ${nomePastaLocal || "geradorBD"}`
-                          : "Pasta não encontrada"}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleTrocarPasta}
-                      className="text-accent hover:underline flex items-center gap-1 shrink-0 ml-2"
-                      title="Selecionar ou trocar pasta local"
-                    >
-                      <RefreshCw className="h-2.5 w-2.5" />
-                      {pastaLocalConectada ? "Trocar" : "Localizar"}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSalvar}
-                      disabled={isSaving || isLoading}
-                      className="flex items-center justify-center gap-1.5 rounded-xl bg-accent px-2.5 py-2 text-[11px] font-bold text-white shadow hover:bg-accent/90 disabled:opacity-50 transition"
-                      title={`Salvar dados e fotos de ${tipoRelatorio} na pasta geradorBD`}
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      {isSaving ? "Salvando..." : "Salvar"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleCarregar}
-                      disabled={isSaving || isLoading}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-2.5 py-2 text-[11px] font-semibold text-white hover:bg-white/20 disabled:opacity-50 transition"
-                      title={`Carregar dados salvos anteriormente de ${tipoRelatorio}`}
-                    >
-                      <FolderOpen className="h-3.5 w-3.5 text-white/80" />
-                      {isLoading ? "Lendo..." : "Carregar"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Menu de Navegação (separado abaixo, sem contornos/fundos, clicável recolhido) */}
-          <div className="!mt-7 border-t border-white/10 pt-5">
-            {expanded && (
-              <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/45">
-                Rota do Relatório
-              </div>
-            )}
-            <nav className="space-y-1.5">
-              {navItems.map(({ n, label, icon: Icon }) => {
-                const unlocked = n <= maxUnlockedStep;
-                const cur = n === selectedStep;
-                const done = n < maxUnlockedStep || (n === totalSteps && hasRelatorios);
-                return (
-                  <a
-                    key={n}
-                    href={unlocked ? `#b${n}` : undefined}
-                    aria-disabled={!unlocked}
-                    title={
-                      !unlocked
-                        ? `${n}. ${label} (complete a etapa anterior)`
-                        : expanded
-                          ? undefined
-                          : `${n}. ${label}`
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!unlocked) {
-                        e.preventDefault();
-                        return;
-                      }
-                      scrollLockUntilRef.current = Date.now() + 700;
-                      setSelectedStep(n);
-                      const target = document.getElementById(`b${n}`);
-                      if (target) {
-                        e.preventDefault();
-                        target.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }
-                      if (onNavigate) onNavigate();
-                    }}
-                    style={unlocked && done ? { color: theme.primary } : undefined}
-                    className={`relative flex h-11 items-center text-xs font-medium transition-colors overflow-hidden ${
-                      !unlocked
-                        ? "cursor-not-allowed text-sidebar-foreground/30"
-                        : cur
-                          ? `${done ? "" : "text-white"} font-semibold`
-                          : done
-                            ? "hover:opacity-90"
-                            : "text-white/80 hover:text-white"
-                    }`}
-                  >
-                    {cur && (
-                      <motion.span
-                        layoutId={navIndicatorId}
-                        transition={
-                          performanceMode
-                            ? { duration: 0 }
-                            : { type: "spring", stiffness: 380, damping: 32 }
-                        }
-                        style={{ backgroundColor: theme.primary }}
-                        className="absolute left-0 h-6 w-1 rounded-r-full transition-colors duration-200"
-                      />
-                    )}
-                    <div className="relative grid h-11 w-11 shrink-0 place-items-center">
-                      <Icon
-                        style={unlocked && done ? { color: theme.primary } : undefined}
-                        className={`h-4 w-4 transition-colors ${
-                          !unlocked
-                            ? "text-sidebar-foreground/30"
-                            : done
-                              ? ""
-                              : cur
-                                ? "text-white"
-                                : "text-white/80"
-                        }`}
-                      />
-                    </div>
-
-                    <div
-                      className={`flex flex-1 items-center justify-between overflow-hidden whitespace-nowrap transition-all duration-200 ${
-                        expanded
-                          ? "pr-3 opacity-100"
-                          : "max-w-0 opacity-0 pointer-events-none"
-                      }`}
-                    >
-                      <span className="truncate">{label}</span>
-                    </div>
-                  </a>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-
-        {/* 5. Rodapé (Auto preenchimento + Expandir recolhido / Ações Rápidas expandido) */}
-        <div className="pt-4">
-          {!expanded ? (
-            <div className="flex flex-col items-center gap-2.5">
-              <button
-                type="button"
-                onClick={handleDemo}
-                title="Auto preenchimento"
-                aria-label="Auto preenchimento"
-                className="grid h-11 w-11 place-items-center rounded-2xl text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-white transition"
-              >
-                <Wand2 className="h-4 w-4" />
               </button>
 
               <button
                 type="button"
                 onClick={onToggleExpand}
-                title="Abrir menu completo"
-                aria-label="Abrir menu completo"
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-primary shadow-md hover:bg-secondary transition"
+                title="Recolher menu lateral"
+                aria-label="Recolher menu lateral"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-sidebar-accent text-sidebar-foreground/70 hover:bg-sidebar-primary hover:text-white transition"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
             </div>
-          ) : (
-            <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-accent/40 via-sidebar-accent to-navy shadow-lg overflow-hidden animate-in fade-in duration-200">
+          )}
+
+          {/* 2. Perfil do Usuário (solto no fundo do menu, sem caixa/borda ao redor) */}
+          {perfil && (
+            <div className="w-full">
+              {!expanded ? (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleExpand();
+                      setPerfilOpen(true);
+                    }}
+                    title={`${perfil.nome_completo} (@${perfil.usuario})`}
+                    aria-label="Abrir perfil do usuário"
+                    className="rounded-full p-0.5 transition hover:scale-105"
+                  >
+                    <UserAvatar
+                      nomeCompleto={perfil.nome_completo}
+                      usuario={perfil.usuario}
+                      size={40}
+                      bordered
+                    />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-full">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPerfilOpen((prev) => !prev);
+                    }}
+                    aria-expanded={perfilOpen}
+                    className="flex w-full flex-col items-center px-2 py-2 text-center hover:opacity-95 transition"
+                  >
+                    <UserAvatar
+                      nomeCompleto={perfil.nome_completo}
+                      usuario={perfil.usuario}
+                      size={50}
+                      bordered
+                    />
+                    <div className="mt-2 flex items-center justify-center gap-1 max-w-full">
+                      <span className="truncate text-xs font-bold text-white">
+                        {perfil.nome_completo}
+                      </span>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 shrink-0 text-white/65 transition-transform duration-200 ${perfilOpen ? "rotate-180 text-white" : ""
+                          }`}
+                      />
+                    </div>
+                  </button>
+
+                  {/* Sanfona de informações e ações do perfil (mesmas opções do APK + Gestionamento) */}
+                  <div
+                    className={`grid transition-all duration-300 ease-in-out ${perfilOpen
+                      ? "grid-rows-[1fr] opacity-100 px-2.5 pb-2.5"
+                      : "grid-rows-[0fr] opacity-0 px-2.5 pb-0 pointer-events-none"
+                      }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="border-t border-white/10 pt-2 space-y-1 text-left">
+                        <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 bg-white/[0.04]">
+                          <AtSign className="h-3.5 w-3.5 shrink-0 text-white/60" />
+                          <div className="min-w-0">
+                            <div className="text-[9.5px] uppercase tracking-wider text-white/50">
+                              Usuário corporativo
+                            </div>
+                            <div className="truncate text-[11px] font-semibold text-white">
+                              @{perfil.usuario}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 bg-white/[0.04]">
+                          <Shield className="h-3.5 w-3.5 shrink-0 text-white/60" />
+                          <div className="min-w-0">
+                            <div className="text-[9.5px] uppercase tracking-wider text-white/50">
+                              Nível de acesso
+                            </div>
+                            <div className="truncate text-[11px] font-semibold text-white">
+                              {obterLabelPerfil(perfil.role)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {perfil.role === "adm" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toast.info("Painel ADM", {
+                                description: "Disponível na próxima etapa da aba Painel.",
+                              })
+                            }
+                            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[11px] font-semibold text-white/90 hover:bg-white/10 transition"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+                            <span>Painel ADM</span>
+                          </button>
+                        )}
+
+                        {(perfil.role === "adm" || perfil.role === "coordenador") && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toast.info("Aprovações de Acesso", {
+                                description: "Disponível na próxima etapa da aba Painel.",
+                              })
+                            }
+                            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[11px] font-semibold text-white/90 hover:bg-white/10 transition"
+                          >
+                            <UserCheck className="h-3.5 w-3.5 shrink-0 text-sky-300" />
+                            <span>Aprovações de Acesso</span>
+                          </button>
+                        )}
+
+                        {(perfil.role === "coordenador" || perfil.role === "adm") && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toast.info("Gestionamento", {
+                                description: "Disponível na próxima etapa da aba Painel.",
+                              })
+                            }
+                            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[11px] font-semibold text-white/90 hover:bg-white/10 transition"
+                          >
+                            <Briefcase className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                            <span>Gestionamento</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toast.info("Configurações", {
+                              description: "Preferências do perfil disponíveis em breve.",
+                            })
+                          }
+                          className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[11px] font-semibold text-white/90 hover:bg-white/10 transition"
+                        >
+                          <Settings className="h-3.5 w-3.5 shrink-0 text-white/75" />
+                          <span>Configurações</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void logout()}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[11px] font-bold text-red-300 hover:bg-red-500/20 hover:text-red-200 transition"
+                        >
+                          <LogOut className="h-3.5 w-3.5 shrink-0" />
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3. Navegação Principal: Gerador (rotas sempre visíveis nesta aba, sem seta), Vistorias, Painel e Quadro */}
+          <div className="border-t border-white/10 pt-3 space-y-1">
+            {/* Botão Gerador */}
+            <div>
               <button
                 type="button"
-                onClick={() => setQuickActionsOpen((prev) => !prev)}
-                aria-expanded={quickActionsOpen}
-                className="flex w-full items-center justify-between gap-2 p-3.5 text-left hover:bg-white/5 transition"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
-                    <Wand2 className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white whitespace-nowrap">
-                      Ações Rápidas
-                    </div>
-                    <div className="text-[10px] text-white/60 truncate">
-                      {quickActionsOpen ? "Clique para recolher" : "Preenchimento, densidade e atalhos"}
-                    </div>
-                  </div>
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-300 ${
-                    quickActionsOpen ? "rotate-180 text-white" : ""
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectTab("relatorio");
+                  if (onNavigate && expanded) onNavigate();
+                }}
+                title="Gerador"
+                className={`flex w-full items-center rounded-xl text-xs font-bold transition-all duration-300 ease-out ${focusRotaFechada
+                  ? "opacity-20 text-white/70"
+                  : activeTab === "relatorio"
+                    ? "bg-white/12 text-white"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
                   }`}
-                />
+              >
+                <div className="grid h-11 w-11 shrink-0 place-items-center text-white">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div
+                  className={`flex flex-1 items-center overflow-hidden whitespace-nowrap transition-all duration-200 ${expanded
+                    ? "pr-3 opacity-100"
+                    : "max-w-0 opacity-0 pointer-events-none"
+                    }`}
+                >
+                  <span>Gerador</span>
+                </div>
               </button>
 
+              {/* Rotas do Gerador (abertas enquanto activeTab === "relatorio", inclusive com menu fechado) */}
               <div
-                className={`grid transition-all duration-300 ease-in-out ${
-                  quickActionsOpen
-                    ? "grid-rows-[1fr] opacity-100 px-3.5 pb-3.5"
-                    : "grid-rows-[0fr] opacity-0 px-3.5 pb-0 pointer-events-none"
-                }`}
+                className={`grid transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${relatorioOpen
+                  ? "grid-rows-[1fr] opacity-100 mt-1"
+                  : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                  }`}
               >
                 <div className="overflow-hidden">
-                  <div className="pt-2.5 border-t border-white/10 space-y-2.5">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => onToggleDense(!dense)}
-                        title={`Densidade: ${dense ? "Compacta" : "Confortável"} (clique para alternar)`}
-                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition whitespace-nowrap"
-                      >
-                        <MoreVertical className="h-3 w-3" />
-                        {dense ? "Compacta" : "Confortável"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onTogglePerformanceMode(!performanceMode)}
-                        title={`Modo de Renderização: ${performanceMode ? "Desempenho" : "Padrão"} (clique para alternar)`}
-                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/90 hover:bg-white/20 transition whitespace-nowrap"
-                      >
-                        <Zap className={`h-3 w-3 ${performanceMode ? "text-amber-300" : "text-white/70"}`} />
-                        {performanceMode ? "Desempenho" : "Padrão"}
-                      </button>
-                    </div>
-
-                    <div className="text-[11px] leading-snug text-white/65">
-                      Preencha dados de teste ou vá direto para a emissão Word.
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <button
-                        type="button"
-                        onClick={handleDemo}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2 px-3 text-xs font-bold text-primary shadow hover:bg-secondary transition whitespace-nowrap"
-                      >
-                        <Wand2 className="h-3.5 w-3.5 text-accent" /> Auto preenchimento
-                      </button>
-                      <a
-                        href="#b5"
-                        onClick={onNavigate}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-1.5 px-3 text-[11px] font-semibold text-white hover:bg-white/20 transition whitespace-nowrap"
-                      >
-                        <Rocket className="h-3.5 w-3.5" /> Ir para emissão
-                      </a>
-                    </div>
-                  </div>
+                  <nav
+                    className={`border-l border-white/15 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${expanded
+                      ? "ml-5 pl-2 space-y-1"
+                      : "ml-3.5 pl-2 space-y-1.5 py-0.5"
+                      }`}
+                  >
+                    {navItems.map(({ n, label, icon: Icon }) => {
+                      const unlocked = n <= maxUnlockedStep;
+                      const cur = n === selectedStep;
+                      const done = n < maxUnlockedStep || (n === totalSteps && hasRelatorios);
+                      return (
+                        <a
+                          key={n}
+                          href={unlocked ? `#b${n}` : undefined}
+                          aria-disabled={!unlocked}
+                          title={
+                            !unlocked
+                              ? `${n}. ${label} (complete a etapa anterior)`
+                              : expanded
+                                ? undefined
+                                : `${n}. ${label}`
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!unlocked) {
+                              e.preventDefault();
+                              return;
+                            }
+                            scrollLockUntilRef.current = Date.now() + 700;
+                            setSelectedStep(n);
+                            const target = document.getElementById(`b${n}`);
+                            if (target) {
+                              e.preventDefault();
+                              target.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                            if (onNavigate) onNavigate();
+                          }}
+                          style={unlocked && done ? { color: theme.primary } : undefined}
+                          className={`relative flex items-center text-xs font-medium transition-all duration-300 ease-out overflow-hidden rounded-lg ${focusRotaFechada ? "h-11" : "h-10"
+                            } ${!unlocked
+                              ? "cursor-not-allowed text-sidebar-foreground/30"
+                              : cur
+                                ? `${done ? "" : "text-white"} font-semibold`
+                                : done
+                                  ? "hover:opacity-90"
+                                  : "text-white/80 hover:text-white"
+                            }`}
+                        >
+                          {cur && (
+                            <motion.span
+                              layoutId={navIndicatorId}
+                              transition={
+                                performanceMode
+                                  ? { duration: 0 }
+                                  : { type: "spring", stiffness: 380, damping: 32 }
+                              }
+                              style={{ backgroundColor: theme.primary }}
+                              className="absolute left-0 h-5 w-1 rounded-r-full transition-colors duration-200"
+                            />
+                          )}
+                          <div
+                            className={`relative grid shrink-0 place-items-center transition-all duration-300 ease-out ${focusRotaFechada ? "h-11 w-10 scale-115" : "h-10 w-8 scale-100"
+                              }`}
+                          >
+                            <Icon
+                              style={unlocked && done ? { color: theme.primary } : undefined}
+                              className={`transition-all duration-300 ease-out ${focusRotaFechada ? "h-[18px] w-[18px]" : "h-4 w-4"
+                                } ${!unlocked
+                                  ? "text-sidebar-foreground/30"
+                                  : done
+                                    ? ""
+                                    : cur
+                                      ? "text-white"
+                                      : "text-white/80"
+                                }`}
+                            />
+                          </div>
+                          {expanded && <span className="truncate pr-2">{label}</span>}
+                        </a>
+                      );
+                    })}
+                  </nav>
                 </div>
               </div>
             </div>
-          )}
 
-          {perfil && (
-            expanded ? (
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-white/10 px-3 py-2.5 border border-white/10">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
-                    <UserCheck className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white truncate">
-                      {perfil.nome_completo}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wider text-white/65 truncate">
-                      {perfil.role} · @{perfil.usuario}
-                    </div>
-                  </div>
-                </div>
+            {/* Botões abaixo de Gerador: Vistorias, Painel e Quadro */}
+            {(
+              [
+                { key: "vistorias", label: "Vistorias", icon: ClipboardList },
+                { key: "painel", label: "Painel", icon: LayoutDashboard },
+                { key: "quadro", label: "Quadro", icon: Table2 },
+              ] as const
+            ).map(({ key, label, icon: ItemIcon }) => {
+              const isActive = activeTab === key;
+              return (
                 <button
+                  key={key}
                   type="button"
-                  onClick={() => void logout()}
-                  title="Sair da conta"
-                  aria-label="Sair da conta"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/85 hover:bg-red-500/80 hover:text-white transition"
+                  title={label}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectTab(key);
+                    if (onNavigate) onNavigate();
+                  }}
+                  className={`flex w-full items-center rounded-xl text-xs font-semibold transition-all duration-300 ease-out ${focusRotaFechada
+                    ? "opacity-20 text-white/70"
+                    : isActive
+                      ? "bg-white/15 text-white"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                    }`}
                 >
-                  <LogOut className="h-4 w-4" />
+                  <div className="grid h-11 w-11 shrink-0 place-items-center">
+                    <ItemIcon className="h-4 w-4" />
+                  </div>
+                  <div
+                    className={`overflow-hidden whitespace-nowrap transition-all duration-200 ${expanded
+                      ? "pr-3 opacity-100"
+                      : "max-w-0 opacity-0 pointer-events-none"
+                      }`}
+                  >
+                    <span>{label}</span>
+                  </div>
                 </button>
-              </div>
-            ) : (
-              <div className="mt-2 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => void logout()}
-                  title={`Sair (${perfil.usuario} · ${perfil.role})`}
-                  aria-label="Sair da conta"
-                  className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-white/85 hover:bg-red-500/80 hover:text-white transition"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </div>
-            )
-          )}
+              );
+            })}
+          </div>
         </div>
-      </aside>
 
-      {/* Modal de Instrução da pasta geradorBD */}
-      <PastaGeradorBDModal
-        isOpen={showFolderModal}
-        onClose={() => setShowFolderModal(false)}
-        onSelectFolder={handleRetryPendingAction}
-        errorMessage={modalErrorMessage}
-      />
-    </>
+        {/* 4. Parte Inferior: Botão expandir quando recolhido */}
+        {!expanded && (
+          <div className="pt-4 flex flex-col items-center">
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              title="Abrir menu completo"
+              aria-label="Abrir menu completo"
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-primary shadow-md hover:bg-secondary transition"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+      </aside>
   );
 };

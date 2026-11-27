@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Toaster } from "sonner";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, SidebarTab } from "./components/Sidebar";
 import { TopHeader } from "./components/TopHeader";
 import { useClickOutside } from "./hooks/useClickOutside";
 import { FiscalizacaoForm } from "./components/FiscalizacaoForm";
@@ -78,6 +78,7 @@ const AppContent: React.FC = () => {
   // No mobile (< lg), controla o drawer flutuante
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dense, setDense] = useState(false);
+  const [activeTab, setActiveTab] = useState<SidebarTab>("relatorio");
 
   const handleTogglePerformanceMode = (val: boolean) => {
     setPerformanceMode(val);
@@ -147,19 +148,40 @@ const AppContent: React.FC = () => {
     <div
       className={`relative min-h-screen ${performanceMode ? "perf-mode" : "transition-colors duration-700 ease-in-out"}`}
       style={{
-        backgroundColor: activeBgTheme.lightBg,
+        backgroundColor: activeBgTheme.pastelBg,
       }}
     >
-      {/* Fundo Corporativo (No modo desempenho, usa fundo sólido leve sem radial-gradient) */}
+      {/* Fundo Pastel Temático + Faixas Diagonais (estilo Login, da metade esquerda até ~80% da base direita) */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none fixed inset-0 z-0 overflow-hidden ${performanceMode ? "" : "transition-colors duration-700 ease-in-out opacity-75"}`}
+        className={`pointer-events-none fixed inset-0 z-0 overflow-hidden ${performanceMode ? "" : "transition-colors duration-700 ease-in-out"}`}
         style={{
-          background: performanceMode
-            ? activeBgTheme.lightBg
-            : `radial-gradient(ellipse 135% 85% at 50% -15%, ${activeBgTheme.primary}18 0%, ${activeBgTheme.lightBorder} 38%, ${activeBgTheme.lightBg} 72%, #ffffff 100%)`,
+          backgroundColor: activeBgTheme.pastelBg,
         }}
-      />
+      >
+        {[
+          { points: "0,495 800,1000 0,1300", color: activeBgTheme.stripeColors[0], z: 1, shadow: "drop-shadow(0px -5px 12px rgba(4, 14, 28, 0.16))" },
+          { points: "0,585 800,1000 0,1300", color: activeBgTheme.stripeColors[1], z: 2, shadow: "drop-shadow(0px -5px 12px rgba(4, 14, 28, 0.18))" },
+          { points: "0,675 800,1000 0,1300", color: activeBgTheme.stripeColors[2], z: 3, shadow: "drop-shadow(0px -5px 12px rgba(4, 14, 28, 0.2))" },
+        ].map((stripe, idx) => (
+          <svg
+            key={idx}
+            viewBox="0 0 1000 1000"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-20"
+            style={{
+              zIndex: stripe.z,
+              filter: performanceMode ? undefined : stripe.shadow,
+            }}
+          >
+            <polygon
+              points={stripe.points}
+              fill={stripe.color}
+              className={performanceMode ? undefined : "transition-[fill] duration-700 ease-in-out"}
+            />
+          </svg>
+        ))}
+      </div>
 
       {/* Sidebar Desktop Infinita (Topo, Base e Esquerda colados na tela): Alterna entre 76px e 288px com Animação Fluida */}
       <div
@@ -169,17 +191,20 @@ const AppContent: React.FC = () => {
             setSidebarExpanded(true);
           }
         }}
-        className={`fixed inset-y-0 left-0 z-40 hidden lg:block transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
-          sidebarExpanded ? "w-72" : "w-[76px] cursor-pointer"
+        className={`fixed inset-y-0 left-0 z-40 hidden lg:block transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          sidebarExpanded
+            ? "w-72"
+            : activeTab === "relatorio"
+              ? "w-[92px] cursor-pointer"
+              : "w-[76px] cursor-pointer"
         }`}
       >
         <Sidebar
           expanded={sidebarExpanded}
           onToggleExpand={() => setSidebarExpanded((prev) => !prev)}
-          dense={dense}
-          onToggleDense={setDense}
           performanceMode={performanceMode}
-          onTogglePerformanceMode={handleTogglePerformanceMode}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
         />
       </div>
 
@@ -206,31 +231,42 @@ const AppContent: React.FC = () => {
             expanded={true}
             onToggleExpand={() => setMobileMenuOpen(false)}
             onNavigate={() => setMobileMenuOpen(false)}
-            dense={dense}
-            onToggleDense={setDense}
             performanceMode={performanceMode}
-            onTogglePerformanceMode={handleTogglePerformanceMode}
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
           />
         </div>
       </div>
 
       {/* Área Principal com Transição Fluida no Padding e Fundo Transparente para Atmosfera */}
       <main
-        className={`relative z-10 min-h-screen bg-transparent transition-[padding] duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
-          sidebarExpanded ? "lg:pl-72" : "lg:pl-[76px]"
+        className={`relative z-10 min-h-screen bg-transparent transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          sidebarExpanded
+            ? "lg:pl-72"
+            : activeTab === "relatorio"
+              ? "lg:pl-[92px]"
+              : "lg:pl-[76px]"
         }`}
       >
-        <TopHeader
-          onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
-        />
+        {activeTab !== "relatorio" ? (
+          <div className="min-h-screen w-full bg-white" />
+        ) : (
+          <>
+            <TopHeader
+              onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
+              dense={dense}
+              onToggleDense={setDense}
+              performanceMode={performanceMode}
+              onTogglePerformanceMode={handleTogglePerformanceMode}
+            />
 
-        <div
-          className={`mx-auto px-6 py-10 transition-all duration-300 ${
-            dense
-              ? "max-w-[1480px] grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch"
-              : "max-w-5xl space-y-10"
-          }`}
-        >
+            <div
+              className={`mx-auto px-6 py-10 transition-all duration-300 ${
+                dense
+                  ? "max-w-[1480px] grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch"
+                  : "max-w-5xl space-y-10"
+              }`}
+            >
           {/* 01 · Informações da Fiscalização / Monitoramento */}
           <div
             className={
@@ -318,7 +354,9 @@ const AppContent: React.FC = () => {
               />
             </div>
           )}
-        </div>
+            </div>
+          </>
+        )}
       </main>
 
       {staffModalMode && (
