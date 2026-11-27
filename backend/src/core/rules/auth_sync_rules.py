@@ -203,3 +203,187 @@ def resolver_nome_unico_vistoria(nome_desejado: str, nomes_existentes: List[str]
         if candidato.casefold() not in ocupados:
             return candidato
         indice += 1
+
+
+def extrair_data_vistoria_iso(
+    payload_json: Dict[str, Any],
+    fallback_iso: Optional[str] = None,
+) -> str:
+    """Converte data da vistoria (DD/MM/YYYY ou YYYY-MM-DD) para YYYY-MM-DD."""
+    fisc = payload_json.get("fiscalizacao") if isinstance(payload_json, dict) else None
+    candidatos = []
+    if isinstance(fisc, dict):
+        candidatos.extend([fisc.get("data"), fisc.get("Data"), fisc.get("periodo")])
+    if isinstance(payload_json, dict):
+        candidatos.extend([payload_json.get("data"), payload_json.get("data_vistoria")])
+
+    for raw in candidatos:
+        texto = str(raw or "").strip()
+        if not texto:
+            continue
+        m_br = re.search(r"\b(\d{2})/(\d{2})/(\d{4})\b", texto)
+        if m_br:
+            return f"{m_br.group(3)}-{m_br.group(2)}-{m_br.group(1)}"
+        m_iso = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", texto)
+        if m_iso:
+            return m_iso.group(1)
+
+    if fallback_iso:
+        m_fb = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", str(fallback_iso))
+        if m_fb:
+            return m_fb.group(1)
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def normalizar_situacao_historico(situacao_raw: Optional[str], modalidade: str) -> str:
+    """Mapeia situação para o enum SQL de historico_achados."""
+    val = (situacao_raw or "").strip().casefold()
+    if val in ("sanada", "saneada", "resolvida"):
+        return "Sanada"
+    if "parcial" in val:
+        return "Parcialmente Sanada"
+    if val in ("pendente", "nao sanada", "não sanada"):
+        return "Pendente"
+    if modalidade == "Fiscalização" and not val:
+        return "Nova"
+    return "Nova" if val == "nova" else "Pendente"
+
+
+def extrair_registros_historico_achados(
+    id_vistoria: str,
+    concessao: str,
+    modalidade: str,
+    payload_json: Dict[str, Any],
+    fallback_iso: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Extrai registros analíticos anônimos (zero fotos, zero PII) para historico_achados."""
+    data_iso = extrair_data_vistoria_iso(payload_json, fallback_iso=fallback_iso)
+    fisc = payload_json.get("fiscalizacao") if isinstance(payload_json, dict) else None
+    local_base = ""
+    if isinstance(fisc, dict):
+        local_base = str(fisc.get("local") or fisc.get("Local") or fisc.get("terminal") or "").strip()
+    if not local_base and isinstance(payload_json, dict):
+        local_base = str(payload_json.get("local") or payload_json.get("terminal") or "").strip()
+
+    itens = _extrair_itens_inspecao(payload_json)
+    registros: List[Dict[str, Any]] = []
+    for item in itens:
+        tipo_raw = str(item.get("tipoAchado") or item.get("tipo") or item.get("Tipo") or "NC").strip().upper()
+        tipo_achado = "PA" if tipo_raw == "PA" else "NC"
+
+        categoria = str(
+            item.get("constatacao")
+            or item.get("categoria")
+            or item.get("sigla")
+            or item.get("identificacao")
+            or item.get("Identificação")
+            or "Não classificada"
+        ).strip()[:120]
+
+        local_item = str(
+            item.get("setorPredial")
+            or item.get("trecho")
+            or item.get("terminal")
+            or item.get("pista")
+            or local_base
+            or "Não informado"
+        ).strip()[:140]
+
+        situacao_raw = item.get("situacao") or item.get("Situação")
+        situacao = normalizar_situacao_historico(
+            str(situacao_raw) if situacao_raw is not None else None,
+            modalidade,
+        )
+
+        registros.append(
+            {
+                "id_vistoria": id_vistoria,
+                "concessao": concessao,
+                "modalidade": modalidade,
+                "data_vistoria": data_iso,
+                "local_ou_trecho": local_item,
+                "tipo_achado": tipo_achado,
+                "categoria_nc": categoria,
+                "situacao": situacao,
+            }
+        )
+    return registros
+
+
+def agregar_resumo_historico(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Agrega métricas para gráficos do Painel Web sem expor dados individuais/PII."""
+    total = len(rows)
+    total_ncs = 0
+    total_pas = 0
+    sanadas = 0
+    parciais = 0
+    pendentes = 0
+    novas = 0
+
+    por_mes: Dict[str, Dict[str, Any]] = {}
+    por_categoria: Dict[str, int] = {}
+    por_concessao: Dict[str, int] = {"CRA": 0, "CRC": 0, "SOCICAM": 0}
+
+    for r in rows:
+        tipo = str(r.get("tipo_achado", "NC")).upper()
+        if tipo == "PA":
+            total_pas += 1
+        else:
+            total_ncs += 1
+
+        sit = str(r.get("situacao", "Pendente"))
+        if sit == "Sanada":
+            sanadas += 1
+        elif sit == "Parcialmente Sanada":
+            parciais += 1
+        elif sit == "Nova":
+            novas += 1
+        else:
+            pendentes += 1
+
+        mes = str(r.get("data_vistoria", ""))[:7] or "0000-00"
+        bucket = por_mes.setdefault(
+            mes,
+            {"mes": mes, "ncs": 0, "pas": 0, "sanadas": 0, "pendentes": 0},
+        )
+        if tipo == "PA":
+            bucket["pas"] += 1
+        else:
+            bucket["ncs"] += 1
+        if sit == "Sanada":
+            bucket["sanadas"] += 1
+        elif sit in ("Pendente", "Parcialmente Sanada"):
+            bucket["pendentes"] += 1
+
+        cat = str(r.get("categoria_nc") or "Não classificada").strip()
+        por_categoria[cat] = por_categoria.get(cat, 0) + 1
+
+        conc = str(r.get("concessao") or "")
+        if conc in por_concessao:
+            por_concessao[conc] += 1
+
+    base_saneamento = sanadas + parciais + pendentes
+    taxa_saneamento = round((sanadas / base_saneamento) * 100, 1) if base_saneamento > 0 else 0.0
+
+    serie_mensal = [por_mes[k] for k in sorted(por_mes.keys())]
+    top_categorias = [
+        {"categoria": cat, "quantidade": qtd}
+        for cat, qtd in sorted(por_categoria.items(), key=lambda x: (-x[1], x[0]))[:5]
+    ]
+
+    return {
+        "totais": {
+            "total_achados": total,
+            "total_ncs": total_ncs,
+            "total_pas": total_pas,
+            "sanadas": sanadas,
+            "parcialmente_sanadas": parciais,
+            "pendentes": pendentes,
+            "novas": novas,
+            "taxa_saneamento_pct": taxa_saneamento,
+        },
+        "serie_mensal": serie_mensal,
+        "top_categorias": top_categorias,
+        "por_concessao": por_concessao,
+    }
+

@@ -73,6 +73,13 @@ class CrcMonitoramentoReport(BaseMonitoramentoMixin, CrcReport, IReportContract)
     def get_abbreviations(self) -> List[Tuple[str, str]]:
         return list(CRC_MONITORAMENTO_ABBREVIATIONS)
 
+    def get_process_sei_texts(self, row: Any, ano: Optional[Any] = None) -> List[str]:
+        id_mon = self._resolver_id_monitoramento(row, self.ctr_num)
+        return [
+            f"PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_mon}",
+            "SEI Nº XXXXXXXXXXXX",
+        ]
+
     def gerar_capa_monitoramento(self, doc: Any, logo_path: str, row: Any, documento_anterior: Any) -> None:
         """Renderiza a capa do CRC Monitoramento com auditoria anterior integrada."""
         style = doc.styles["Normal"]
@@ -116,11 +123,12 @@ class CrcMonitoramentoReport(BaseMonitoramentoMixin, CrcReport, IReportContract)
             return p
 
         # Cabeçalho Superior
+        id_mon = self._resolver_id_monitoramento(row, self.ctr_num)
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("COORDENADORIA DE TRANSPORTES E RODOVIAS", bold=True, size_pt=12, space_after=4)
-        add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DO PROCESSO", bold=True, size_pt=12, space_after=4)
-        add_cover_p(f"DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {self.ctr_num}", bold=True, size_pt=12, space_after=12)
+        add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO", bold=True, size_pt=12, space_after=4)
+        add_cover_p(f"PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_mon}", bold=True, size_pt=12, space_after=12)
 
         # Imagem da Capa
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -146,7 +154,7 @@ class CrcMonitoramentoReport(BaseMonitoramentoMixin, CrcReport, IReportContract)
         add_cover_p("EXPLORAÇÃO DA PONTE DE ACESSO E SISTEMA VIÁRIO", bold=True, size_pt=11, space_after=4)
         add_cover_p("DO DESTINO DE TURISMO E LAZER PRAIA DO PAIVA", bold=True, size_pt=11, space_after=6)
         add_cover_p("", bold=False, size_pt=11, space_after=6)
-        add_cover_p(f"PROCESSO SEI Nº {self.processo_sei_prev}", bold=True, size_pt=11, space_after=6)
+        add_cover_p("PROCESSO SEI Nº XXXXXXXXXXXX", bold=True, size_pt=11, space_after=6)
         add_cover_p("", bold=False, size_pt=11, space_after=6)
         add_cover_p("Recife, data da assinatura eletrônica", bold=False, size_pt=11, space_after=0)
 
@@ -283,8 +291,7 @@ class CrcMonitoramentoReport(BaseMonitoramentoMixin, CrcReport, IReportContract)
         add_p(
             f"Apresentam-se os resultados das vistorias técnicas realizadas em {data_extenso} na Rodovia Estadual PE-024 "
             f"referentes às Não Conformidades (NC) registradas no Relatório de Fiscalização Técnico-Operacional ARPE/CTR "
-            f"nº {ctr_num}, organizadas em subitens pelo sentido da pista, associadas a cada Segmento Homogêneo (SH) "
-            f"com indicação do ponto fiscalizado (KM)."
+            f"nº {ctr_num}, associadas a cada Segmento Homogêneo (SH) com indicação do ponto fiscalizado (KM)."
         )
 
         if ncs_reais.empty:
@@ -297,34 +304,21 @@ class CrcMonitoramentoReport(BaseMonitoramentoMixin, CrcReport, IReportContract)
                         ident = ncs_from_prev[nc_idx - 1]["id_nc"]
 
                 nc_desc = str(nc_row.get("Não Conformidade", "")).strip()
-                pista_val = str(nc_row.get("Pista", "")).strip() if not pd.isna(nc_row.get("Pista")) else ""
-                trecho_val = str(nc_row.get("Trecho", "")).strip() if not pd.isna(nc_row.get("Trecho")) else ""
                 observacoes = str(nc_row.get("Observações", nc_row.get("Legenda da Foto", ""))).strip()
                 determinacao = str(nc_row.get("Determinação", "")).strip()
                 analise_arpe = str(nc_row.get("Análise ARPE", "")).strip()
+                situacao = str(nc_row.get("Situação", "Pendente")).strip()
 
-                partes_titulo = []
-                if ident and not ident.lower().startswith("foto"):
-                    partes_titulo.append(ident)
-                elif nc_desc:
-                    partes_titulo.append(nc_desc)
-                else:
-                    partes_titulo.append(f"NÃO CONFORMIDADE {nc_idx}")
-
-                if trecho_val:
-                    partes_titulo.append(trecho_val)
-                if pista_val and pista_val.lower() not in ["única", "unica"]:
-                    partes_titulo.append(f"PISTA {pista_val.upper()}")
-
-                sub_title = f"3.{nc_idx} " + " – ".join(partes_titulo)
-                adicionar_titulo_secao(doc, sub_title)
-                doc.add_paragraph()
-
-                add_label_text("NÃO CONFORMIDADE: ", nc_desc if nc_desc else (ident if ident else "A ser preenchido."))
-                add_label_text("POSICIONAMENTO DA CRC: ", determinacao if determinacao else "A ser preenchido.")
-                add_label_text("CONSTATAÇÃO: ", observacoes if observacoes else "A ser preenchido.")
-                add_label_text("ANÁLISE ARPE: ", analise_arpe if analise_arpe else "A ser preenchido.")
-                doc.add_paragraph()
+                self._renderizar_bloco_nc_monitoramento(
+                    doc=doc,
+                    ident=ident,
+                    nc_desc=nc_desc,
+                    label_concessionaria="Posicionamento CRC: ",
+                    determinacao=determinacao,
+                    observacoes=observacoes,
+                    situacao=situacao,
+                    analise_arpe=analise_arpe,
+                )
 
         # 4. RESUMO DA SITUAÇÃO
         adicionar_titulo_secao(doc, f"4. RESUMO DA SITUAÇÃO DAS NÃO CONFORMIDADES MONITORADAS ({mes_ano_cap})")
@@ -421,7 +415,13 @@ class CrcMonitoramentoReport(BaseMonitoramentoMixin, CrcReport, IReportContract)
     def get_conclusions_paragraphs(self, total_ncs: int, local_val: Any) -> List[Any]:
         return []
 
-    def get_conclusions_monitoramento_paragraphs(self, total_ncs: int, data_extenso: str) -> List[Any]:
+    def get_conclusions_monitoramento_paragraphs(
+        self,
+        total_ncs: int,
+        data_extenso: str,
+        row: Any = None,
+        nc_df: Any = None,
+    ) -> List[Any]:
         n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         ctr_num = getattr(self, "ctr_num", "05/2025")
         return get_crc_monitoramento_conclusions_paragraphs(total_ncs, data_extenso, n_curr_str, ctr_num)

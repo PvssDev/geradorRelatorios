@@ -67,31 +67,61 @@ def get_socicam_monitoramento_objective_paragraphs(
 
 def get_socicam_monitoramento_conclusions_paragraphs(
     total_ncs: int,
-    data_extenso: str,
-    n_curr_str: str,
-    ctr_num: str
+    data_extenso: str = "",
+    n_curr_str: str = "1º",
+    ctr_num: str = "04/2025",
+    id_monitoramento: Any = None,
+    qtd_pendentes: Any = None,
+    local_val: Any = "Recife",
+    recomendacoes_socicam: str = "",
 ) -> List[List[Tuple[str, bool, bool, Any]]]:
     """Gera os parágrafos estruturados para a Seção 5 (Conclusões e Recomendações) do SOCICAM Monitoramento."""
-    if total_ncs == 0:
-        conc_nc = "todas as Não Conformidades foram sanadas"
-        singular_plural_nc = "da Não Conformidade identificada"
-    elif total_ncs == 1:
-        conc_nc = "permanece uma Não Conformidade ainda sem solução definitiva"
-        singular_plural_nc = "da Não Conformidade identificada"
+    from core.rules.socicam_rules import normalizar_nome_terminal_passageiros_municipio
+
+    id_mon = str(id_monitoramento or "").strip() or str(ctr_num or "04/2025").strip()
+    qtd_analisadas = max(0, int(total_ncs or 0))
+    qtd_pend = max(0, int(qtd_pendentes if qtd_pendentes is not None else qtd_analisadas))
+    terminal_str = normalizar_nome_terminal_passageiros_municipio(local_val)
+
+    termo_analisadas = (
+        "1 Não Conformidade pendente"
+        if qtd_analisadas == 1
+        else f"{qtd_analisadas} Não Conformidades pendentes"
+    )
+    termo_pendentes = (
+        "1 permanece pendente"
+        if qtd_pend == 1
+        else f"{qtd_pend} permanecem pendentes"
+    )
+
+    rec_clean = str(recomendacoes_socicam or "").strip()
+    if rec_clean.lower() in ("nan", "none"):
+        rec_clean = ""
+    if rec_clean:
+        rec_sem_ponto_final = rec_clean.rstrip(".")
+        if rec_sem_ponto_final and rec_sem_ponto_final[0] in (",", ";", ":", "-"):
+            sufixo_rec = f"{rec_sem_ponto_final}."
+        else:
+            sufixo_rec = f" {rec_sem_ponto_final}."
     else:
-        conc_nc = f"permanecem {total_ncs} Não Conformidades ainda sem solução definitiva"
-        singular_plural_nc = "das Não Conformidades identificadas"
+        sufixo_rec = "."
 
     p1 = (
-        f"As vistorias técnicas, realizadas em {data_extenso}, bem como as análises apresentadas neste "
-        f"{n_curr_str} Relatório de Monitoramento do Relatório de Fiscalização Técnico-Operacional ARPE/CTR "
-        f"nº {ctr_num}, indicam que {conc_nc}."
+        f"Analisou-se neste {n_curr_str} Relatório de Monitoramento do Processo de Fiscalização "
+        f"Técnico-Operacional ARPE/CTR nº {id_mon}, {termo_analisadas} no {terminal_str}, "
+        f"constatando-se que {termo_pendentes}{sufixo_rec}"
     )
     p2 = (
-        "Diante desse resultado, considera-se necessário que a ARPE continue realizando vistorias até que a "
-        f"Concessionária efetive a execução dos serviços para correção {singular_plural_nc}."
+        "Sugere-se o encaminhamento deste Relatório de Monitoramento também para conhecimento da EPTI, "
+        "de modo a permitir o efetivo acompanhamento das ações fiscalizatórias desta Agência, em atendimento "
+        "à Lei nº 13.254, de 2007 e alterações, e o Contrato de Concessão nº 1.041.080/08."
+    )
+    p3 = (
+        "Por fim, informa-se que a próxima fiscalização nesse Terminal Rodoviário de Passageiros concedido "
+        "à SOCICAM, está prevista para XXXXXX, conforme cronograma anual da Coordenadoria de Transportes e Rodovias."
     )
     return [
         [(p1, False, False, None)],
-        [(p2, False, False, None)]
+        [(p2, False, False, None)],
+        [(p3, False, False, None)],
     ]

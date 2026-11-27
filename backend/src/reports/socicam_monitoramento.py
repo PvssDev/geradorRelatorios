@@ -13,7 +13,10 @@ import pandas as pd
 from reports.base import BaseMonitoramentoMixin
 from reports.socicam import SocicamReport
 from core.interfaces.report_contracts import IReportContract
-from core.rules.socicam_rules import normalizar_nome_terminal_rodoviario
+from core.rules.socicam_rules import (
+    normalizar_nome_terminal_rodoviario,
+    calcular_estatisticas_monitoramento_socicam,
+)
 from services.previous_report.previous_report_audit_service import (
     extrair_metadados_anterior,
     extrair_linhas_quadro1_anterior,
@@ -61,7 +64,7 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
 
     @property
     def capa_ctr_number_template(self) -> str:
-        return "RELATÓRIO DE MONITORAMENTO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}"
+        return "PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}"
 
     @property
     def sumario_before_abreviaturas(self) -> bool:
@@ -106,8 +109,8 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
             raw_id = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else (str(row["ID da Fiscalização"]).strip() if isinstance(row, dict) or hasattr(row, "__getitem__") else "")
             id_fisc = raw_id or mes_ano
         return [
-            f"RELATÓRIO DE MONITORAMENTO TÉCNICO-OPERACIONAL PROC ADM Nº {id_fisc} - CTR",
-            f"SEI Nº {self.processo_sei_prev}"
+            f"PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_fisc}",
+            "SEI Nº XXXXXXXXXXXX"
         ]
 
     def get_sumario_linhas(self, row: Any, nc_df: Any = None) -> List[str]:
@@ -117,37 +120,14 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
         except Exception:
             mes_ano = "JULHO/2026"
 
-        linhas = [
+        return [
             "1.\tINTRODUÇÃO\t4",
             "2.\tOBJETIVO\t4",
             "3.\tRESULTADO DAS VISTORIAS DAS NÃO CONFORMIDADES\t5",
-        ]
-
-        id_fisc = str(row.get("ID da Fiscalização", "")).strip() if hasattr(row, "get") else str(row["ID da Fiscalização"]).strip()
-        ncs_reais = []
-        if nc_df is not None and not nc_df.empty and "ID da Fiscalização" in nc_df.columns:
-            current_ncs = nc_df[nc_df["ID da Fiscalização"].astype(str).str.strip() == id_fisc]
-            if "Não Conformidade" in current_ncs.columns:
-                ncs_reais = current_ncs[
-                    current_ncs["Não Conformidade"].fillna("").astype(str).str.strip() != ""
-                ].to_dict('records')
-
-        if ncs_reais:
-            for idx, nc_row in enumerate(ncs_reais, 1):
-                term_val = str(nc_row.get("Terminal", nc_row.get("Local", "TIP"))).strip()
-                term_name = normalizar_nome_terminal_rodoviario(term_val).upper()
-                sub_num = f"3.{idx}"
-                p_num = min(5 + (idx - 1) // 2, 7)
-                linhas.append(f"{sub_num}\t{term_name}\t{p_num}")
-        else:
-            linhas.append("3.1\tTERMINAL RODOVIÁRIO DE PASSAGEIROS DO RECIFE (TIP)\t5")
-
-        linhas.extend([
             f"4.\tRESUMO DA SITUAÇÃO DAS NÃO CONFORMIDADES MONITORADAS ({mes_ano})\t8",
             "5.\tCONCLUSÕES E RECOMENDAÇÕES\t9",
             f"\tAPÊNDICE ÚNICO - MEMORIAL FOTOGRÁFICO - VISTORIAS REALIZADAS EM {mes_ano}\t10",
-        ])
-        return linhas
+        ]
 
     def gerar_capa_monitoramento(self, doc: Any, logo_path: str, row: Any, documento_anterior: Any) -> None:
         """Renderiza a capa do SOCICAM Monitoramento com auditoria anterior integrada."""
@@ -185,11 +165,12 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
             return p
 
         # Cabeçalho Superior
+        id_mon = self._resolver_id_monitoramento(row, self.ctr_num)
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("", bold=False, size_pt=12, space_after=6)
         add_cover_p("COORDENADORIA DE TRANSPORTES E RODOVIAS (CTR)", bold=True, size_pt=12, space_after=4)
         add_cover_p(f"RELATÓRIO DO {n_curr_str} MONITORAMENTO DAS NÃO CONFORMIDADES", bold=True, size_pt=12, space_after=4)
-        add_cover_p(f"PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {self.ctr_num}", bold=True, size_pt=12, space_after=12)
+        add_cover_p(f"PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL CTR Nº {id_mon}", bold=True, size_pt=12, space_after=12)
 
         # Imagem da Capa
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -208,7 +189,7 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
         # Títulos Centrais
         add_cover_p("PROCESSO DE FISCALIZAÇÃO TÉCNICO-OPERACIONAL DOS TERMINAIS RODOVIÁRIOS CONCEDIDOS À SOCICAM - ADMINISTRAÇÃO, PROJETOS E REPRESENTAÇÕES LTDA", bold=True, size_pt=11, space_after=6)
         add_cover_p("CONTRATO Nº 1.041.080/08", bold=True, size_pt=11, space_after=4)
-        add_cover_p(f"PROCESSO SEI Nº {self.processo_sei_prev}", bold=True, size_pt=11, space_after=6)
+        add_cover_p("PROCESSO SEI Nº XXXXXXXXXXXX", bold=True, size_pt=11, space_after=6)
         add_cover_p("", bold=False, size_pt=11, space_after=6)
         add_cover_p("Recife, data de assinatura eletrônica", bold=False, size_pt=11, space_after=0)
 
@@ -289,14 +270,7 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
         if ncs_reais.empty:
             add_p("Nenhuma Não Conformidade registrada para este monitoramento.")
         else:
-            for sub_idx, (_, nc_row) in enumerate(ncs_reais.iterrows(), 1):
-                term_val = str(nc_row.get("Terminal", nc_row.get("Local", "TIP"))).strip()
-                term_name = normalizar_nome_terminal_rodoviario(term_val).upper()
-
-                sub_title = f"3.{sub_idx} – {term_name}"
-                adicionar_titulo_secao(doc, sub_title)
-                doc.add_paragraph()
-
+            for _, nc_row in ncs_reais.iterrows():
                 ident = str(nc_row.get("Identificação", "")).strip()
                 nc_desc = str(nc_row.get("Não Conformidade", "")).strip()
                 observacoes = str(nc_row.get("Observações", nc_row.get("Legenda da Foto", ""))).strip()
@@ -304,21 +278,16 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
                 analise_arpe = str(nc_row.get("Análise ARPE", "")).strip()
                 situacao = str(nc_row.get("Situação", "Pendente")).strip()
 
-                title_text = f"Não Conformidade {ident} - {nc_desc}" if ident and not ident.lower().startswith("foto") else (nc_desc if nc_desc else "Não Conformidade")
-                add_p(title_text, bold=True)
-
-                add_label_text("Informação da SOCICAM: ", determinacao if determinacao else "A ser preenchido.")
-                add_label_text("Constatação: ", observacoes if observacoes else "A ser preenchido.")
-
-                if analise_arpe:
-                    texto_analise = analise_arpe
-                elif situacao:
-                    texto_analise = f"Não Conformidade {situacao.upper()}."
-                else:
-                    texto_analise = "A ser preenchido."
-
-                add_label_text("Análise da ARPE: ", texto_analise)
-                doc.add_paragraph()
+                self._renderizar_bloco_nc_monitoramento(
+                    doc=doc,
+                    ident=ident,
+                    nc_desc=nc_desc,
+                    label_concessionaria="Informação SOCICAM: ",
+                    determinacao=determinacao,
+                    observacoes=observacoes,
+                    situacao=situacao,
+                    analise_arpe=analise_arpe,
+                )
 
         # 4. RESUMO DA SITUAÇÃO
         adicionar_titulo_secao(doc, f"4. RESUMO DA SITUAÇÃO DAS NÃO CONFORMIDADES MONITORADAS ({mes_ano_cap})")
@@ -372,10 +341,63 @@ class SocicamMonitoramentoReport(BaseMonitoramentoMixin, SocicamReport, IReportC
     def finalizacao_sections_config(self) -> Dict[str, str]:
         return {"5": "conclusoes_monitoramento"}
 
-    def get_conclusions_monitoramento_paragraphs(self, total_ncs: int, data_extenso: str) -> List[Any]:
+    def get_conclusions_monitoramento_paragraphs(
+        self,
+        total_ncs: int,
+        data_extenso: str,
+        row: Any = None,
+        nc_df: Any = None,
+    ) -> List[Any]:
         n_curr_str = f"{self.N_curr}º" if self.N_curr else "1º"
         ctr_num = getattr(self, "ctr_num", "04/2025")
-        return get_socicam_monitoramento_conclusions_paragraphs(total_ncs, data_extenso, n_curr_str, ctr_num)
+
+        id_fisc = ""
+        local_val = "Recife"
+        recomendacoes = ""
+        if row is not None:
+            if hasattr(row, "get"):
+                id_fisc = str(row.get("ID da Fiscalização", "") or "").strip()
+                local_val = str(row.get("Local", "") or "Recife").strip()
+                recomendacoes = str(
+                    row.get("Recomendações à SOCICAM", "")
+                    or row.get("Recomendação Geral", "")
+                    or ""
+                ).strip()
+            elif isinstance(row, dict) or hasattr(row, "__getitem__"):
+                try:
+                    id_fisc = str(row["ID da Fiscalização"] or "").strip()
+                except Exception:
+                    id_fisc = ""
+                try:
+                    local_val = str(row["Local"] or "Recife").strip()
+                except Exception:
+                    local_val = "Recife"
+                try:
+                    recomendacoes = str(row["Recomendações à SOCICAM"] or "").strip()
+                except Exception:
+                    recomendacoes = ""
+
+        doc_anterior = getattr(self, "documento_anterior", None)
+        itens_prev = extrair_linhas_quadro1_anterior(doc_anterior) if doc_anterior is not None else []
+        qtd_anterior = len(itens_prev) if itens_prev else None
+
+        qtd_analisadas, qtd_pendentes = calcular_estatisticas_monitoramento_socicam(
+            nc_df,
+            id_fisc=id_fisc,
+            total_fallback=total_ncs,
+            qtd_anterior=qtd_anterior,
+        )
+
+        return get_socicam_monitoramento_conclusions_paragraphs(
+            qtd_analisadas,
+            data_extenso,
+            n_curr_str,
+            ctr_num,
+            id_monitoramento=id_fisc or ctr_num,
+            qtd_pendentes=qtd_pendentes,
+            local_val=local_val,
+            recomendacoes_socicam=recomendacoes,
+        )
 
     def render_apendices(self, doc: Any, row: Any, ncs_reais: Any, pas_reais: Any, fotos_dir: Any, data_fisc: Any, ano: Any, criar_grade_fotos_fn: Any) -> None:
         from utils import adicionar_titulo_secao, formatar_mes_ano

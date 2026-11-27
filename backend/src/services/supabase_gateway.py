@@ -5,9 +5,12 @@ Isola toda comunicação externa e uso de SUPABASE_SERVICE_ROLE_KEY no servidor,
 permitindo injeção de dependência limpa nos testes BDD (SOLID - DIP).
 """
 
+from concurrent.futures import ThreadPoolExecutor
 import os
+import threading
+import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import httpx
 
 from core.rules.auth_sync_rules import PRESIGN_EXPIRES_SECONDS, SENHA_DESCARTADA_SENTINEL
@@ -59,6 +62,20 @@ class HttpSupabaseGateway:
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
             timeout=10.0,
         )
+        self._cache_lock = threading.Lock()
+        self._token_cache: Dict[str, Tuple[str, float]] = {}
+        self._perfil_cache: Dict[str, Tuple[Dict[str, Any], float]] = {}
+        self._cache_ttl_sec = 25.0
+        self._audit_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="arpe-audit")
+
+    def _invalidate_perfil_cache(self, user_id: str) -> None:
+        with self._cache_lock:
+            self._perfil_cache.pop(user_id, None)
+
+    def _invalidate_tokens_for_user(self, user_id: str) -> None:
+        with self._cache_lock:
+            for tok in [k for k, (uid, _) in self._token_cache.items() if uid == user_id]:
+                self._token_cache.pop(tok, None)
 
     def is_configured(self) -> bool:
         return bool(self.base_url and self.anon_key and self.service_role_key)
@@ -118,6 +135,11 @@ class HttpSupabaseGateway:
         self._require_configured()
         if not access_token:
             return None
+        agora = time.monotonic()
+        with self._cache_lock:
+            cached = self._token_cache.get(access_token)
+            if cached and cached[1] > agora:
+                return cached[0]
         res = self._client.get(
             f"{self.base_url}/auth/v1/user",
             headers={
@@ -129,7 +151,11 @@ class HttpSupabaseGateway:
         if res.status_code != 200:
             return None
         data = res.json()
-        return data.get("id")
+        user_id = data.get("id")
+        if user_id:
+            with self._cache_lock:
+                self._token_cache[access_token] = (str(user_id), agora + self._cache_ttl_sec)
+        return user_id
 
     def admin_create_user(self, email_sintetico: str, senha: str) -> str:
         self._require_configured()
@@ -160,6 +186,7 @@ class HttpSupabaseGateway:
         )
         if res.status_code not in (200, 204):
             raise SupabaseGatewayError("Não foi possível atualizar a senha do usuário no Auth.", 400)
+        self._invalidate_tokens_for_user(user_id)
 
     def admin_delete_user(self, user_id: str) -> None:
         self._require_configured()
@@ -173,6 +200,8 @@ class HttpSupabaseGateway:
                 "Não foi possível excluir a conta (o usuário pode possuir vistorias ou registros de auditoria vinculados; desative a conta em Editar).",
                 409,
             )
+        self._invalidate_perfil_cache(user_id)
+        self._invalidate_tokens_for_user(user_id)
 
     def update_perfil_admin(self, user_id: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         self._require_configured()
@@ -185,6 +214,9 @@ class HttpSupabaseGateway:
         )
         if res.status_code not in (200, 204):
             raise SupabaseGatewayError("Não foi possível atualizar os dados do usuário.", 400)
+        self._invalidate_perfil_cache(user_id)
+        if fields.get("ativo") is False:
+            self._invalidate_tokens_for_user(user_id)
         rows = res.json() if res.content else []
         return rows[0] if rows else {"id": user_id, **fields}
 
@@ -223,6 +255,11 @@ class HttpSupabaseGateway:
 
     def get_perfil_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         self._require_configured()
+        agora = time.monotonic()
+        with self._cache_lock:
+            cached = self._perfil_cache.get(user_id)
+            if cached and cached[1] > agora:
+                return dict(cached[0])
         res = self._client.get(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(),
@@ -236,7 +273,11 @@ class HttpSupabaseGateway:
         if res.status_code != 200:
             raise SupabaseGatewayError("Erro ao consultar perfil por ID.", 502)
         rows = res.json()
-        return rows[0] if rows else None
+        if rows:
+            with self._cache_lock:
+                self._perfil_cache[user_id] = (dict(rows[0]), agora + self._cache_ttl_sec)
+            return dict(rows[0])
+        return None
 
     def update_perfil_lockout(
         self,
@@ -245,6 +286,7 @@ class HttpSupabaseGateway:
         bloqueado_ate: Optional[str],
     ) -> None:
         self._require_configured()
+        self._invalidate_perfil_cache(user_id)
         self._client.patch(
             f"{self.base_url}/rest/v1/perfis",
             headers=self._admin_headers(),
@@ -360,6 +402,30 @@ class HttpSupabaseGateway:
         if res.status_code not in (200, 204):
             raise SupabaseGatewayError("Erro ao finalizar status da solicitação.", 502)
 
+    def _send_audit_log(
+        self,
+        ator_id: Optional[str],
+        acao: str,
+        alvo: Optional[str],
+        ip: Optional[str],
+        detalhes: Dict[str, Any],
+    ) -> None:
+        try:
+            self._client.post(
+                f"{self.base_url}/rest/v1/audit_logs",
+                headers=self._admin_headers(),
+                json={
+                    "ator_id": ator_id,
+                    "acao": acao,
+                    "alvo": alvo,
+                    "ip": ip,
+                    "detalhes": detalhes,
+                },
+                timeout=6.0,
+            )
+        except httpx.HTTPError:
+            pass
+
     def insert_audit_log(
         self,
         ator_id: Optional[str],
@@ -370,21 +436,14 @@ class HttpSupabaseGateway:
     ) -> None:
         if not self.is_configured():
             return
-        try:
-            self._client.post(
-                f"{self.base_url}/rest/v1/audit_logs",
-                headers=self._admin_headers(),
-                json={
-                    "ator_id": ator_id,
-                    "acao": acao,
-                    "alvo": alvo,
-                    "ip": ip,
-                    "detalhes": detalhes or {},
-                },
-                timeout=6.0,
-            )
-        except httpx.HTTPError:
-            pass
+        self._audit_executor.submit(
+            self._send_audit_log,
+            ator_id,
+            acao,
+            alvo,
+            ip,
+            detalhes or {},
+        )
 
     def list_audit_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
         self._require_configured()
@@ -606,6 +665,96 @@ class HttpSupabaseGateway:
         )
         if res.status_code != 200:
             raise SupabaseGatewayError("Erro ao consultar fotos da vistoria.", 502)
+        return res.json()
+
+    def update_vistoria_status(
+        self,
+        vistoria_id: str,
+        status_handoff: str,
+        total_fotos: Optional[int] = None,
+    ) -> None:
+        self._require_configured()
+        body: Dict[str, Any] = {
+            "status_handoff": status_handoff,
+            "atualizado_em": datetime.now(timezone.utc).isoformat(),
+        }
+        if total_fotos is not None:
+            body["total_fotos"] = int(total_fotos)
+        res = self._client.patch(
+            f"{self.base_url}/rest/v1/vistorias_transito",
+            headers=self._admin_headers(),
+            params={"id": f"eq.{vistoria_id}"},
+            json=body,
+            timeout=8.0,
+        )
+        if res.status_code not in (200, 204):
+            raise SupabaseGatewayError("Falha ao atualizar status da vistoria.", 502)
+
+    def delete_fotos_temp_by_vistoria(self, vistoria_id: str) -> None:
+        self._require_configured()
+        res = self._client.delete(
+            f"{self.base_url}/rest/v1/vistorias_fotos_temp",
+            headers=self._admin_headers(),
+            params={"vistoria_id": f"eq.{vistoria_id}"},
+            timeout=8.0,
+        )
+        if res.status_code not in (200, 204):
+            raise SupabaseGatewayError("Falha ao remover metadados de fotos temporárias.", 502)
+
+    def exists_historico_by_vistoria(self, id_vistoria: str) -> bool:
+        self._require_configured()
+        res = self._client.get(
+            f"{self.base_url}/rest/v1/historico_achados",
+            headers=self._admin_headers(),
+            params={"id_vistoria": f"eq.{id_vistoria}", "select": "id", "limit": "1"},
+            timeout=8.0,
+        )
+        if res.status_code != 200:
+            return False
+        return len(res.json()) > 0
+
+    def insert_historico_achados(self, rows: List[Dict[str, Any]]) -> int:
+        self._require_configured()
+        if not rows:
+            return 0
+        res = self._client.post(
+            f"{self.base_url}/rest/v1/historico_achados",
+            headers=self._admin_headers(),
+            json=rows,
+            timeout=10.0,
+        )
+        if res.status_code not in (200, 201, 204):
+            raise SupabaseGatewayError("Falha ao gravar histórico permanente de achados.", 502)
+        return len(rows)
+
+    def list_historico_achados(
+        self,
+        concessao: Optional[str] = None,
+        modalidade: Optional[str] = None,
+        data_inicio: Optional[str] = None,
+        data_fim: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        self._require_configured()
+        params: List[tuple[str, str]] = [
+            ("select", "id,id_vistoria,concessao,modalidade,data_vistoria,local_ou_trecho,tipo_achado,categoria_nc,situacao"),
+            ("order", "data_vistoria.asc"),
+        ]
+        if concessao:
+            params.append(("concessao", f"eq.{concessao}"))
+        if modalidade:
+            params.append(("modalidade", f"eq.{modalidade}"))
+        if data_inicio:
+            params.append(("data_vistoria", f"gte.{data_inicio}"))
+        if data_fim:
+            params.append(("data_vistoria", f"lte.{data_fim}"))
+        res = self._client.get(
+            f"{self.base_url}/rest/v1/historico_achados",
+            headers=self._admin_headers(),
+            params=params,
+            timeout=10.0,
+        )
+        if res.status_code != 200:
+            raise SupabaseGatewayError("Erro ao consultar histórico analítico.", 502)
         return res.json()
 
 

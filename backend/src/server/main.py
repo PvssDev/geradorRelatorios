@@ -42,7 +42,10 @@ from services.data_service import gerar_planilha_excel_buffer
 from services.image_service import comprimir_imagem_para_word
 from services.monitoramento_service import processar_documento_monitoramento_anterior
 from server.routers.auth_router import router as auth_router
+from server.routers.historico_router import router as historico_router
 from server.routers.sync_router import router as sync_router
+from server.security_config import carregar_allowed_origins
+from server.security_headers import registrar_security_headers
 
 BASE_NC_OPTIONS = [
     "FI", "TTC", "TTL", "TLC", "TLL", "TRR", "J", "TB",
@@ -71,19 +74,7 @@ app = FastAPI(
     version="2.0.0",
 )
 
-DEFAULT_DEV_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:8081",
-    "http://127.0.0.1:8081",
-    "http://localhost:19006",
-]
-_raw_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
-ALLOWED_ORIGINS = (
-    [o.strip() for o in _raw_origins.split(",") if o.strip() and o.strip() != "*"]
-    if _raw_origins
-    else DEFAULT_DEV_ORIGINS
-)
+ALLOWED_ORIGINS = carregar_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,
@@ -92,6 +83,13 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
+
+registrar_security_headers(app)
+
+
+app.include_router(auth_router)
+app.include_router(sync_router)
+app.include_router(historico_router)
 
 
 @app.middleware("http")
