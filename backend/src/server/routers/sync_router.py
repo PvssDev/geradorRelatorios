@@ -4,12 +4,13 @@ para o Bucket Privado (vistorias-temp) com validação dos 6 Estados Regulatóri
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from core.rules.auth_sync_rules import (
     PRESIGN_EXPIRES_SECONDS,
+    extrair_registros_historico_achados,
     gerar_storage_key_segura,
     pode_aprovar_acessos,
     resolver_nome_unico_vistoria,
@@ -18,11 +19,13 @@ from core.rules.auth_sync_rules import (
 )
 from server.auth_sync_schemas import (
     AtribuirVistoriaRequestSchema,
+    ConcessaoLiteral,
+    ModalidadeLiteral,
     PresignUploadRequestSchema,
     PresignUploadResponseSchema,
     VistoriaSyncRequestSchema,
 )
-from server.dependencies.auth_deps import get_authenticated_perfil
+from server.dependencies.auth_deps import get_authenticated_perfil, verificar_origem_confiavel
 from services.supabase_gateway import HttpSupabaseGateway, SupabaseGatewayError, get_supabase_gateway
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
@@ -35,7 +38,7 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-@router.post("/presign-upload", response_model=PresignUploadResponseSchema)
+@router.post("/presign-upload", response_model=PresignUploadResponseSchema, dependencies=[Depends(verificar_origem_confiavel)])
 def emitir_presigned_upload(
     payload: PresignUploadRequestSchema,
     caller: Dict[str, Any] = Depends(get_authenticated_perfil),
@@ -71,7 +74,7 @@ def emitir_presigned_upload(
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
 
-@router.post("/vistorias")
+@router.post("/vistorias", dependencies=[Depends(verificar_origem_confiavel)])
 def sincronizar_vistoria_finalizada(
     payload: VistoriaSyncRequestSchema,
     request: Request,
@@ -185,12 +188,97 @@ def sincronizar_vistoria_finalizada(
 
 @router.get("/vistorias")
 def listar_vistorias_sincronizadas(
+    concessao: Optional[ConcessaoLiteral] = Query(default=None),
+    modalidade: Optional[ModalidadeLiteral] = Query(default=None),
     caller: Dict[str, Any] = Depends(get_authenticated_perfil),
     gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
 ):
     try:
-        rows = gateway.list_vistorias_transito()
+        autor_filter = None if pode_aprovar_acessos(caller["role"]) else str(caller["id"])
+        rows = gateway.list_vistorias_transito(autor_id_filter=autor_filter)
+        if concessao:
+            rows = [r for r in rows if r.get("concessao") == concessao]
+        if modalidade:
+            rows = [r for r in rows if r.get("modalidade") == modalidade]
         return {"vistorias": rows}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.get("/vistorias/{vistoria_id}")
+def obter_vistoria_para_editor(
+    vistoria_id: str,
+    marcar_revisao: bool = Query(default=False),
+    caller: Dict[str, Any] = Depends(get_authenticated_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    try:
+        vistoria = gateway.get_vistoria_transito(vistoria_id)
+        if not vistoria:
+            raise HTTPException(status_code=404, detail="Vistoria não encontrada.")
+        if str(vistoria.get("autor_id")) != str(caller["id"]) and not pode_aprovar_acessos(caller["role"]):
+            raise HTTPException(status_code=403, detail="Sem permissão para abrir esta vistoria.")
+
+        if marcar_revisao and vistoria.get("status_handoff") == "aguardando_web":
+            gateway.update_vistoria_status(vistoria_id, "em_revisao")
+            vistoria["status_handoff"] = "em_revisao"
+        return {"vistoria": vistoria}
+    except SupabaseGatewayError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.post("/vistorias/{vistoria_id}/concluir", dependencies=[Depends(verificar_origem_confiavel)])
+def concluir_e_expurgar_vistoria(
+    vistoria_id: str,
+    request: Request,
+    caller: Dict[str, Any] = Depends(get_authenticated_perfil),
+    gateway: HttpSupabaseGateway = Depends(get_supabase_gateway),
+):
+    """Grava achados anônimos no histórico permanente e expurga fotos temporárias (LGPD)."""
+    try:
+        vistoria = gateway.get_vistoria_transito(vistoria_id)
+        if not vistoria:
+            raise HTTPException(status_code=404, detail="Vistoria não encontrada.")
+        if str(vistoria.get("autor_id")) != str(caller["id"]) and not pode_aprovar_acessos(caller["role"]):
+            raise HTTPException(status_code=403, detail="Sem permissão para concluir esta vistoria.")
+
+        id_fisc = str(vistoria.get("id_fiscalizacao") or vistoria_id)
+        achados_inseridos = 0
+        if not gateway.exists_historico_by_vistoria(id_fisc):
+            registros = extrair_registros_historico_achados(
+                id_vistoria=id_fisc,
+                concessao=str(vistoria.get("concessao", "CRA")),
+                modalidade=str(vistoria.get("modalidade", "Fiscalização")),
+                payload_json=vistoria.get("payload_json") or {},
+                fallback_iso=str(vistoria.get("atualizado_em") or ""),
+            )
+            achados_inseridos = gateway.insert_historico_achados(registros)
+
+        fotos = gateway.list_fotos_temp_by_vistoria(vistoria_id)
+        storage_keys = [str(f.get("storage_key", "")) for f in fotos if f.get("storage_key")]
+        if storage_keys:
+            gateway.delete_storage_objects(storage_keys)
+        gateway.delete_fotos_temp_by_vistoria(vistoria_id)
+        gateway.update_vistoria_status(vistoria_id, "emitida", total_fotos=0)
+
+        gateway.insert_audit_log(
+            ator_id=str(caller["id"]),
+            acao="VISTORIA_CONCLUIDA_EXPURGADA",
+            alvo=vistoria_id,
+            ip=_client_ip(request),
+            detalhes={
+                "id_fiscalizacao": id_fisc,
+                "fotos_expurgadas": len(storage_keys),
+                "achados_historico": achados_inseridos,
+            },
+        )
+        return {
+            "ok": True,
+            "vistoria_id": vistoria_id,
+            "status_handoff": "emitida",
+            "fotos_expurgadas": len(storage_keys),
+            "achados_historico": achados_inseridos,
+        }
     except SupabaseGatewayError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 

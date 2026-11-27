@@ -17,9 +17,12 @@ import {
   RefreshCw,
   Palette,
   Zap,
+  LogOut,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useReportStore } from "../store/useReportStore";
+import { useAuthStore } from "../store/useAuthStore";
 import {
   solicitarPastaGeradorBD,
   salvarEstadoEmGeradorBD,
@@ -75,6 +78,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     nomePastaLocal,
     setPastaLocalStatus,
   } = useReportStore();
+  const perfil = useAuthStore((s) => s.perfil);
+  const logout = useAuthStore((s) => s.logout);
   const ws = getActiveWorkspace();
   const theme = getConcessionTheme(tipoRelatorio, categoriaRelatorio);
 
@@ -714,6 +719,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
             </div>
+          )}
+
+          {perfil && (
+            expanded ? (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-white/10 px-3 py-2.5 border border-white/10">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
+                    <UserCheck className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-white truncate">
+                      {perfil.nome_completo}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-white/65 truncate">
+                      {perfil.role} · @{perfil.usuario}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void logout()}
+                  title="Sair da conta"
+                  aria-label="Sair da conta"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-white/85 hover:bg-red-500/80 hover:text-white transition"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void logout()}
+                  title={`Sair (${perfil.usuario} · ${perfil.role})`}
+                  aria-label="Sair da conta"
+                  className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-white/85 hover:bg-red-500/80 hover:text-white transition"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            )
           )}
         </div>
       </aside>

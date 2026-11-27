@@ -21,6 +21,8 @@ import { useReportStore } from "./store/useReportStore";
 import { getConcessionTheme } from "./utils/concessionTheme";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useLockBodyScroll } from "./hooks/useLockBodyScroll";
+import { useAuthStore } from "./store/useAuthStore";
+import { LoginPage } from "./components/auth/LoginPage";
 
 const AppContent: React.FC = () => {
   const { hydrateBootstrapConfig, tipoRelatorio, categoriaRelatorio } =
@@ -148,8 +150,6 @@ const AppContent: React.FC = () => {
         backgroundColor: activeBgTheme.lightBg,
       }}
     >
-      <Toaster position="top-right" richColors closeButton />
-
       {/* Fundo Corporativo (No modo desempenho, usa fundo sólido leve sem radial-gradient) */}
       <div
         aria-hidden="true"
@@ -372,10 +372,31 @@ const AppContent: React.FC = () => {
   );
 };
 
-export const App: React.FC = () => (
-  <ErrorBoundary>
-    <AppContent />
-  </ErrorBoundary>
-);
+export const App: React.FC = () => {
+  const perfil = useAuthStore((s) => s.perfil);
+  const checkingSession = useAuthStore((s) => s.checkingSession);
+  const bootstrapSession = useAuthStore((s) => s.bootstrapSession);
+
+  useEffect(() => {
+    void bootstrapSession();
+  }, [bootstrapSession]);
+
+  return (
+    <ErrorBoundary>
+      <Toaster position="top-right" richColors closeButton />
+      {checkingSession ? (
+        <div className="min-h-screen w-full bg-[#071d36] flex items-center justify-center">
+          <div className="rounded-2xl bg-white/10 px-5 py-3 text-xs font-semibold text-white/85">
+            Verificando sessão segura...
+          </div>
+        </div>
+      ) : !perfil ? (
+        <LoginPage />
+      ) : (
+        <AppContent />
+      )}
+    </ErrorBoundary>
+  );
+};
 
 export default App;
