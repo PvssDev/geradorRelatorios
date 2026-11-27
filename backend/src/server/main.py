@@ -92,6 +92,19 @@ app.include_router(sync_router)
 app.include_router(historico_router)
 
 
+@app.middleware("http")
+async def add_owasp_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+app.include_router(auth_router)
+app.include_router(sync_router)
+
+
 def _sincronizar_map_siglas_global(
     custom_ncs: List[Dict[str, str]],
     custom_ncs_socicam: List[Dict[str, str]],
