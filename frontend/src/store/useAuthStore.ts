@@ -3,7 +3,6 @@ import {
   fetchCurrentUserApi,
   loginWebApi,
   logoutWebApi,
-  refreshSessionWebApi,
 } from "../services/authApi";
 import { LoginPayload, PerfilUsuario } from "../types/auth.types";
 
@@ -29,12 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ checkingSession: true });
     try {
       const atual = await fetchCurrentUserApi();
-      if (atual) {
-        set({ perfil: atual, checkingSession: false, erroAuth: null });
-        return;
-      }
-      const renovado = await refreshSessionWebApi();
-      set({ perfil: renovado, checkingSession: false, erroAuth: null });
+      set({ perfil: atual, checkingSession: false, erroAuth: null });
     } catch {
       set({ perfil: null, checkingSession: false });
     }

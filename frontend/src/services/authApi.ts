@@ -54,19 +54,27 @@ async function parseErrorDetail(res: Response, fallback: string): Promise<string
 
 async function authFetch(
   url: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  timeoutMs: number = 8000
 ): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    credentials: "include",
-    cache: "no-store",
-    redirect: "error",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-      ...(init.headers || {}),
-    },
-  });
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      credentials: "include",
+      cache: "no-store",
+      redirect: "error",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        ...(init.headers || {}),
+      },
+    });
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export async function loginWebApi(payload: LoginPayload): Promise<PerfilUsuario> {
@@ -89,7 +97,7 @@ export async function loginWebApi(payload: LoginPayload): Promise<PerfilUsuario>
 }
 
 export async function fetchCurrentUserApi(): Promise<PerfilUsuario | null> {
-  const res = await authFetch(AUTH_ENDPOINTS.me, { method: "GET" });
+  const res = await authFetch(AUTH_ENDPOINTS.me, { method: "GET" }, 3500);
   if (res.status === 401 || res.status === 403) {
     return null;
   }

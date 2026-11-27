@@ -9,6 +9,8 @@ export interface ConcessionTheme {
   borderLeft: string;
   lightBg: string;
   lightBorder: string;
+  pastelBg: string;
+  stripeColors: [string, string, string];
 }
 
 export function isPerformanceModeActive(): boolean {
@@ -35,6 +37,8 @@ export function getConcessionTheme(
       borderLeft: "border-l-[#2563eb]",
       lightBg: "#f0f6ff",
       lightBorder: "#bfdbfe",
+      pastelBg: "#e8f1ff",
+      stripeColors: ["#93c5fd", "#3b82f6", "#1d4ed8"],
     };
   }
   const isMonitoring = categoria === "Monitoramento";
@@ -51,6 +55,8 @@ export function getConcessionTheme(
           borderLeft: "border-l-[#ea580c]",
           lightBg: "#fff9f5",
           lightBorder: "#fed7aa",
+          pastelBg: "#fff2e6",
+          stripeColors: ["#fdba74", "#f97316", "#c2410c"],
         };
       case "CRC":
         return {
@@ -62,6 +68,8 @@ export function getConcessionTheme(
           borderLeft: "border-l-[#e11d48]",
           lightBg: "#fff5f6",
           lightBorder: "#fecdd3",
+          pastelBg: "#ffecf0",
+          stripeColors: ["#fda4af", "#f43f5e", "#be123c"],
         };
       case "CRA":
       default:
@@ -74,6 +82,8 @@ export function getConcessionTheme(
           borderLeft: "border-l-[#dc2626]",
           lightBg: "#fff5f5",
           lightBorder: "#fecaca",
+          pastelBg: "#ffeded",
+          stripeColors: ["#fca5a5", "#ef4444", "#b91c1c"],
         };
     }
   }
@@ -90,6 +100,8 @@ export function getConcessionTheme(
         borderLeft: "border-l-[#0095c4]",
         lightBg: "#f0f9ff",
         lightBorder: "#bae6fd",
+        pastelBg: "#e5f6fd",
+        stripeColors: ["#67e8f9", "#06b6d4", "#0369a1"],
       };
     case "SOCICAM":
       return {
@@ -101,6 +113,8 @@ export function getConcessionTheme(
         borderLeft: "border-l-[#5b52c6]",
         lightBg: "#f6f5ff",
         lightBorder: "#ddd6fe",
+        pastelBg: "#f1efff",
+        stripeColors: ["#c4b5fd", "#7c3aed", "#4338ca"],
       };
     case "CRA":
     default:
@@ -113,6 +127,8 @@ export function getConcessionTheme(
         borderLeft: "border-l-[#2563eb]",
         lightBg: "#f0f6ff",
         lightBorder: "#bfdbfe",
+        pastelBg: "#e8f1ff",
+        stripeColors: ["#93c5fd", "#3b82f6", "#1d4ed8"],
       };
   }
 }

@@ -8,7 +8,7 @@ tradução HTTP ⇄ caso de uso, cookies de sessão e rate limit por IP.
 import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Header, HTTPException, Query, Request, Response
 
 from server.auth_sync_schemas import (
     AdminAtualizarUsuarioRequestSchema,
@@ -118,9 +118,38 @@ def renovar_sessao(
 
 
 @router.get("/me")
-def perfil_sessao_atual(caller: Dict[str, Any] = Depends(get_current_user)):
-    """Restaura a sessão no F5 do Web sem expor JWT ao JavaScript."""
-    return {"perfil": serializar_perfil_publico(caller)}
+def perfil_sessao_atual(
+    request: Request,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(default=None),
+    access_cookie: Optional[str] = Cookie(default=None, alias=ACCESS_COOKIE_NAME),
+    refresh_cookie: Optional[str] = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
+    service: AuthService = Depends(get_auth_service),
+):
+    """Restaura a sessão no F5 em 1 única chamada (tenta refresh pelo cookie se access expirou)."""
+    token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    elif access_cookie:
+        token = access_cookie.strip()
+
+    if token:
+        try:
+            perfil = service.resolver_perfil_por_token(token)
+            return {"perfil": serializar_perfil_publico(perfil)}
+        except AuthError as exc:
+            if not refresh_cookie or exc.status_code == 403:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+        except SupabaseGatewayError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+    if refresh_cookie:
+        sessao = _executar(service.refresh, refresh_cookie, client_ip(request), background_tasks.add_task)
+        _aplicar_cookies_sessao(request, response, sessao)
+        return {"perfil": sessao.perfil}
+
+    raise HTTPException(status_code=401, detail="Autenticação obrigatória.")
 
 
 @router.post("/logout", dependencies=[Depends(verificar_origem_confiavel)])
